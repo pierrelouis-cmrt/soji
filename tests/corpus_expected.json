@@ -240,6 +240,52 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from balanced",
+   "selected": false
+  },
+  "early": null,
+  "group": "Package caches",
+  "hint": "homebrew-cache",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Caches/Homebrew/bootsnap",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from balanced",
+   "selected": false
+  },
+  "early": null,
+  "group": "Package caches",
+  "hint": "homebrew-cache",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Caches/Homebrew/downloads",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Cannot confirm application ownership or running state",
    "selected": false
   },
@@ -247,7 +293,32 @@
    "decision": "Cannot confirm application ownership or running state",
    "selected": false
   },
-  "bytes": 262144,
+  "bytes": 131072,
+  "careful": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "early": null,
+  "group": "Developer tool caches",
+  "hint": "jetbrains-caches",
+  "holds": [
+   "Cannot confirm application ownership or running state"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Caches/JetBrains/IntelliJIdea2025.1/caches",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "bytes": 131072,
   "careful": {
    "decision": "Cannot confirm application ownership or running state",
    "selected": false
@@ -259,7 +330,7 @@
    "Cannot confirm application ownership or running state"
   ],
   "modeHolds": {},
-  "path": "~/Library/Caches/Homebrew",
+  "path": "~/Library/Caches/JetBrains/IntelliJIdea2025.1/log",
   "rank": null
  },
  {
@@ -339,27 +410,81 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Cannot confirm application ownership or running state",
-   "selected": false
+   "decision": "Idle 90.0 d; eligible from aggressive",
+   "selected": true
   },
   "balanced": {
-   "decision": "Cannot confirm application ownership or running state",
+   "decision": "Eligible from aggressive",
    "selected": false
   },
-  "bytes": 393216,
+  "bytes": 131072,
   "careful": {
-   "decision": "Cannot confirm application ownership or running state",
+   "decision": "Retained newest version in product group",
    "selected": false
   },
   "early": null,
-  "group": "App caches",
-  "hint": "user-caches",
-  "holds": [
-   "Cannot confirm application ownership or running state"
-  ],
-  "modeHolds": {},
-  "path": "~/Library/Caches/ms-playwright",
-  "rank": null
+  "group": "Toolchains and SDKs",
+  "hint": "playwright-browsers",
+  "holds": [],
+  "modeHolds": {
+   "careful": "Retained newest version in product group"
+  },
+  "path": "~/Library/Caches/ms-playwright/chromium-1100",
+  "rank": 1
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "playwright-browsers",
+  "holds": [],
+  "modeHolds": {
+   "aggressive": "Retained newest version in product group",
+   "balanced": "Retained newest version in product group",
+   "careful": "Retained newest version in product group"
+  },
+  "path": "~/Library/Caches/ms-playwright/chromium-1200",
+  "rank": 0
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Retained newest version in product group",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "playwright-browsers",
+  "holds": [],
+  "modeHolds": {
+   "aggressive": "Retained newest version in product group",
+   "balanced": "Retained newest version in product group",
+   "careful": "Retained newest version in product group"
+  },
+  "path": "~/Library/Caches/ms-playwright/firefox-1400",
+  "rank": 0
  },
  {
   "action": "official-command",

@@ -161,6 +161,25 @@ class Finding:
 
 
 
+# Rules that make a matched folder one cleanup unit (retention family, device,
+# worktree, workspace); such rows are never split around nested hints.
+UNIT_RULES = ('keepNewest', 'simulatorDevice', 'deviceBuild', 'early', 'workspaceMissing')
+
+
+def generic_container(match) -> bool:
+    """A selectable catch-all such as ~/Library/Caches/*.
+
+    Reconstruction choice: when a more specific hint matches inside one of
+    these (Homebrew, Playwright, Cypress, browser caches...), the frontier
+    descends so the specific rule applies, and the unmatched remainder keeps
+    the catch-all classification. Review-only parents already descend.
+    """
+    if not match:return False
+    hint,pattern=match
+    return (pattern.rstrip('/').rsplit('/',1)[-1]=='*' and not hint.get('listOnly')
+            and hint['tier']!='userData' and not any(k in (hint.get('rule') or {}) for k in UNIT_RULES))
+
+
 class Catalog:
     def __init__(self, home: str):
         self.home = home
@@ -205,7 +224,8 @@ class Catalog:
 
 
 class Scanner:
-    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0):
+    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0, inherit_hint=None):
+        self.inherit_hint=inherit_hint
         self.home=os.path.realpath(home or str(Path.home()))
         cleaned=sorted(set(os.path.realpath(os.path.expanduser(p)) for p in roots))
         self.roots=[p for p in cleaned if not any(p != q and within(p,q) for q in cleaned)]
@@ -333,8 +353,21 @@ class Scanner:
         i=bisect.bisect_left(self.open_paths,path.rstrip('/')+'/')
         return i<len(self.open_paths) and within(self.open_paths[i],path)
 
-    def classify(self,node: Node) -> Finding:
-        match=self.catalog.match(node.path)
+    def inherited_match(self,path: str):
+        """Re-establish `inherit_hint` for a root split out of a catch-all row.
+
+        Only the hint the caller already holds (a plan item) is accepted, and
+        only when the nearest matched ancestor is that same generic hint, so a
+        root never acquires a classification it did not have when planned.
+        """
+        if not self.inherit_hint or self.catalog.match(path):return None
+        for parent in Path(path).parents:
+            match=self.catalog.match(str(parent))
+            if match:return match if match[0]['id']==self.inherit_hint and generic_container(match) else None
+        return None
+
+    def classify(self,node: Node,match=None) -> Finding:
+        match=match or self.catalog.match(node.path)
         if match:
             hint,pattern=match
             f=Finding(node.path,node.size,node.apparent,node.files,node.newest,hint['group'],hint['label'],hint['id'],hint['tier'],hint.get('comesBack','gone'),hint.get('rule',{}),hint.get('smartRule',''),hint.get('listOnly',False),matched_pattern=pattern)
@@ -395,29 +428,33 @@ class Scanner:
         self.specialized=SpecializedRules(self,self.apps,self.activity,self.tools) if self.context else None
         # Every row is measured once. Select a non-overlapping frontier: known
         # hint roots first; otherwise recurse to expose meaningful children.
-        known_ancestors=set()
+        below=collections.defaultdict(set)  # ancestor -> hint ids matched beneath it
         for path,n in self.nodes.items():
-            if self.catalog.match(path):
+            match=self.catalog.match(path)
+            if match:
                 for parent in Path(path).parents:
-                    if str(parent) in known_ancestors: break
-                    known_ancestors.add(str(parent))
-        def frontier(path,level=0):
+                    ids=below[str(parent)]
+                    if match[0]['id'] in ids: break
+                    ids.add(match[0]['id'])
+        known_ancestors=below
+        def frontier(path,level=0,inherited=None):
             n=self.nodes[path]
             if n.size<self.min_bytes and not n.reason:return
-            match=self.catalog.match(path)
+            match=self.catalog.match(path) or inherited
             descend_review=bool(match and (match[0].get('listOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash'))
-            if (match and not descend_review) or not n.children or n.reason:
-                self.findings.append(self.classify(n));return
+            split=bool(not descend_review and generic_container(match) and below.get(path,set())-{match[0]['id']})
+            if (match and not descend_review and not split) or not n.children or n.reason:
+                self.findings.append(self.classify(n,match));return
             if level>=4 and n.size<500_000_000 and path not in known_ancestors:
-                self.findings.append(self.classify(n));return
+                self.findings.append(self.classify(n,match));return
             if n.children:
                 own=n.size-sum(self.nodes[c].size for c in n.children)
                 if own>=self.min_bytes:
                     direct=dataclasses.replace(n,size=own,apparent=own,children=[],directory=False)
                     f=self.classify(direct);f.label='Directory metadata';f.group='Other files';self.findings.append(f)
-                for c in n.children:frontier(c,level+1)
+                for c in n.children:frontier(c,level+1,match if split else None)
         for root in self.roots:
-            if root in self.nodes:frontier(root)
+            if root in self.nodes:frontier(root,0,self.inherited_match(root))
         self.findings.sort(key=lambda f:f.size,reverse=True)
         from .catalogs import expand_catalogs
         self.findings=expand_catalogs(self)

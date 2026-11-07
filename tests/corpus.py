@@ -79,6 +79,8 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     # Specific hints nested under the generic ~/Library/Caches/* hint.
     ('Library/Caches/Homebrew/downloads/bottle.tar.gz', PAYLOAD, 10),
     ('Library/Caches/Homebrew/bootsnap/blob', PAYLOAD, 10),
+    ('Library/Caches/JetBrains/IntelliJIdea2025.1/caches/blob', PAYLOAD, 10),
+    ('Library/Caches/JetBrains/IntelliJIdea2025.1/log/blob', PAYLOAD, 10),
     # Xcode DerivedData with present/missing workspaces.
     ('Library/Developer/Xcode/DerivedData/Present-abc/Build/blob', PAYLOAD, 20),
     ('Library/Developer/Xcode/DerivedData/Missing-def/Build/blob', PAYLOAD, 20),

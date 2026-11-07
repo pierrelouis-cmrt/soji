@@ -105,7 +105,7 @@ class Cleaner:
             from .nativeplans import verify_native
             verify_native(item)
             return identity
-        scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000)
+        scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None)
         measure_root=path
         if item.get('finding',{}).get('rule',{}).get('projectUntouchedDays'):
             measure_root=scan.project_for(path) or path

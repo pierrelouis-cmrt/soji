@@ -42,6 +42,14 @@ Files: `tests/`, `scripts/native_integration.py`, `research/`.
 
 Done when the current release can be reproduced and a short list of observed differences replaces guesses. This is the best next step for measuring similarity; a percentage is not justified today.
 
+**Status (7 Nov 2026):** items 1–2 done (initial commit `fba8e03`). Item 3 is done on our side: `tests/corpus.py` builds the synthetic home, scans it hermetically (processes, open files, `/Applications`, simctl/devicectl and the native helper are pinned; Git runs for real with `GIT_CEILING_DIRECTORIES`), and `tests/test_corpus.py` diffs the rows against `tests/corpus_expected.json`. `python3 scripts/corpus_export.py --keep DIR` leaves the fake home for the original app; normalize its results to the same row shape and use `--diff`. That original-app run is still outstanding. After an intentional behavior change, run `SOJI_UPDATE_CORPUS=1 python3 -m unittest tests.test_corpus` and review the golden diff in the commit.
+
+What the corpus found on our side:
+
+- **Fixed:** the generic `~/Library/Caches/*` hint (`user-caches`) used to emit one row for its whole folder. That hid 13 more specific hints beneath it: Homebrew, Playwright, Cypress, JetBrains, Chrome/Firefox, Poetry, Deno, Sparkle and others. Homebrew therefore held on "Cannot confirm application ownership", and Playwright lost version retention. The frontier now splits a selectable `/*` catch-all without unit rules (`engine.generic_container`) when a different hint matches below it. Unmatched remainder rows keep the catch-all hint, and cleanup revalidation re-establishes only the plan item's own hint (`Scanner(inherit_hint=...)`). Roots never inherit otherwise: an earlier draft let a home under `/private/var/folders/*/*/T/` inherit `temp-folders`, which made `~/Documents` selectable. Do not reintroduce root inheritance.
+- **Open (item 3 below):** a Claude session with `cwd` at a project root does not hold that project's `.venv` or `node_modules`, because activity lookup only checks descendants. See `~/code/py-agent/.venv` in the golden.
+- **Open:** worktrees under `<project>/.claude/worktrees` count toward the parent project's idle clock (`~/code/clean-web/node_modules` reads 10 days, not 60). This is probably right, but it is unverified.
+
 ### 2. Close the specialized-rule gaps that affect selection
 
 Files: `specialized.py`, `levels.py`, `engine.py`; evidence: `research/rules-recovery.md`, `mode-recovery.md`.
@@ -95,7 +103,7 @@ python3 dist/soji.pyz --version
 
 `build_release.py` requires Swift/Xcode Command Line Tools and builds ARM64 + x86-64. The integration script uses temporary fixtures, actual local FSEvents and a fake local agent/MCP subprocess; it makes no model call. Do not interpret these checks as destructive-service or provider equivalence validation.
 
-Latest completed checks before this handoff: default suite **167 tests, passed, 2 opt-in native tests skipped**; cleanup selector integration **22 focused tests passed**; rebuilt helper and real FSEvents/fake-agent integration passed (full → unchanged incremental → changed subtree → unchanged incremental); portable app reports version **0.3.0**. Native opt-in result is recorded in `research/validation-0.3.md`.
+Latest completed checks: default suite **175 tests passed, 2 opt-in native tests skipped** (includes corpus golden and generic-split tests); `scripts/native_integration.py` passed after the split change. The `dist/` release predates the split change; rebuild with `build_release.py` before shipping. Earlier handoff checks: cleanup selector integration **22 focused tests passed**; rebuilt helper and real FSEvents/fake-agent integration passed (full → unchanged incremental → changed subtree → unchanged incremental); portable app reports version **0.3.0**. Native opt-in result is recorded in `research/validation-0.3.md`.
 
 Releases: `dist/Soji-0.3.0.zip`, `dist/Soji.zip`, `dist/soji.pyz`. Research extraction scripts expect the external original evidence paths noted in each report; bounded evidence slices are included in the release. Tests alone do not demonstrate equality with Sōji's private source.
 
