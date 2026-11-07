@@ -24,7 +24,8 @@
 | Outside link to a single-link file | `index.reconcile` | Caught by the weekly full check; estimates only |
 | Native busy filter, settle measurement | `SojiNative.swift`, `nativeplans.py` | Conservative holds |
 | System receipts, uninstalled co-owners | `uninstall.py` | Excluded |
-| `soji --ai` refinements | `agent.py` | Per-row idle thresholds; grouping for very large briefings |
+| `soji --ai` refinements | `agent.py` | Per-row idle thresholds; grouping for very large briefings. Real Claude Code run on `~/Library/Caches`: 7 turns, about $0.30, 3 rows / 350 MB accepted, Playwright version ambiguity sent to review |
+| Retention by timestamp vs. version | `specialized.py` | Recovered rule ranks by timestamp; a newer version with an older mtime is the one removed (seen with Playwright 1248 vs 1234) |
 | Hermetic uninstall tests | `tests/` | Older tests call real `codesign`/`pkgutil` on fake apps |
 
 ## Validation

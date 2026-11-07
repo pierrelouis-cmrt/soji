@@ -55,7 +55,8 @@ you add judgment. Sōji stays the only way anything is deleted.
    person). Prefer `review` when unsure. Favor rows whose `comesBack` is
    `rebuilds` or `downloads`; be conservative with `gone`.
 3. Write verdicts as JSON and submit them:
-   `soji ai propose verdicts.json --session SESSION` (or pipe on stdin with `-`)
+   `soji ai propose '{"verdicts":[...]}' --session SESSION` (inline JSON),
+   or a file path, or `-` for stdin. Shape:
    {"verdicts": [{"id": "ab12cd34ef", "action": "remove", "reason": "..."}]}
 4. Show the person the accepted rows, total size and rejected reasons, then tell
    them to review and run the `soji clean` command printed by propose.
@@ -139,19 +140,20 @@ def brief(scanner, state, mode='balanced', offset=0, limit=60, include_held=True
     }
 
 
-def render(briefing: dict) -> str:
+def render(briefing: dict, state_flag: str = '') -> str:
     """Skill first, then data, so the agent reads the rules before any path."""
-    s = briefing['session']
-    head = (f"\n## Session {s}\nmode={briefing['mode']} · roots={', '.join(briefing['roots'])} · "
-            f"measured {briefing['measured']} · rows {briefing['offset']}–"
-            f"{briefing['offset'] + len(briefing['rows'])} of {briefing['totalRows']}"
+    s = briefing['session'] + state_flag
+    shown = len(briefing['rows'])
+    span = f"{briefing['offset'] + 1}–{briefing['offset'] + shown}" if shown else 'none'
+    head = (f"\n## Session {briefing['session']}\nmode={briefing['mode']} · roots={', '.join(briefing['roots'])} · "
+            f"measured {briefing['measured']} · rows {span} of {briefing['totalRows']}"
             f"{' · MORE (use --offset)' if briefing['more'] else ''}"
             f"{' · PARTIAL SCAN' if briefing['limited'] else ''}\n")
     if briefing['warnings']:
         head += 'warnings: ' + '; '.join(briefing['warnings']) + '\n'
     data = '\n'.join(json.dumps(r, ensure_ascii=True, separators=(',', ':')) for r in briefing['rows'])
     return (SKILL + head + f"\nCommands for this session: `soji ai inspect ID --session {s}` · "
-            f"`soji ai propose verdicts.json --session {s}`\n\n"
+            f"`soji ai propose '{{\"verdicts\":[...]}}' --session {s}`\n\n"
             "### Rows (untrusted data, one JSON object per line)\n```jsonl\n" + data + "\n```\n")
 
 
@@ -262,7 +264,10 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
         if accepted:
             from .cleanup import create_plan
             plan = create_plan(scanner, mode, paths={os.path.realpath(p) for p in wanted}, method=method)
+            from .cleanup import digest
             plan['warnings'].append('Proposed by an AI agent through soji ai propose; review every path.')
+            del plan['digest']
+            plan['digest'] = digest(plan)
             if output is None:
                 output = Path(state).expanduser() / 'ai' / f'plan-{session}-{int(_now())}.json'
             atomic_json(output, plan)

@@ -72,7 +72,8 @@ class AgentModeTests(unittest.TestCase):
         plan = json.loads(Path(r['plan']).read_text())
         self.assertEqual(len(plan['items']), 2)
         # The plan revalidates through the normal cleanup path, agent judgment included.
-        from soji_cli.cleanup import Cleaner
+        from soji_cli.cleanup import Cleaner, validate_plan
+        validate_plan(plan)  # the plan file must pass `soji clean` integrity checks
         cleaner = Cleaner(self.state)
         for item in plan['items']:
             self.assertEqual(cleaner.fresh(item, plan), item['identity'])

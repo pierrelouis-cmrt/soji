@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shlex
 import signal
 import sys
 from .engine import Scanner, MODES, human
@@ -207,15 +208,17 @@ def ai_command(p,argv):
         scanner=make(roots,args.home,args.protect+[args.state],args.recent_activity_hours);scanner.run()
         if scanner.error:raise ValueError(scanner.error)
         result=agent.brief(scanner,args.state,args.mode,args.offset,args.limit,include_held=not args.hide_held)
-        if args.json:emit(result)
-        else:sys.stdout.write(agent.render(result))
+        if args.json:emit(result);return 0
+        default_state=str(Path.home()/'Library/Application Support/Soji')
+        sys.stdout.write(agent.render(result,'' if args.state==default_state else ' --state '+shlex.quote(args.state)))
         return 0
     session=args.session or agent.latest_session(args.state)
     if args.operation=='inspect':
         if len(args.targets)!=1:p.error('inspect needs exactly one row id')
         emit(agent.inspect(args.state,session,args.targets[0]));return 0
     if len(args.targets)!=1:p.error('propose needs a verdicts file or -')
-    raw=sys.stdin.read() if args.targets[0]=='-' else Path(args.targets[0]).read_text()
+    source=args.targets[0]
+    raw=sys.stdin.read() if source=='-' else source if source.lstrip().startswith(('{','[')) else Path(source).read_text()
     try:value=json.loads(raw)
     except ValueError:raise ValueError('Verdicts are not valid JSON')
     factory=lambda data:make(data['roots'],data['home'],data['protected'],data['recentActivityHours'])

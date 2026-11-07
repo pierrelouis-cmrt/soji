@@ -257,6 +257,21 @@ class Cleaner:
         return {'entries':entries,'completed':sum(e['status']=='done' for e in entries),
                 'partial':sum(e['status']=='partial' for e in entries),
                 'failed':sum(e['status']!='done' for e in entries)}
+    def system_trash(self,rec,entry,fd,name,original):
+        """FileManager.trashItem via the native helper, bound to the verified identity."""
+        from .platform import native
+        rec['trashApi']='FileManager.trashItem';self.append(entry)
+        again=os.stat(name,dir_fd=fd,follow_symlinks=False)
+        if (again.st_dev,again.st_ino)!=(original.st_dev,original.st_ino):raise ValueError('Target changed before operation')
+        result=native('trash',rec['path'])
+        if not isinstance(result,dict) or not result.get('trashedTo'):
+            raise ValueError('System Trash failed: '+str(result.get('error') if isinstance(result,dict) else result))
+        rec['trashedTo']=result['trashedTo'];self.append(entry)
+        trashed=file_identity(rec['trashedTo'])
+        if (trashed['device'],trashed['inode'])!=(original.st_dev,original.st_ino):
+            raise ValueError('Trashed item identity differs; inspect '+rec['trashedTo'])
+        rec['trashedIdentity']=trashed;rec['method']='trash';rec['status']='done'
+        return True
     def move(self,rec,tag,entry,plan,want_permanent):
         """Identity-bound Trash move or staged removal of rec['path'].
 
@@ -282,7 +297,15 @@ class Cleaner:
                 trash=Path(self.trash_directory or Path(plan['home'])/'.Trash')
                 trash.mkdir(mode=0o700,parents=True,exist_ok=True)
                 if trash.is_symlink():raise ValueError('Trash cannot be a symlink')
-                tfd=os.open(trash,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+                try:tfd=os.open(trash,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+                except PermissionError:
+                    # macOS privacy protection denies opening ~/.Trash without Full
+                    # Disk Access; the system Trash API is still permitted.
+                    if self.trash_directory:raise
+                    try:self.system_trash(rec,entry,fd,name,original)
+                    except Exception:
+                        moved=bool(rec.get('trashedTo'));raise
+                    return True
                 try:
                     if os.fstat(tfd).st_dev!=original.st_dev:raise ValueError('Cross-volume Trash move needs native-volume support; no copy/delete fallback')
                     dest=name+'.soji-'+tag;rec['trashedTo']=str(trash/dest);self.append(entry)
@@ -374,19 +397,31 @@ class Cleaner:
         e.update(status='restored',restoredAt=time.time());self.append(e);return e
     def restore(self,e):
         source=e['trashedTo'];dest=e['path']
+        # macOS stamps Trash items with xattrs (com.apple.macl), bumping ctime only.
+        def same(current):
+            want=dict(e.get('trashedIdentity') or {});current=dict(current)
+            want.pop('ctimeNs',None);current.pop('ctimeNs',None)
+            return bool(want) and current==want
         if os.path.lexists(dest):raise ValueError('Original destination exists; refusing overwrite')
-        if file_identity(source)!=e.get('trashedIdentity'):raise ValueError('Trashed item changed')
-        sfd=parent_fd(source);dfd=parent_fd(dest)
+        if not same(file_identity(source)):raise ValueError('Trashed item changed')
+        # ~/.Trash itself may not be openable (macOS privacy protection); then
+        # address the source by absolute path while keeping the destination fd.
+        try:sfd=parent_fd(source);sname=Path(source).name
+        except PermissionError:sfd=None;sname=source
+        dfd=parent_fd(dest)
         try:
             parent=os.fstat(dfd);expected=e['identity']
             if (parent.st_dev,parent.st_ino)!=(expected.get('parentDevice'),expected.get('parentInode')):
                 raise ValueError('Original parent changed; refusing restore')
-            if file_identity(source)!=e.get('trashedIdentity'):raise ValueError('Trashed item changed before restore')
+            if not same(file_identity(source)):raise ValueError('Trashed item changed before restore')
             # Reserve the destination atomically; macOS renameatx_np offers
             # RENAME_EXCL, used rather than a check-then-overwrite rename.
             import ctypes
             libc=ctypes.CDLL(None,use_errno=True)
             if hasattr(libc,'renameatx_np'):
-                if libc.renameatx_np(sfd,os.fsencode(Path(source).name),dfd,os.fsencode(Path(dest).name),4)!=0:raise OSError(ctypes.get_errno(),'Exclusive restore failed')
+                AT_FDCWD=-2
+                if libc.renameatx_np(AT_FDCWD if sfd is None else sfd,os.fsencode(sname),dfd,os.fsencode(Path(dest).name),4)!=0:raise OSError(ctypes.get_errno(),'Exclusive restore failed')
             else:raise ValueError('Exclusive directory restore requires macOS renameatx_np')
-        finally:os.close(sfd);os.close(dfd)
+        finally:
+            if sfd is not None:os.close(sfd)
+            os.close(dfd)

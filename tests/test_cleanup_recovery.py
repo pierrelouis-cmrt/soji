@@ -142,3 +142,36 @@ class PolicyTests(unittest.TestCase):
         p=result['plan'];self.assertEqual(len(p['items']),1);self.assertEqual(p['routinePermit']['minItemBytes'],50);validate_plan(p)
 
 if __name__=='__main__':unittest.main()
+
+
+class SystemTrashFallback(unittest.TestCase):
+    """~/.Trash cannot be opened under macOS privacy protection: use the system API."""
+    def setUp(self):
+        import tempfile
+        self.temp=tempfile.TemporaryDirectory();self.base=Path(self.temp.name).resolve()
+        self.home=self.base/'home';(self.home/'.Trash').mkdir(parents=True)
+        self.target=self.home/'cache';self.target.mkdir();(self.target/'blob').write_bytes(b'x'*4096)
+    def tearDown(self):self.temp.cleanup()
+    def run_move(self,native_result):
+        from soji_cli.cleanup import Cleaner,file_identity
+        cleaner=Cleaner(self.base/'state')
+        rec={'path':str(self.target),'identity':file_identity(self.target),'status':'prepared'}
+        entry=dict(rec,id='e1')
+        real_open=os.open
+        def deny(path,*a,**k):
+            if str(path).endswith('.Trash'):raise PermissionError(1,'Operation not permitted',str(path))
+            return real_open(path,*a,**k)
+        def fake_native(op,path):
+            dest=self.home/'.Trash'/'cache';os.rename(path,dest)
+            return native_result(dest)
+        with patch('os.open',side_effect=deny),patch('soji_cli.platform.native',side_effect=fake_native):
+            ok=cleaner.move(rec,'t',entry,{'home':str(self.home)},False)
+        return ok,rec
+    def test_fallback_moves_and_records_identity(self):
+        ok,rec=self.run_move(lambda dest:{'trashedTo':str(dest)})
+        self.assertTrue(ok);self.assertEqual(rec['status'],'done');self.assertEqual(rec['trashApi'],'FileManager.trashItem')
+        self.assertEqual(rec['trashedIdentity']['inode'],rec['identity']['inode'])
+        self.assertTrue((self.home/'.Trash/cache/blob').exists())
+    def test_helper_error_is_failure_and_nothing_claimed(self):
+        ok,rec=self.run_move(lambda dest:(os.rename(dest,self.target),{'error':'denied'})[1])
+        self.assertFalse(ok);self.assertEqual(rec['status'],'failed');self.assertIn('System Trash failed',rec['error'])
