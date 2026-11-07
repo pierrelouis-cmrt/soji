@@ -120,7 +120,7 @@ def main():
     p.add_argument('--dry-run',action='store_true',help='Prepare AI prompt/config without launching an agent')
     p.add_argument('--auto-settings',help='Auto-mode configuration JSON');p.add_argument('--apply',action='store_true');p.add_argument('--permanent',action='store_true')
     p.add_argument('--method',choices=['trash','permanent'],default='trash');p.add_argument('--interval',type=float,default=5)
-    p.add_argument('--version',action='version',version='Sōji reconstruction 0.3.0')
+    p.add_argument('--version',action='version',version='Sōji 0.4.0')
     args=p.parse_args(argv)
     if args.max_files<1 or args.max_seconds<=0 or args.min_mb<0:p.error('Invalid scan limits')
     if not math.isfinite(args.recent_activity_hours) or args.recent_activity_hours<0:p.error('Invalid recent activity hours')

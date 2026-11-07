@@ -8,7 +8,7 @@ import zipapp
 import zipfile
 BASE=Path(__file__).resolve().parent
 OUT=BASE/'dist';OUT.mkdir(exist_ok=True)
-VERSION='0.3.0'
+VERSION='0.4.0'
 with tempfile.TemporaryDirectory(prefix='soji-release-') as tmp:
     temp=Path(tmp)
     binaries=[]
@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='soji-release-') as tmp:
     stage=temp/'Sōji';stage.mkdir()
     for name in ['soji_cli','tests','native','scripts','research']:
         shutil.copytree(BASE/name,stage/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc','integration-*','tmp*'))
-    for name in ['soji','Launch Sōji.command','entrypoint.py','README.md','FIDELITY.md','RECONSTRUCTION_RECAP.md','build_release.py','NEXT_STEPS.md']:
+    for name in ['soji','Launch Sōji.command','entrypoint.py','README.md','FIDELITY.md','build_release.py','NEXT_STEPS.md']:
         shutil.copy2(BASE/name,stage/name)
     payload=temp/'payload';payload.mkdir();shutil.copytree(stage/'soji_cli',payload/'soji_cli')
     (payload/'__main__.py').write_text('from soji_cli.__main__ import entry\nraise SystemExit(entry())\n')

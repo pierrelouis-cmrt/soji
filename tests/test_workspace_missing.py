@@ -126,6 +126,8 @@ class WorkspaceMissingScan(unittest.TestCase):
         self.assertEqual(self.picks(rows['Missing']), [False, False, False])
 
     def test_explicit_judgment_takes_precedence(self):
+        """Confirmed (0x100678ec0, CleanupLevels.apply): with an agent judgement the
+        rule level is discarded; the judgement's levels decide by idle time."""
         self.project('Missing', 20, self.home / 'code/gone')
         rows = self.scan()
         f = rows['Missing']['finding']
