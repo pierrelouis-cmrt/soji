@@ -1,0 +1,916 @@
+[
+ {
+  "action": "empty-trash",
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Trash",
+  "hint": "trash-item",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.Trash/junk.bin",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 2.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 2.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from balanced",
+   "selected": false
+  },
+  "early": null,
+  "group": "Agent and editor history",
+  "hint": "claude-sessions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.claude/projects/-code-py-agent/session.jsonl",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 100.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "nvm-versions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.nvm/versions/node/v18.0.0",
+  "rank": 2
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Active version: ~/.nvm/alias/default",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Active version: ~/.nvm/alias/default",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Active version: ~/.nvm/alias/default",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "nvm-versions",
+  "holds": [
+   "Active version: ~/.nvm/alias/default"
+  ],
+  "modeHolds": {
+   "careful": "Retained newest version in all group"
+  },
+  "path": "~/.nvm/versions/node/v20.1.0",
+  "rank": 1
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Retained newest version in all group",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Retained newest version in all group",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Retained newest version in all group",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "nvm-versions",
+  "holds": [],
+  "modeHolds": {
+   "aggressive": "Retained newest version in all group",
+   "balanced": "Retained newest version in all group",
+   "careful": "Retained newest version in all group"
+  },
+  "path": "~/.nvm/versions/node/v22.3.0",
+  "rank": 0
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other files",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Documents/report.pdf",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 10.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Idle 240.0 h; rule needs 336 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Downloads and installers",
+  "hint": "unfinished-downloads",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Downloads/movie.part",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Downloads and installers",
+  "hint": "downloads-installers",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Downloads/new-installer.dmg",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Downloads and installers",
+  "hint": "downloads-installers",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Downloads/old-installer.dmg",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Downloads and installers",
+  "hint": "downloads-archives",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Downloads/photos.zip",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "bytes": 262144,
+  "careful": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "early": null,
+  "group": "App caches",
+  "hint": "user-caches",
+  "holds": [
+   "Cannot confirm application ownership or running state"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Caches/Homebrew",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Changed or created within the last 5 minutes; Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Changed or created within the last 5 minutes; Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Changed or created within the last 5 minutes; Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "early": null,
+  "group": "App caches",
+  "hint": "user-caches",
+  "holds": [
+   "Cannot confirm application ownership or running state",
+   "Changed or created within the last 5 minutes"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Caches/com.example.Fresh",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 10.0 d; eligible from careful",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 10.0 d; eligible from careful",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Idle 10.0 d; eligible from careful",
+   "selected": true
+  },
+  "early": null,
+  "group": "App caches",
+  "hint": "user-caches",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Caches/com.example.Known",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "early": null,
+  "group": "App caches",
+  "hint": "user-caches",
+  "holds": [
+   "Cannot confirm application ownership or running state"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Caches/com.example.Unknown",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "bytes": 393216,
+  "careful": {
+   "decision": "Cannot confirm application ownership or running state",
+   "selected": false
+  },
+  "early": null,
+  "group": "App caches",
+  "hint": "user-caches",
+  "holds": [
+   "Cannot confirm application ownership or running state"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Caches/ms-playwright",
+  "rank": null
+ },
+ {
+  "action": "official-command",
+  "aggressive": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 10.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from balanced",
+   "selected": false
+  },
+  "early": null,
+  "group": "Package caches",
+  "hint": "pip-cache",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Caches/pip",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Simulator is not shut down",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Simulator is not shut down",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Simulator is not shut down",
+   "selected": false
+  },
+  "early": null,
+  "group": "Simulators and emulators",
+  "hint": "simulator-devices",
+  "holds": [
+   "Simulator is not shut down"
+  ],
+  "modeHolds": {},
+  "path": "~/Library/Developer/CoreSimulator/Devices/11111111-1111-1111-1111-111111111111",
+  "rank": null
+ },
+ {
+  "action": "simulator-device",
+  "aggressive": {
+   "decision": "Idle 30.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 30.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from balanced",
+   "selected": false
+  },
+  "early": null,
+  "group": "Simulators and emulators",
+  "hint": "simulator-devices",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/CoreSimulator/Devices/22222222-2222-2222-2222-222222222222",
+  "rank": null
+ },
+ {
+  "action": "simulator-device",
+  "aggressive": {
+   "decision": "Idle 30.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "early": null,
+  "group": "Simulators and emulators",
+  "hint": "simulator-devices",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/CoreSimulator/Devices/33333333-3333-3333-3333-333333333333",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 30.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "early": null,
+  "group": "Simulators and emulators",
+  "hint": "simulator-devices",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/CoreSimulator/Devices/44444444-4444-4444-4444-444444444444",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Idle 480.0 h; rule needs 672 h at careful",
+   "selected": false
+  },
+  "early": "workspaceMissing",
+  "group": "Xcode build data",
+  "hint": "xcode-derived-data",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/Xcode/DerivedData/Missing-def",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Idle 480.0 h; rule needs 672 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Xcode build data",
+  "hint": "xcode-derived-data",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/Xcode/DerivedData/Present-abc",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 72.0 h; rule needs 168 h at aggressive",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Idle 72.0 h; rule needs 336 h at balanced",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Idle 72.0 h; rule needs 672 h at careful",
+   "selected": false
+  },
+  "early": "workspaceMissing",
+  "group": "Xcode build data",
+  "hint": "xcode-derived-data",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Developer/Xcode/DerivedData/Recent-ghi",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "early": null,
+  "group": "Device support files",
+  "hint": "xcode-ios-device-support",
+  "holds": [
+   "Connected-device build state unavailable"
+  ],
+  "modeHolds": {
+   "balanced": "Retained newest version in device group",
+   "careful": "Retained newest version in device group"
+  },
+  "path": "~/Library/Developer/Xcode/iOS DeviceSupport/iPhone15,2 17.0 (21A329)",
+  "rank": 1
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Connected-device build state unavailable",
+   "selected": false
+  },
+  "early": null,
+  "group": "Device support files",
+  "hint": "xcode-ios-device-support",
+  "holds": [
+   "Connected-device build state unavailable"
+  ],
+  "modeHolds": {
+   "aggressive": "Retained newest version in device group",
+   "balanced": "Retained newest version in device group",
+   "careful": "Retained newest version in device group"
+  },
+  "path": "~/Library/Developer/Xcode/iOS DeviceSupport/iPhone15,2 18.0 (22A3354)",
+  "rank": 0
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Worktree has unpushed commits",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Worktree has unpushed commits",
+   "selected": false
+  },
+  "bytes": 143360,
+  "careful": {
+   "decision": "Worktree has unpushed commits",
+   "selected": false
+  },
+  "early": null,
+  "group": "Agent worktrees",
+  "hint": "claude-worktrees",
+  "holds": [
+   "Worktree has unpushed commits"
+  ],
+  "modeHolds": {},
+  "path": "~/code/clean-web/.claude/worktrees/feature",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/clean-web/.git",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other files",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/clean-web/assets.bin",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 60.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Project idle 240.0 h; rule needs 336 h at balanced",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Project idle 240.0 h; rule needs 1344 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "node-modules",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/clean-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/dirty-web/.git",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Uncommitted or untracked work",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Uncommitted or untracked work",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Uncommitted or untracked work",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "node-modules",
+  "holds": [
+   "Uncommitted or untracked work"
+  ],
+  "modeHolds": {},
+  "path": "~/code/dirty-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Project idle 24.0 h; rule needs 84 h at aggressive",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Project idle 24.0 h; rule needs 336 h at balanced",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Project idle 24.0 h; rule needs 1344 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "node-modules",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/fresh-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 40.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 40.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Project idle 960.0 h; rule needs 1344 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "node-modules",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/old-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 45.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Project idle 1080.0 h; rule needs 2880 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "python-venv",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/py-agent/.venv",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 45.0 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Project idle 1080.0 h; rule needs 2880 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "python-venv",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/py-idle/.venv",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Project idle 480.0 h; rule needs 1344 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Build output",
+  "hint": "cargo-target",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/rusty/target",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Contains credential or environment-file names",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Contains credential or environment-file names",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Contains credential or environment-file names",
+   "selected": false
+  },
+  "early": null,
+  "group": "Project dependencies",
+  "hint": "node-modules",
+  "holds": [
+   "Contains credential or environment-file names"
+  ],
+  "modeHolds": {},
+  "path": "~/code/secret-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other files",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/unrelated/target/blob",
+  "rank": null
+ }
+]

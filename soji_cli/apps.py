@@ -11,10 +11,12 @@ from .util import read_plist,read_json,inside
 from .platform import native
 
 class AppCatalog:
+    # System-wide roots are class-level so hermetic tests can pin them.
+    SYSTEM_ROOTS=(Path('/Applications'),Path('/System/Applications'))
     def __init__(self,home,processes=()):
         self.home=Path(home);self.apps=[];self.processes=processes;self.running=[]
     def build(self):
-        for root in [Path('/Applications'),Path('/System/Applications'),self.home/'Applications']:
+        for root in [*self.SYSTEM_ROOTS,self.home/'Applications']:
             if not root.exists():continue
             for folder,dirs,files in os.walk(root):
                 if len(Path(folder).relative_to(root).parts)>3:dirs[:]=[];continue
@@ -44,6 +46,7 @@ class AppCatalog:
         return any(r.get('bundleID')==app['bundle'] or r.get('path')==app['path'] for r in self.running) or any(inside(p.casefold(),app['path'].casefold()) for p in self.processes if p.startswith('/'))
 
 class InstalledTools:
+    SYSTEM_AGENT_ROOTS=(Path('/Library/LaunchAgents'),Path('/Library/LaunchDaemons'))
     def __init__(self,home):self.home=Path(home);self.targets=[];self.errors=[]
     def add(self,path,source):
         if isinstance(path,str) and path.startswith('/'):
@@ -98,7 +101,7 @@ class InstalledTools:
                         if re.match(r'\s*(command|args)\s*=',line):
                             for value in re.findall(r'["\'](/[^"\']+)["\']',line):self.add(value,'Codex MCP config')
         except (OSError,ValueError):self.errors.append('Codex config unreadable')
-        for root in [self.home/'Library/LaunchAgents',Path('/Library/LaunchAgents'),Path('/Library/LaunchDaemons')]:
+        for root in [self.home/'Library/LaunchAgents',*self.SYSTEM_AGENT_ROOTS]:
             for p in root.glob('*.plist'):
                 info=read_plist(p)
                 for value in [info.get('Program'),*(info.get('ProgramArguments') or [])]:self.add(value,'Launch agent '+p.stem)
