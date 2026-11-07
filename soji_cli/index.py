@@ -33,13 +33,29 @@ CREATE INDEX IF NOT EXISTS nodes_parent ON nodes(parent);
 CREATE TABLE IF NOT EXISTS snapshots(day TEXT NOT NULL,path TEXT NOT NULL,bytes INTEGER NOT NULL,PRIMARY KEY(day,path));
 CREATE TABLE IF NOT EXISTS verdicts(path TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,judged_at REAL NOT NULL,data TEXT NOT NULL,content TEXT);
 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,started_at REAL,finished_at REAL,outcome TEXT,usage TEXT);
+CREATE TABLE IF NOT EXISTS links(path TEXT PRIMARY KEY,device INTEGER NOT NULL,inode INTEGER NOT NULL,nlink INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS links_identity ON links(device,inode);
 '''
+
+def _link_rows(items):
+    # Regular files with nlink > 1: the only cached names whose allocated
+    # share can change when a different name of the same inode is touched.
+    for p,n in items:
+        if not n.directory and not n.reason and n.inode and getattr(n,'link_count',0)>1:
+            yield (p,n.device,n.inode,n.link_count)
 
 class IndexStore:
     def __init__(self,path):
         self.path=Path(path);self.path.parent.mkdir(parents=True,exist_ok=True)
         self.db=sqlite3.connect(self.path,timeout=10)
+        had_links=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='links'").fetchone() is not None
         self.db.executescript(SCHEMA)
+        # Existing indexes predate the hardlink identity table; backfill it
+        # from persisted node rows so incremental reconciliation stays exact.
+        if not had_links:
+            with self.db:
+                rows=((p,Node(**json.loads(data))) for p,data in self.db.execute('SELECT path,data FROM nodes').fetchall())
+                self.db.executemany('INSERT OR REPLACE INTO links VALUES(?,?,?,?)',list(_link_rows(rows)))
         # Existing terminal indexes predate the content reuse contract.
         if 'content' not in {row[1] for row in self.db.execute('PRAGMA table_info(verdicts)')}:
             self.db.execute('ALTER TABLE verdicts ADD COLUMN content TEXT')
@@ -51,10 +67,17 @@ class IndexStore:
     def set_meta(self,key,value):self.db.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(key,json.dumps(value)))
     def load(self):
         return {p:Node(**json.loads(data)) for p,data in self.db.execute('SELECT path,data FROM nodes')}
+    def links_for(self,identities):
+        result={}
+        for device,inode in identities:
+            result[(device,inode)]=[r[0] for r in self.db.execute('SELECT path FROM links WHERE device=? AND inode=?',(device,inode))]
+        return result
     def save(self,scanner,event_id,signature,*,full_scan=True,volumes=None):
         with self.db:
             self.db.execute('DELETE FROM nodes')
             self.db.executemany('INSERT INTO nodes VALUES(?,?,?)',((p,str(Path(p).parent),json.dumps(dataclasses.asdict(n))) for p,n in scanner.nodes.items()))
+            self.db.execute('DELETE FROM links')
+            self.db.executemany('INSERT INTO links VALUES(?,?,?,?)',list(_link_rows(scanner.nodes.items())))
             self.set_meta('signature',signature);self.set_meta('eventID',event_id)
             now=time.time()
             complete=not scanner.limited and not scanner.cancel.is_set() and not scanner.error and not any(n.own_errors for n in scanner.nodes.values())
@@ -137,6 +160,77 @@ class IndexedScanner(Scanner):
         self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
         self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
         self.skipped=sum(bool(n.reason) for n in self.nodes.values())
+    def reconcile(self,store,dirty):
+        """Re-walk dirty subtrees, then refresh only cached names sharing a
+        hardlink identity with a name added, removed or changed inside them.
+        Aggregates are recomputed only for ancestors of changed rows."""
+        def inside(p):return any(within(p,root) for root in dirty)
+        def identity(n):return (n.device,n.inode)
+        def multi(n):return not n.directory and not n.reason and n.inode and getattr(n,'link_count',0)>1
+        old={}
+        for root in dirty:
+            for p in [p for p in self.nodes if within(p,root)]:
+                old[p]=self.nodes.pop(p)
+            if os.path.lexists(root):
+                scan_root=next(r for r in self.roots if within(root,r))
+                depth=len(Path(root).parts)-len(Path(scan_root).parts)
+                device=self.nodes[scan_root].device if scan_root in self.nodes and root!=scan_root else None
+                self.visit(root,depth,device)
+        fresh={p:n for p,n in self.nodes.items() if inside(p)}
+        removed_ids={identity(n) for n in old.values() if multi(n)}
+        added_ids={identity(n) for n in fresh.values() if multi(n)}
+        affected=removed_ids|added_ids
+        cached=store.links_for(affected)
+        # A brand-new link to a file cached with nlink == 1 is not in the
+        # links table; fall back to an in-memory (stat-free) identity lookup.
+        new_ids={i for i in added_ids-removed_ids if not cached.get(i)}
+        if new_ids:
+            for p,n in self.nodes.items():
+                if not n.directory and not inside(p) and identity(n) in new_ids:cached.setdefault(identity(n),[]).append(p)
+        touched=set(dirty);restatted=0
+        for ident in affected:
+            for p in cached.get(ident,[]):
+                n=self.nodes.get(p)
+                if n is None or inside(p) or n.directory:continue
+                before=(n.own_size,n.link_count,n.own_errors);restatted+=1
+                try:
+                    current=os.lstat(p)
+                    if (current.st_dev,current.st_ino)!=identity(n) or not stat.S_ISREG(current.st_mode):
+                        raise OSError('Cached regular-file identity changed')
+                    n.link_count=max(1,current.st_nlink)
+                    n.own_size=(getattr(current,'st_blocks',0)*512)//n.link_count
+                except OSError:
+                    n.own_errors=max(1,n.own_errors);n.errors=max(1,n.errors)
+                n.size=n.own_size
+                if before!=(n.own_size,n.link_count,n.own_errors):touched.add(p)
+            # Logical bytes are attributed once per identity to the first name.
+            names=sorted(q for q in set(cached.get(ident,[]))|{q for q,m in fresh.items() if not m.directory and identity(m)==ident} if q in self.nodes)
+            for i,q in enumerate(names):
+                m=self.nodes[q];value=m.own_apparent if i==0 else 0
+                if m.apparent!=value:m.apparent=value;touched.add(q)
+        dirs=set()
+        for p in touched:
+            if p in self.nodes and self.nodes[p].directory:dirs.add(p)
+            for parent in Path(p).parents:
+                q=str(parent)
+                if q in self.nodes:dirs.add(q)
+                if any(q==r for r in self.roots) or q=='/':break
+        # Within dirty subtrees visit() already aggregated; re-aggregate them
+        # only when a descendant's attribution changed afterwards.
+        for p in sorted(dirs,key=lambda p:p.count('/'),reverse=True):
+            n=self.nodes[p]
+            n.children=[c for c in n.children if c in self.nodes]
+            if n.directory and not n.reason:
+                kids=[self.nodes[c] for c in n.children]
+                n.size=n.own_size+sum(k.size for k in kids)
+                n.apparent=n.own_apparent+sum(k.apparent for k in kids)
+                n.newest=max([n.own_newest]+[k.newest for k in kids])
+                n.files=sum(k.files for k in kids);n.errors=n.own_errors+sum(k.errors for k in kids)
+                n.secret=any(k.secret for k in kids);n.skipped=any(k.skipped for k in kids)
+        self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
+        self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
+        self.skipped=sum(bool(n.reason) for n in self.nodes.values())
+        return {'affectedIdentities':len(affected),'restatted':restatted,'recomputedDirectories':len(dirs)}
     def run(self):
         self.started=time.monotonic();store=None
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()
@@ -168,15 +262,8 @@ class IndexedScanner(Scanner):
                     while target not in self.nodes and target!='/':target=str(Path(target).parent)
                     if any(within(target,r) for r in self.roots):dirty.append(target)
                 dirty=sorted(set(dirty));dirty=[p for p in dirty if not any(p!=q and within(p,q) for q in dirty)]
-                for root in dirty:
-                    for p in list(self.nodes):
-                        if within(p,root):del self.nodes[p]
-                    if os.path.lexists(root):
-                        scan_root=next(r for r in self.roots if within(root,r))
-                        depth=len(Path(root).parts)-len(Path(scan_root).parts)
-                        device=self.nodes[scan_root].device if scan_root in self.nodes and root!=scan_root else None
-                        self.visit(root,depth,device)
-                self.recompute();self.index_info={'strategy':'incremental','dirtySubtrees':dirty,'reusedEntries':len(self.nodes)-self.visited}
+                stats=self.reconcile(store,dirty)
+                self.index_info={'strategy':'incremental','dirtySubtrees':dirty,'reusedEntries':len(self.nodes)-self.visited,**stats}
                 if not dirty:self.current='Persistent index reused; FSEvents history checked'
             if any(r not in self.nodes for r in self.roots):self.limited=True
             self._build_findings()

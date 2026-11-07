@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from soji_cli.engine import Node, Scanner
+from soji_cli.engine import Node, Scanner, within
 from soji_cli.index import IndexStore, IndexedScanner, RECOVERED_DEFAULTS
 from soji_cli.locations import cache_locations
 
@@ -114,6 +114,65 @@ class IndexRecovery(unittest.TestCase):
         self.assertNotIn(str(first),updated.nodes)
         self.assertEqual(updated.nodes[str(second)].size,second.stat().st_blocks*512)
         self.assertEqual(updated.nodes[str(self.root)].files,1)
+    def counted_scan(self, event_id, changes):
+        calls=[];real_lstat=os.lstat;real_stat=os.stat
+        def lstat(p,*a,**k):calls.append(os.fspath(p));return real_lstat(p,*a,**k)
+        def stat_(p,*a,**k):calls.append(os.fspath(p));return real_stat(p,*a,**k)
+        with patch('os.lstat',lstat),patch('os.stat',stat_):s=self.run_scan(event_id,changes)
+        return s,calls
+    def assert_matches_full(self, incremental):
+        full=IndexedScanner([str(self.root)],home=str(self.root),database=self.base/'full/index.sqlite',context=False,min_bytes=0,refresh=True)
+        with patch.object(Scanner,'collect_context',lambda _:None),patch.object(Scanner,'_build_findings',lambda _:None),patch('soji_cli.index.native',return_value={'eventID':1}),patch('soji_cli.index.events',return_value=[]):
+            full.run()
+        self.assertFalse(full.error,full.error)
+        for p in (str(self.root),*[str(x) for x in self.root.iterdir()]):
+            self.assertEqual((incremental.nodes[p].size,incremental.nodes[p].files),(full.nodes[p].size,full.nodes[p].files),p)
+        self.assertEqual(incremental.nodes[str(self.root)].apparent,full.nodes[str(self.root)].apparent)
+    def test_incremental_stat_work_is_bounded_by_dirty_subtree_and_identities(self):
+        for d in range(30):
+            folder=self.root/f'unrelated{d}';folder.mkdir()
+            for f in range(40):(folder/f'f{f}').write_bytes(b'z'*64)
+        dirty=self.root/'dirty';dirty.mkdir();(dirty/'keep').write_bytes(b'k')
+        removed=dirty/'link';removed.write_bytes(b'x'*16384)
+        survivor=self.root/'unrelated0/survivor';os.link(removed,survivor)
+        initial=self.run_scan();self.assertEqual(initial.index_info['strategy'],'full')
+        self.assertEqual(initial.nodes[str(survivor)].size,survivor.stat().st_blocks*512//2)
+        removed.unlink()
+        s,calls=self.counted_scan(101,[{'path':str(removed),'flags':0x200,'id':101},{'checkpoint':101}])
+        self.assertEqual(s.index_info['strategy'],'incremental')
+        # Only cached index entries count; signature() probes home config files.
+        outside=[c for c in calls if c in initial.nodes and not initial.nodes[c].directory and not within(c,str(dirty))]
+        # Before: every cached regular file (1,202) was re-statted.
+        self.assertEqual(outside,[str(survivor)])
+        self.assertEqual(s.index_info['restatted'],1)
+        self.assertEqual(s.nodes[str(survivor)].size,survivor.stat().st_blocks*512)
+        self.assertEqual(s.nodes[str(survivor)].apparent,16384)
+        self.assertLess(s.index_info['recomputedDirectories'],5)
+        self.assert_matches_full(s)
+    def test_new_link_to_single_link_cached_file_refreshes_its_share(self):
+        a=self.root/'a';b=self.root/'b';a.mkdir();b.mkdir()
+        original=a/'file';original.write_bytes(b'x'*16384)
+        self.run_scan()
+        os.link(original,b/'link')
+        s=self.run_scan(101,[{'path':str(b/'link'),'flags':0x100,'id':101},{'checkpoint':101}])
+        self.assertEqual(s.index_info['dirtySubtrees'],[str(b)])
+        share=original.stat().st_blocks*512//2
+        self.assertEqual((s.nodes[str(original)].size,s.nodes[str(b/'link')].size),(share,share))
+        self.assertEqual(s.nodes[str(self.root)].apparent-s.nodes[str(self.root)].own_apparent-s.nodes[str(a)].own_apparent-s.nodes[str(b)].own_apparent,16384)
+        self.assert_matches_full(s)
+    def test_legacy_index_backfills_link_identities(self):
+        import sqlite3
+        a=self.root/'a';b=self.root/'b';a.mkdir();b.mkdir()
+        first=a/'file';first.write_bytes(b'x'*16384);os.link(first,b/'link')
+        self.run_scan()
+        with sqlite3.connect(self.database) as db:db.execute('DROP TABLE links')
+        db.close()
+        store=IndexStore(self.database)
+        try:self.assertEqual(sorted(r[0] for r in store.db.execute('SELECT path FROM links')),[str(first),str(b/'link')])
+        finally:store.close()
+        first.unlink()
+        s=self.run_scan(101,[{'path':str(first),'flags':0x200,'id':101},{'checkpoint':101}])
+        self.assertEqual(s.nodes[str(b/'link')].size,(b/'link').stat().st_blocks*512)
     def test_prorated_scanner_hook_does_not_deduplicate_shares_twice(self):
         s=self.scanner();a=str(self.root/'a');b=str(self.root/'b')
         s.nodes={str(self.root):Node(str(self.root),children=[a,b])}
