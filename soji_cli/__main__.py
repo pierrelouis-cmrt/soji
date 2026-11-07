@@ -10,12 +10,15 @@ import sys
 from .engine import Scanner, MODES, human
 from .util import atomic_json,read_json
 
-COMMANDS={'scan','analyse','plan','clean','undo','journal','watch','mcp','agents','activity','versions','runtimes','routines','processes','rules','apps','uninstall','auto','recover'}
+COMMANDS={'ai','scan','analyse','plan','clean','undo','journal','watch','mcp','agents','activity','versions','runtimes','routines','processes','rules','apps','uninstall','auto','recover'}
 
 def emit(value):print(json.dumps(value,indent=2,ensure_ascii=False))
 
 def main():
-    argv=sys.argv[1:];action=argv.pop(0) if argv and argv[0] in COMMANDS else 'scan'
+    argv=sys.argv[1:]
+    if '--ai' in argv and (not argv or argv[0] not in COMMANDS):
+        argv=['ai','brief',*[a for a in argv if a!='--ai']]
+    action=argv.pop(0) if argv and argv[0] in COMMANDS else 'scan'
     p=argparse.ArgumentParser(prog='soji '+action,description='Sōji: reconstructed disk analysis, persistent index, AI and verified cleanup.')
     p.add_argument('--state',default=str(Path.home()/'Library/Application Support/Soji'),help='Independent application state directory')
     if action=='mcp':
@@ -25,6 +28,7 @@ def main():
         report=read_json(args.report)
         if not isinstance(report,dict):p.error('Invalid report')
         MCPServer(report,os.environ.get('SOJI_RUN_DIR'),json.loads(os.environ.get('SOJI_HIDDEN_PATHS','[]'))).serve();return 0
+    if action=='ai':return ai_command(p,argv)
     if action in ('clean','undo','journal','recover'):
         p.add_argument('target',nargs='?');p.add_argument('--apply',action='store_true');p.add_argument('--permanent',action='store_true');p.add_argument('--execute-tools',action='store_true')
         args=p.parse_args(argv)
@@ -170,6 +174,52 @@ def main():
         print(f'{scanner.unreadable} unreadable · {scanner.skipped} excluded · {"PARTIAL" if report["limited"] else "complete"}')
         for f in scanner.decisions(args.mode)[:60]:print(f'{human(f.size):>10}  {"READY" if f.selected else "KEEP ":5}  {f.group:<26}  {f.path}\n                  {f.decision}')
     return 0
+
+
+def ai_command(p,argv):
+    from . import agent
+    p.prog='soji ai'
+    p.add_argument('operation',choices=['brief','inspect','propose','skill'])
+    p.add_argument('targets',nargs='*',help='brief: scan roots (default home) · inspect: row id · propose: verdicts file or -')
+    p.add_argument('--session',help='Session id from a briefing (default: latest)')
+    p.add_argument('--mode',choices=MODES,default='balanced')
+    p.add_argument('--offset',type=int,default=0);p.add_argument('--limit',type=int,default=60)
+    p.add_argument('--json',action='store_true',help='brief: JSON only, without the skill block')
+    p.add_argument('--hide-held',action='store_true',help='brief: omit rows with holds')
+    p.add_argument('--protect',action='append',default=[]);p.add_argument('--home')
+    p.add_argument('--max-seconds',type=float,default=300);p.add_argument('--max-files',type=int,default=1000000);p.add_argument('--min-mb',type=float,default=10)
+    p.add_argument('--recent-activity-hours',type=float,default=24,help='Recent-use protection window (default 24 h in AI mode)')
+    p.add_argument('--no-index',action='store_true');p.add_argument('--output');p.add_argument('--method',choices=['trash','permanent'],default='trash')
+    args=p.parse_args(argv)
+    if args.operation=='skill':
+        print('---\nname: soji\ndescription: Free disk space on macOS safely with Sōji. Use when the user asks to clean up disk space, caches, build output or old dependencies.\n---\n\nStart with `soji --ai [paths]` and follow the instructions it prints.\n\n'+agent.SKILL);return 0
+    if args.limit<1 or args.offset<0 or args.max_files<1 or args.max_seconds<=0 or args.min_mb<0:p.error('Invalid limits')
+    if not math.isfinite(args.recent_activity_hours) or args.recent_activity_hours<0:p.error('Invalid recent activity hours')
+    def make(roots,home,protected,recent):
+        options=dict(home=home,protected=protected,max_files=args.max_files,max_seconds=args.max_seconds,min_bytes=int(args.min_mb*1000000),recent_activity_hours=recent)
+        if args.no_index:return Scanner(roots,**options)
+        from .index import IndexedScanner
+        return IndexedScanner(roots,database=Path(args.state)/'index.sqlite',**options)
+    if args.operation=='brief':
+        roots=args.targets or [str(Path.home())]
+        for path in roots:
+            if not Path(path).expanduser().is_dir():p.error('Not a directory: '+path)
+        scanner=make(roots,args.home,args.protect+[args.state],args.recent_activity_hours);scanner.run()
+        if scanner.error:raise ValueError(scanner.error)
+        result=agent.brief(scanner,args.state,args.mode,args.offset,args.limit,include_held=not args.hide_held)
+        if args.json:emit(result)
+        else:sys.stdout.write(agent.render(result))
+        return 0
+    session=args.session or agent.latest_session(args.state)
+    if args.operation=='inspect':
+        if len(args.targets)!=1:p.error('inspect needs exactly one row id')
+        emit(agent.inspect(args.state,session,args.targets[0]));return 0
+    if len(args.targets)!=1:p.error('propose needs a verdicts file or -')
+    raw=sys.stdin.read() if args.targets[0]=='-' else Path(args.targets[0]).read_text()
+    try:value=json.loads(raw)
+    except ValueError:raise ValueError('Verdicts are not valid JSON')
+    factory=lambda data:make(data['roots'],data['home'],data['protected'],data['recentActivityHours'])
+    emit(agent.propose(args.state,session,value,factory,output=args.output,method=args.method));return 0
 
 
 def entry():

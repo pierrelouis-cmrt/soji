@@ -36,6 +36,8 @@ Sōji stays a command you run, in the style of mole. It does not try to be a bac
 
 - **No background automation.** No daemon, login item, scheduled AI runs or notifications. Routines and `auto` stay explicit CLI invocations. The cadence and backoff policy code stays but will not be wired.
 - **AI inverts the original design.** Instead of Sōji launching an agent, an agent (Claude Code, Codex, anything) runs `soji --ai`. Sōji prints a built-in instruction block (a "skill": usage, safety rules, delete only through soji), then a paged briefing with stable candidate IDs. `soji ai inspect ID` drills down. `soji ai propose` validates verdicts into an ordinary expiring plan, and `soji clean` re-checks everything before acting. Verdicts can never lift holds, reference unknown IDs, or select personal data. `analyse` (agent launching) is legacy: kept working, no further parity work. Matching Sōji's prompt packing, run budgets and cadence is dropped.
+- **AI mode status:** implemented in `soji_cli/agent.py`, `__main__.ai_command` and `tests/test_agent_mode.py`. Not yet exercised with a real agent session. Possible next steps: per-row agent `minIdleHours` instead of the mode-wide 0-hour judgment; grouping hints for very large briefings; showing `--ai` in the TUI.
+- **Cleanup fix found while testing it:** `Cleaner.fresh` now measures a retention family (keepNewest hints) from its family folder. Before this, revalidating an old nvm, Playwright or archive version always ranked it newest and refused it.
 - **Original-app comparison** (corpus run against the consumer build, early-rule tracing) is done by the project owner, not by agents.
 - Engineering items still in scope: compound Claude session cleanup, uninstall ownership, incremental index performance.
 

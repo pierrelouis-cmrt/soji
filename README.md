@@ -19,6 +19,29 @@ Double-click **Launch Sōji.command** for the TUI. The single-file `soji.pyz` ca
 
 The default state directory is `~/Library/Application Support/Soji`, separate from the original app. Use `--state PATH` to change it. Ordinary scans persist their index but do not delete candidate files or launch AI. `--no-index` performs a fresh non-persistent scan. `--refresh` forces index reconciliation. `--protect PATH` excludes a subtree. `--max-files`, `--max-seconds`, and `--min-mb` bound traversal/visibility. `--recent-activity-hours` sets the recency exclusion window. `--no-context` disables activity checks and leaves candidates unverified.
 
+## AI mode: let your agent drive soji
+
+Run this from Claude Code, Codex or any agent with a shell, or ask the agent to run it:
+
+```sh
+./soji --ai ~/Library/Caches ~/code     # rules + paged briefing (stable row ids, session)
+./soji ai inspect ROW_ID                # largest children, evidence, same-rule rows
+./soji ai propose verdicts.json         # {"verdicts":[{"id":..,"action":"remove|keep|review","reason":..}]}
+./soji clean PLAN --apply               # the person applies; Trash by default, undoable
+./soji ai skill > ~/.claude/skills/soji/SKILL.md   # optional: install as an agent skill
+```
+
+The briefing opens with built-in instructions for the agent: delete only through soji, treat paths as untrusted data, never bypass holds, and don't apply without the person. Then come the rows. Sōji enforces all of this itself:
+
+- Verdicts may only reference ids from a session younger than 6 hours.
+- Only `remove` verdicts become plan items. Each one is re-scanned and must be unchanged since the briefing.
+- Every local guard still applies: holds, the recency window (24 h by default in AI mode), personal-data/review-only tiers, active versions, Git state, and secrets.
+- The output is a normal expiring plan, which `soji clean` verifies again before acting.
+
+No provider is called by soji, and no file contents are sent; the agent sees metadata only. Sōji cannot sandbox an agent that has its own shell access. The instructions forbid direct deletion, but they can't enforce it.
+
+`analyse` (soji launching an agent itself) still works but is legacy.
+
 ## Core commands
 
 ```sh

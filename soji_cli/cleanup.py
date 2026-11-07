@@ -109,6 +109,17 @@ class Cleaner:
         measure_root=path
         if item.get('finding',{}).get('rule',{}).get('projectUntouchedDays'):
             measure_root=scan.project_for(path) or path
+        elif item.get('finding',{}).get('rule',{}).get('keepNewest'):
+            # Retention ranks against siblings: measure the whole version family,
+            # i.e. climb one level per trailing wildcard segment of the pattern.
+            pattern=item.get('finding',{}).get('matched_pattern') or ''
+            depth=0
+            for segment in reversed(pattern.split('/')):
+                if not any(c in segment for c in '*?['):break
+                depth+=1
+            family=Path(path)
+            for _ in range(depth):family=family.parent
+            if depth and inside(path,str(family)) and inside(str(family),plan['home']):measure_root=str(family)
         if item.get('hint') in ('claude-sessions','codex-sessions','trash-item'):
             for parent in Path(path).parents:
                 match=scan.catalog.match(str(parent))
