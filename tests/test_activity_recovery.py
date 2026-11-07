@@ -1,4 +1,5 @@
 """Disposable metadata and Git fixtures for executable-derived adapter contracts."""
+from contextlib import closing
 import datetime as dt
 import json
 import os
@@ -12,6 +13,7 @@ from types import SimpleNamespace
 from soji_cli.engine import Finding
 
 from soji_cli.activity import ActivityIndex
+from soji_cli import activity as activity_mod
 from soji_cli.apps import InstalledTools
 from soji_cli.catalogs import codex_writer_ids, codex_idle_ordinal, codex_process_freshness, expand_catalogs, runtime_catalog, document_versions
 from soji_cli.gitstate import GitInspector
@@ -56,7 +58,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual({Path(r.path).name for r in a.records},{'day0','day29'})
     def test_t3_unarchived_now_archived_max_and_deleted_excluded(self):
         db=self.home/'.t3/userdata/statev2.sqlite';db.parent.mkdir(parents=True)
-        with sqlite3.connect(db) as c:
+        with closing(sqlite3.connect(db)) as c,c:
             c.execute('CREATE TABLE orchestration_v2_projection_threads(payload_json,updated_at,archived_at,deleted_at)')
             c.executemany('INSERT INTO orchestration_v2_projection_threads VALUES(?,?,?,?)',[
                 (json.dumps({'worktreePath':'/fixture/live'}),'2026-01-01T00:00:00Z',None,None),
@@ -77,6 +79,42 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(a.records[0].path,'/fixture/space name')
         self.file(str(p.parent.relative_to(self.home))+'/state.vscdb','',200)
         os.utime(p.parent,(100,100));a=ActivityIndex(self.home);a.editors();self.assertEqual(a.records[0].at,200)
+    def zst(self,path,text,mtime=1000):
+        from compression import zstd
+        p=self.home/path;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(zstd.compress(text.encode()))
+        os.utime(p,(mtime,mtime));return p
+    def codex_day(self,offset=10):
+        return (dt.datetime.fromtimestamp(self.now).date()-dt.timedelta(days=offset)).strftime('%Y/%m/%d')
+    @unittest.skipUnless(activity_mod._zstd,'needs compression.zstd (Python 3.14+)')
+    def test_codex_compressed_rollout_head_and_mtime(self):
+        meta=json.dumps({'type':'session_meta','payload':{'cwd':'/fixture/zst'}})
+        self.zst(f'.codex/sessions/{self.codex_day()}/rollout-a.jsonl.zst',meta+'\n'+'x'*100000,4321)
+        # cwd beyond the 16 KiB decompressed head is not read, as for .jsonl.
+        self.zst(f'.codex/sessions/{self.codex_day()}/rollout-b.jsonl.zst','y'*20000+'"cwd":"/late"',4321)
+        a=ActivityIndex(self.home,self.now);a.codex()
+        self.assertEqual([(r.path,r.at,r.source) for r in a.records],[('/fixture/zst',4321,'Codex')])
+        self.assertEqual(a.errors,[])
+        # Corrupt data is an error (fail closed), not a crash.
+        self.file(f'.codex/sessions/{self.codex_day()}/rollout-c.jsonl.zst','not zstd')
+        a=ActivityIndex(self.home,self.now);a.codex();self.assertTrue(a.errors)
+    def test_codex_compressed_without_zstd_needs_db_coverage(self):
+        day=self.codex_day()
+        for name in ('listed','unlisted'):
+            self.file(f'.codex/sessions/{day}/rollout-{name}.jsonl.zst','opaque')
+        db=self.home/'.codex/state_5.sqlite'
+        with closing(sqlite3.connect(db)) as c,c:
+            c.execute('CREATE TABLE threads(cwd TEXT,updated_at INTEGER,rollout_path TEXT)')
+            c.execute('INSERT INTO threads VALUES(?,?,?)',('/fixture/db',5000,str(self.home/f'.codex/sessions/{day}/rollout-listed.jsonl')))
+        with patch.object(activity_mod,'_zstd',None):
+            a=ActivityIndex(self.home,self.now);a.codex()
+        self.assertEqual(a.sources['codexCompressed'],{'read':False,'unreadable':2,'uncovered':1})
+        self.assertEqual(len(a.errors),1);self.assertIn('compressed',a.errors[0])
+        self.assertEqual([r.path for r in a.records],['/fixture/db'])
+        with closing(sqlite3.connect(db)) as c,c:
+            c.execute('INSERT INTO threads VALUES(?,?,?)',('/fixture/db',5000,str(self.home/f'.codex/sessions/{day}/rollout-unlisted.jsonl')))
+        with patch.object(activity_mod,'_zstd',None):
+            a=ActivityIndex(self.home,self.now);a.codex()
+        self.assertEqual(a.errors,[])
     def test_codex_catalog_idle_boundaries_and_process_freshness(self):
         for seconds,ordinal in ((-1,3),(10799,3),(10800,2),(172799,2),(172800,1),(604799,1),(604800,0)):
             self.assertEqual(codex_idle_ordinal(seconds),ordinal)
