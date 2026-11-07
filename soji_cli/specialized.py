@@ -269,8 +269,11 @@ class SpecializedRules:
             missing=workspace_missing(f.path)
             if missing:
                 # SmartRules early Outcome (0x1006ac248-0x1006ac2b4): level=Careful,
-                # earlier-collected holds kept, rank/age loop skipped. Generic
-                # holds, recency floor and age/activity policy still apply later.
+                # earlier-collected holds kept, rank/age loop skipped. The level
+                # becomes Finding.minLevel; CleanupLevels.apply (0x100660bf4) then
+                # applies the normal recency/age policy (levelByOwnRule is false:
+                # no document-version action, no simulator runtime). Static trace
+                # only; not observed in the original app.
                 f.rule_early_reason='workspaceMissing';f.rule_level='careful'
                 f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
             f.evidence.append({'check':'workspaceMissing','missing':missing,'basis':'literal WorkspacePath existence; absent/unreadable metadata is missing'})
