@@ -19,6 +19,7 @@
 | Original-app corpus run | owner | No safe fake-home entry point found in the original (research/consumer-observation.md) |
 | Costly-tier verifier adjustment | `levels.combine_rule_level` | Flag source unresolved; omitted |
 | Device-build supersession, simulator twins | `specialized.py` | Unported early branches |
+| Codex raw level byte → Careful/Balanced/Aggressive mapping | `catalogs.py` | Unconfirmed cross-check (research/activity-recovery.md) |
 | `.jsonl.zst` Codex rollouts | `catalogs.py`, `activity.py` | No metadata read |
 | Worktree activity in the parent project clock | `engine.project_age` | `<project>/.claude/worktrees` counts as project use; unverified |
 | Outside link to a single-link file | `index.reconcile` | Caught by the weekly full check; estimates only |
