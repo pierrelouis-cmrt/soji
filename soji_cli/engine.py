@@ -390,6 +390,16 @@ class Scanner:
         project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('projectUntouchedDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
         if project:
             f.project_idle_hours=self.project_age(project)
+            # Safety extension, not original ActivityTable semantics: agent or
+            # editor activity recorded at the owning project root also counts
+            # as project use. Descendant-only last() is kept; the query is just
+            # rooted at the project, and only the project clock is affected.
+            used=self.activity.last(project) if self.activity and project!=node.path else None
+            if used:
+                idle=max(0,(self.now-used.at)/3600)
+                f.evidence.append({'check':'projectActivity','project':project,'source':used.source,'at':used.at,'basis':'safety extension: activity at owning project root'})
+                if f.project_idle_hours is None or idle<f.project_idle_hours:f.project_idle_hours=idle
+                if self.now-used.at<max(300,self.recent_activity_hours*3600):f.holds.append('Coding agent or editor used this project recently')
             state=self.git.inspect(project,worktree=f.group=='Agent worktrees') if self.git else {}
             if state.get('reason'):f.holds.append(state['reason'])
             f.evidence.append({'check':'git','state':state})

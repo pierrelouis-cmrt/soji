@@ -924,16 +924,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Idle 45.0 d; eligible from aggressive",
-   "selected": true
+   "decision": "Project idle 48.0 h; rule needs 180 h at aggressive",
+   "selected": false
   },
   "balanced": {
-   "decision": "Eligible from aggressive",
+   "decision": "Project idle 48.0 h; rule needs 720 h at balanced",
    "selected": false
   },
   "bytes": 135168,
   "careful": {
-   "decision": "Project idle 1080.0 h; rule needs 2880 h at careful",
+   "decision": "Project idle 48.0 h; rule needs 2880 h at careful",
    "selected": false
   },
   "early": null,
