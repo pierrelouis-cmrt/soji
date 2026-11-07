@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+APP_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if ! command -v python3 >/dev/null 2>&1; then
+  echo 'Python 3 is required. Install Python from python.org, then open this launcher again.'
+  read -r answer
+  exit 1
+fi
+exec python3 "$APP_DIR/entrypoint.py" "$@"

@@ -1,0 +1,6806 @@
+[
+  {
+    "id": "xcode-derived-data-shared",
+    "group": "Xcode build data",
+    "label": "Xcode shared caches",
+    "patterns": [
+      "~/Library/Developer/Xcode/DerivedData/ModuleCache.noindex",
+      "~/Library/Developer/Xcode/DerivedData/SDKExplicitPrecompiledModules",
+      "~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex",
+      "~/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex",
+      "~/Library/Developer/Xcode/DerivedData/SymbolCache.noindex"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Xcode's module caches: untouched 14 days, not while Xcode builds",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 14,
+      "processes": [
+        "Xcode",
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-derived-data",
+    "group": "Xcode build data",
+    "label": "Xcode project builds",
+    "patterns": [
+      "~/Library/Developer/Xcode/DerivedData/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "one project's build data: untouched 14 days, or at once when its project is gone; not while Xcode or a build uses it, or within an hour of a change",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 14,
+      "processes": [
+        "Xcode",
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest",
+        "clang",
+        "SWBBuildService"
+      ],
+      "workspaceMissing": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-archives",
+    "group": "Backups and archives",
+    "label": "Xcode archives",
+    "patterns": [
+      "~/Library/Developer/Xcode/Archives/*/*.xcarchive"
+    ],
+    "tier": "userData",
+    "smartRule": "one archive, older than 180 days; keep the newest per app and the newest uploaded to Apple",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 180,
+      "keepNewest": 1,
+      "keepBy": "bundle"
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "xcode-ios-device-support",
+    "group": "Device support files",
+    "label": "iOS device support",
+    "patterns": [
+      "~/Library/Developer/Xcode/iOS DeviceSupport/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest 2 per device (at Aggressive the newest goes once unused 60 days); an older build of the same version at once; not while a paired device runs it or a debugger runs",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "device",
+      "processes": [
+        "lldb",
+        "debugserver",
+        "lldb-rpc-server"
+      ],
+      "newestAfterDays": 60,
+      "deviceBuild": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-watchos-device-support",
+    "group": "Device support files",
+    "label": "watchOS device support",
+    "patterns": [
+      "~/Library/Developer/Xcode/watchOS DeviceSupport/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest 2 per device (at Aggressive the newest goes once unused 60 days); an older build of the same version at once; not while a paired device runs it or a debugger runs",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "device",
+      "processes": [
+        "lldb",
+        "debugserver",
+        "lldb-rpc-server"
+      ],
+      "newestAfterDays": 60,
+      "deviceBuild": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-tvos-device-support",
+    "group": "Device support files",
+    "label": "tvOS device support",
+    "patterns": [
+      "~/Library/Developer/Xcode/tvOS DeviceSupport/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest 2 per device (at Aggressive the newest goes once unused 60 days); an older build of the same version at once; not while a paired device runs it or a debugger runs",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "device",
+      "processes": [
+        "lldb",
+        "debugserver",
+        "lldb-rpc-server"
+      ],
+      "newestAfterDays": 60,
+      "deviceBuild": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-visionos-device-support",
+    "group": "Device support files",
+    "label": "visionOS device support",
+    "patterns": [
+      "~/Library/Developer/Xcode/visionOS DeviceSupport/*",
+      "~/Library/Developer/Xcode/xrOS DeviceSupport/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest 2 per device (at Aggressive the newest goes once unused 60 days); an older build of the same version at once; not while a paired device runs it or a debugger runs",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "device",
+      "processes": [
+        "lldb",
+        "debugserver",
+        "lldb-rpc-server"
+      ],
+      "newestAfterDays": 60,
+      "deviceBuild": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-macos-device-support",
+    "group": "Device support files",
+    "label": "macOS device support",
+    "patterns": [
+      "~/Library/Developer/Xcode/macOS DeviceSupport/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest 2 per device (at Aggressive the newest goes once unused 60 days); an older build of the same version at once; not while a paired device runs it or a debugger runs",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "device",
+      "processes": [
+        "lldb",
+        "debugserver",
+        "lldb-rpc-server"
+      ],
+      "newestAfterDays": 60,
+      "deviceBuild": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-device-logs",
+    "group": "Logs and crash reports",
+    "label": "Device logs",
+    "patterns": [
+      "~/Library/Developer/Xcode/DeviceLogs",
+      "~/Library/Developer/Xcode/iOS Device Logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-products",
+    "group": "Logs and crash reports",
+    "label": "Xcode Organizer reports",
+    "patterns": [
+      "~/Library/Developer/Xcode/Products/*/*"
+    ],
+    "tier": "costly",
+    "smartRule": "crash logs, metrics and TestFlight feedback of one app version; untouched 90 days, at Aggressive only",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 180,
+      "processes": [
+        "Xcode"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xcode-documentation",
+    "group": "Xcode build data",
+    "label": "Xcode documentation cache",
+    "patterns": [
+      "~/Library/Developer/Xcode/DocumentationIndex",
+      "~/Library/Developer/Shared/Documentation"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-caches",
+    "group": "Developer tool caches",
+    "label": "Xcode caches",
+    "patterns": [
+      "~/Library/Caches/com.apple.dt.Xcode",
+      "~/Library/Caches/com.apple.dt.Xcode.sourcecontrol.Git"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, no build running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-previews",
+    "group": "Xcode build data",
+    "label": "SwiftUI previews",
+    "patterns": [
+      "~/Library/Developer/Xcode/UserData/Previews",
+      "~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application/*/Library/Caches/com.apple.dt.previews*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, no build running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest",
+        "Xcode"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "simulator-devices",
+    "group": "Simulators and emulators",
+    "label": "Simulators",
+    "patterns": [
+      "~/Library/Developer/CoreSimulator/Devices/*"
+    ],
+    "tier": "costly",
+    "smartRule": "runtime not installed; or shut down and unused 7 days; spare copies with no apps from Balanced; removed with simctl delete",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7,
+      "processes": [
+        "launchd_sim",
+        "Simulator"
+      ],
+      "early": true,
+      "simulatorDevice": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "simulator-caches",
+    "group": "Developer tool caches",
+    "label": "Simulator caches",
+    "patterns": [
+      "~/Library/Developer/CoreSimulator/Caches",
+      "~/Library/Developer/CoreSimulator/Temp"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "launchd_sim",
+        "Simulator"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "simulator-caches-system",
+    "group": "Developer tool caches",
+    "label": "System simulator caches",
+    "patterns": [
+      "/Library/Developer/CoreSimulator/Caches"
+    ],
+    "tier": "regenerable",
+    "listOnly": true,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "swiftpm-cache",
+    "group": "Package caches",
+    "label": "Swift package cache",
+    "patterns": [
+      "~/Library/Caches/org.swift.swiftpm",
+      "~/.cache/swift-package-manager"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "swift-package",
+        "swift-build"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "swiftpm-build",
+    "group": "Build output",
+    "label": "Swift package builds",
+    "patterns": [
+      "**/.build"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Package.swift, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Package.swift"
+    ],
+    "rule": {
+      "processes": [
+        "swift-package",
+        "swift-build"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "swiftpm-xcode-checkouts",
+    "group": "Xcode build data",
+    "label": "Swift package checkouts",
+    "patterns": [
+      "**/.swiftpm/xcode/package.xcworkspace/xcuserdata"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Package.swift, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Package.swift"
+    ],
+    "rule": {
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-ib-support",
+    "group": "Xcode build data",
+    "label": "Interface Builder cache",
+    "patterns": [
+      "~/Library/Developer/Xcode/UserData/IB Support"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "Xcode"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "cocoapods-cache",
+    "group": "Package caches",
+    "label": "CocoaPods cache",
+    "patterns": [
+      "~/Library/Caches/CocoaPods"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "pod",
+      "cache",
+      "clean",
+      "--all"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pod"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cocoapods-pods",
+    "group": "Project dependencies",
+    "label": "CocoaPods in projects",
+    "patterns": [
+      "**/Pods"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Podfile, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Podfile"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cocoapods-repos",
+    "group": "Package caches",
+    "label": "CocoaPods specs",
+    "patterns": [
+      "~/.cocoapods/repos"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pod"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "carthage-cache",
+    "group": "Package caches",
+    "label": "Carthage cache",
+    "patterns": [
+      "~/Library/Caches/org.carthage.CarthageKit"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "carthage"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "carthage-build",
+    "group": "Project dependencies",
+    "label": "Carthage builds",
+    "patterns": [
+      "**/Carthage/Build",
+      "**/Carthage/Checkouts"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Cartfile, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Cartfile"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "homebrew-cache",
+    "group": "Package caches",
+    "label": "Homebrew downloads",
+    "patterns": [
+      "~/Library/Caches/Homebrew/downloads",
+      "~/Library/Caches/Homebrew/Cask",
+      "~/Library/Caches/Homebrew/api",
+      "~/Library/Caches/Homebrew/bootsnap",
+      "~/Library/Caches/Homebrew/portable-ruby-*"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "brew"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "homebrew-logs",
+    "group": "Logs and crash reports",
+    "label": "Homebrew logs",
+    "patterns": [
+      "~/Library/Logs/Homebrew"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "brew"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "xcode-installers",
+    "group": "Downloads and installers",
+    "label": "Xcode installers",
+    "patterns": [
+      "~/Downloads/Xcode*.xip"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "xcode-old-apps",
+    "group": "Toolchains and SDKs",
+    "label": "Old Xcode versions",
+    "patterns": [
+      "/Applications/Xcode-*.app",
+      "/Applications/Xcode_*.app",
+      "/Applications/Xcode-beta*.app"
+    ],
+    "tier": "costly",
+    "smartRule": "not the selected Xcode",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "gradle-caches",
+    "group": "Package caches",
+    "label": "Gradle dependency stores",
+    "patterns": [
+      "~/.gradle/caches/modules-2",
+      "~/.gradle/caches/jars-*"
+    ],
+    "tier": "costly",
+    "smartRule": "older than 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30,
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "gradle-wrapper-dists",
+    "group": "Package caches",
+    "label": "Gradle versions",
+    "patterns": [
+      "~/.gradle/wrapper/dists/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product",
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "gradle-daemon",
+    "group": "Package caches",
+    "label": "Gradle daemon logs",
+    "patterns": [
+      "~/.gradle/daemon"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "gradle-native",
+    "group": "Package caches",
+    "label": "Gradle native files",
+    "patterns": [
+      "~/.gradle/native",
+      "~/.gradle/jdks"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "android-avd",
+    "group": "Simulators and emulators",
+    "label": "Android emulators",
+    "patterns": [
+      "~/.android/avd/*.avd"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "processes": [
+        "qemu-system-aarch64",
+        "qemu-system-x86_64",
+        "emulator"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "android-system-images",
+    "group": "Simulators and emulators",
+    "label": "Emulator system images",
+    "patterns": [
+      "~/Library/Android/sdk/system-images/*"
+    ],
+    "tier": "costly",
+    "smartRule": "not used by any emulator",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "qemu-system-aarch64",
+        "qemu-system-x86_64",
+        "emulator"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "xctest-devices",
+    "group": "Simulators and emulators",
+    "label": "Test devices",
+    "patterns": [
+      "~/Library/Developer/XCTestDevices/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Xcode and simulators not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "Xcode",
+        "xcodebuild",
+        "xctest",
+        "launchd_sim",
+        "Simulator"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "android-sdk-platforms",
+    "group": "Toolchains and SDKs",
+    "label": "Android SDK platforms",
+    "patterns": [
+      "~/Library/Android/sdk/platforms/*",
+      "~/Library/Android/sdk/build-tools/*",
+      "~/Library/Android/sdk/ndk/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the newest per major version and anything a project pins",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "major",
+      "keepPinned": "android"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "android-emulator-cache",
+    "group": "Package caches",
+    "label": "Emulator cache",
+    "patterns": [
+      "~/.android/cache",
+      "~/.android/build-cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "android-studio-caches",
+    "group": "Developer tool caches",
+    "label": "Android Studio cache",
+    "patterns": [
+      "~/Library/Caches/Google/AndroidStudio*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "android-studio-logs",
+    "group": "Logs and crash reports",
+    "label": "Android Studio logs",
+    "patterns": [
+      "~/Library/Logs/Google/AndroidStudio*"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "android-studio-old",
+    "group": "App leftovers",
+    "label": "Old Android Studio settings",
+    "patterns": [
+      "~/Library/Application Support/Google/AndroidStudio*"
+    ],
+    "tier": "userData",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "android-project-build",
+    "group": "Build output",
+    "label": "Android build output",
+    "patterns": [
+      "**/app/build",
+      "**/.cxx"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to build.gradle or build.gradle.kts, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "build.gradle",
+      "build.gradle.kts"
+    ],
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "gradle-project-cache",
+    "group": "Build output",
+    "label": "Gradle project cache",
+    "patterns": [
+      "**/.gradle",
+      "**/.kotlin"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a Gradle settings or build file, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "settings.gradle",
+      "settings.gradle.kts",
+      "build.gradle",
+      "build.gradle.kts"
+    ],
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "kotlin-daemon",
+    "group": "Developer tool caches",
+    "label": "Kotlin daemon",
+    "patterns": [
+      "~/Library/Application Support/kotlin/daemon"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "KotlinCompileDaemon",
+        "kotlinc"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "maven-repository",
+    "group": "Package caches",
+    "label": "Maven packages",
+    "patterns": [
+      "~/.m2/repository"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 60 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 60,
+      "processes": [
+        "mvn",
+        "plexus-classworlds"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "jetbrains-caches",
+    "group": "Developer tool caches",
+    "label": "JetBrains caches",
+    "patterns": [
+      "~/Library/Caches/JetBrains/*/caches",
+      "~/Library/Caches/JetBrains/*/index",
+      "~/Library/Caches/JetBrains/*/jcef_cache",
+      "~/Library/Caches/JetBrains/*/compile-server",
+      "~/Library/Caches/JetBrains/*/tmp"
+    ],
+    "tier": "regenerable",
+    "smartRule": "caches, indexes and build server data, not Local History; app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "jetbrains-logs",
+    "group": "Logs and crash reports",
+    "label": "JetBrains logs",
+    "patterns": [
+      "~/Library/Logs/JetBrains/*"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "jetbrains-old-settings",
+    "group": "App leftovers",
+    "label": "Old JetBrains versions",
+    "patterns": [
+      "~/Library/Application Support/JetBrains/*"
+    ],
+    "tier": "userData",
+    "smartRule": "keep newest per product",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "jetbrains-toolbox-apps",
+    "group": "Toolchains and SDKs",
+    "label": "JetBrains Toolbox apps",
+    "patterns": [
+      "~/Library/Application Support/JetBrains/Toolbox/apps/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per product",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "sbt-ivy",
+    "group": "Package caches",
+    "label": "sbt and Ivy cache",
+    "patterns": [
+      "~/.ivy2/cache",
+      "~/.ivy2/local",
+      "~/.sbt/boot"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "sbt",
+        "sbt-launch"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "coursier-cache",
+    "group": "Package caches",
+    "label": "Coursier cache",
+    "patterns": [
+      "~/Library/Caches/Coursier"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "kotlin-native",
+    "group": "Toolchains and SDKs",
+    "label": "Kotlin Native",
+    "patterns": [
+      "~/.konan"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "KotlinCompileDaemon",
+        "kotlinc"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "jvm-old-jdks",
+    "group": "Toolchains and SDKs",
+    "label": "Java versions",
+    "patterns": [
+      "~/Library/Java/JavaVirtualMachines/*",
+      "~/.sdkman/candidates/java/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per major version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "sdkman-archives",
+    "group": "Package caches",
+    "label": "SDKMAN downloads",
+    "patterns": [
+      "~/.sdkman/archives",
+      "~/.sdkman/tmp"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "jvm-project-target",
+    "group": "Build output",
+    "label": "Maven build output",
+    "patterns": [
+      "**/target"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to pom.xml or build.sbt, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "pom.xml",
+      "build.sbt"
+    ],
+    "rule": {
+      "processes": [
+        "mvn",
+        "plexus-classworlds"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "node-modules",
+    "group": "Project dependencies",
+    "label": "node_modules",
+    "patterns": [
+      "**/node_modules"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "npm-cache",
+    "group": "Package caches",
+    "label": "npm cache",
+    "patterns": [
+      "~/.npm/_cacache"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "npm",
+      "cache",
+      "clean",
+      "--force"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "npm"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "npm-npx",
+    "group": "Package caches",
+    "label": "npx cache",
+    "patterns": [
+      "~/.npm/_npx"
+    ],
+    "tier": "regenerable",
+    "smartRule": "no npx running, untouched 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7,
+      "processes": [
+        "npx",
+        "npm"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "npm-logs",
+    "group": "Logs and crash reports",
+    "label": "npm logs",
+    "patterns": [
+      "~/.npm/_logs"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "npm"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "pnpm-store",
+    "group": "Package caches",
+    "label": "pnpm store",
+    "patterns": [
+      "~/Library/pnpm/store",
+      "~/.local/share/pnpm/store",
+      "~/.pnpm-store",
+      "~/Library/Caches/pnpm"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pnpm"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "yarn-cache",
+    "group": "Package caches",
+    "label": "Yarn cache",
+    "patterns": [
+      "~/Library/Caches/Yarn",
+      "~/.yarn/berry/cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "yarn"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "bun-cache",
+    "group": "Package caches",
+    "label": "Bun cache",
+    "patterns": [
+      "~/.bun/install/cache"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "bun",
+      "pm",
+      "cache",
+      "rm"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "bun"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "next-build",
+    "group": "Build output",
+    "label": "Next.js build",
+    "patterns": [
+      "**/.next"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 7 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "nuxt-build",
+    "group": "Build output",
+    "label": "Nuxt build",
+    "patterns": [
+      "**/.nuxt",
+      "**/.output"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 7 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "turbo-cache",
+    "group": "Build output",
+    "label": "Turborepo cache",
+    "patterns": [
+      "**/.turbo",
+      "**/node_modules/.cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "parcel-cache",
+    "group": "Build output",
+    "label": "Parcel cache",
+    "patterns": [
+      "**/.parcel-cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "svelte-kit",
+    "group": "Build output",
+    "label": "SvelteKit build",
+    "patterns": [
+      "**/.svelte-kit"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "angular-cache",
+    "group": "Build output",
+    "label": "Angular cache",
+    "patterns": [
+      "**/.angular/cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to angular.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "angular.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "vite-cache",
+    "group": "Build output",
+    "label": "Vite and Astro cache",
+    "patterns": [
+      "**/node_modules/.vite",
+      "**/.astro",
+      "**/.vercel/output",
+      "**/.wrangler/tmp"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "expo-cache",
+    "group": "Build output",
+    "label": "Expo and Metro cache",
+    "patterns": [
+      "**/.expo"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to package.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "package.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "playwright-browsers",
+    "group": "Toolchains and SDKs",
+    "label": "Playwright browsers",
+    "patterns": [
+      "~/Library/Caches/ms-playwright/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per browser",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads",
+    "notInside": [
+      "Default",
+      "Local State"
+    ]
+  },
+  {
+    "id": "puppeteer-browsers",
+    "group": "Toolchains and SDKs",
+    "label": "Puppeteer browsers",
+    "patterns": [
+      "~/.cache/puppeteer"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cypress-cache",
+    "group": "Toolchains and SDKs",
+    "label": "Cypress",
+    "patterns": [
+      "~/Library/Caches/Cypress/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "processes": [
+        "Cypress"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "electron-cache",
+    "group": "Package caches",
+    "label": "Electron downloads",
+    "patterns": [
+      "~/Library/Caches/electron",
+      "~/Library/Caches/electron-builder"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "node-gyp",
+    "group": "Package caches",
+    "label": "node-gyp headers",
+    "patterns": [
+      "~/Library/Caches/node-gyp",
+      "~/.node-gyp"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "deno-cache",
+    "group": "Package caches",
+    "label": "Deno cache",
+    "patterns": [
+      "~/Library/Caches/deno/deps",
+      "~/Library/Caches/deno/npm",
+      "~/Library/Caches/deno/gen",
+      "~/Library/Caches/deno/remote",
+      "~/Library/Caches/deno/registries"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "deno"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "nvm-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Node versions (nvm)",
+    "patterns": [
+      "~/.nvm/versions/node/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the default, the newest and any version a project pins; others unused 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.nvm/alias/default"
+      ],
+      "keepPinned": "node"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "fnm-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Node versions (fnm)",
+    "patterns": [
+      "~/Library/Application Support/fnm/node-versions/*",
+      "~/.local/share/fnm/node-versions/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per major version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "volta-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Node versions (Volta)",
+    "patterns": [
+      "~/.volta/tools/image/node/*",
+      "~/.volta/tools/inventory"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per major version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "nvm-cache",
+    "group": "Package caches",
+    "label": "nvm downloads",
+    "patterns": [
+      "~/.nvm/.cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pip-cache",
+    "group": "Package caches",
+    "label": "pip cache",
+    "patterns": [
+      "~/Library/Caches/pip"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "pip",
+      "cache",
+      "purge"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pip",
+        "pip3"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "uv-cache",
+    "group": "Package caches",
+    "label": "uv cache",
+    "patterns": [
+      "~/.cache/uv"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "uv",
+      "cache",
+      "prune"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "uv"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "uv-python",
+    "group": "Toolchains and SDKs",
+    "label": "uv Python versions",
+    "patterns": [
+      "~/.local/share/uv/python/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per minor version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product",
+      "processes": [
+        "uv"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "poetry-cache",
+    "group": "Package caches",
+    "label": "Poetry cache",
+    "patterns": [
+      "~/Library/Caches/pypoetry/cache",
+      "~/Library/Caches/pypoetry/artifacts"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "poetry"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "poetry-venvs",
+    "group": "Project dependencies",
+    "label": "Poetry environments",
+    "patterns": [
+      "~/Library/Caches/pypoetry/virtualenvs/*"
+    ],
+    "tier": "costly",
+    "smartRule": "project untouched 30 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 30
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pipenv-cache",
+    "group": "Package caches",
+    "label": "Pipenv cache",
+    "patterns": [
+      "~/Library/Caches/pipenv"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pipenv"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pipenv-venvs",
+    "group": "Project dependencies",
+    "label": "Pipenv environments",
+    "patterns": [
+      "~/.local/share/virtualenvs/*"
+    ],
+    "tier": "costly",
+    "smartRule": "project untouched 30 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 30
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "conda-pkgs",
+    "group": "Package caches",
+    "label": "Conda packages",
+    "patterns": [
+      "~/miniconda3/pkgs",
+      "~/anaconda3/pkgs",
+      "~/miniforge3/pkgs",
+      "~/opt/anaconda3/pkgs",
+      "~/opt/miniconda3/pkgs",
+      "~/.conda/pkgs",
+      "~/micromamba/pkgs"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "conda"
+      ]
+    },
+    "comesBack": "downloads",
+    "smartRule": "environments may link into it"
+  },
+  {
+    "id": "conda-envs",
+    "group": "Toolchains and SDKs",
+    "label": "Conda environments",
+    "patterns": [
+      "~/miniconda3/envs/*",
+      "~/anaconda3/envs/*",
+      "~/miniforge3/envs/*",
+      "~/opt/anaconda3/envs/*",
+      "~/.conda/envs/*",
+      "~/micromamba/envs/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "processes": [
+        "conda"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pyenv-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Python versions (pyenv)",
+    "patterns": [
+      "~/.pyenv/versions/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per minor version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "python-venv",
+    "group": "Project dependencies",
+    "label": "Project environments",
+    "patterns": [
+      "**/.venv",
+      "**/venv"
+    ],
+    "tier": "costly",
+    "smartRule": "contains pyvenv.cfg, project untouched 30 days",
+    "listOnly": false,
+    "inside": [
+      "pyvenv.cfg"
+    ],
+    "rule": {
+      "projectUntouchedDays": 30
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "python-pycache",
+    "group": "Build output",
+    "label": "Python bytecode",
+    "patterns": [
+      "**/__pycache__"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 7 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "python-tool-caches",
+    "group": "Build output",
+    "label": "Python tool caches",
+    "patterns": [
+      "**/.mypy_cache",
+      "**/.pytest_cache",
+      "**/.ruff_cache",
+      "**/.hypothesis"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 7 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "python-tox",
+    "group": "Build output",
+    "label": "tox and nox environments",
+    "patterns": [
+      "**/.tox",
+      "**/.nox"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to tox.ini, noxfile.py, pyproject.toml or setup.cfg, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "tox.ini",
+      "noxfile.py",
+      "pyproject.toml",
+      "setup.cfg"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "jupyter-runtime",
+    "group": "Build output",
+    "label": "Jupyter runtime",
+    "patterns": [
+      "~/Library/Jupyter/runtime",
+      "**/.ipynb_checkpoints"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7,
+      "processes": [
+        "jupyter",
+        "jupyter-lab",
+        "jupyter-notebook",
+        "ipykernel_launcher"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "huggingface-cache",
+    "group": "AI models",
+    "label": "Hugging Face models",
+    "patterns": [
+      "~/.cache/huggingface/hub/*",
+      "~/.cache/huggingface/datasets/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "huggingface-xet",
+    "group": "Package caches",
+    "label": "Hugging Face download cache",
+    "patterns": [
+      "~/.cache/huggingface/xet"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "ollama-models",
+    "group": "AI models",
+    "label": "Ollama models",
+    "patterns": [
+      "~/.ollama/models"
+    ],
+    "tier": "costly",
+    "smartRule": "per model, unused 30 days",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "ollama"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "lmstudio-models",
+    "group": "AI models",
+    "label": "LM Studio models",
+    "patterns": [
+      "~/.lmstudio/models/*",
+      "~/.cache/lm-studio/models/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "torch-hub",
+    "group": "AI models",
+    "label": "PyTorch models",
+    "patterns": [
+      "~/.cache/torch"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "keras-cache",
+    "group": "AI models",
+    "label": "Keras datasets",
+    "patterns": [
+      "~/.keras/datasets",
+      "~/.keras/models"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "nltk-data",
+    "group": "AI models",
+    "label": "NLTK data",
+    "patterns": [
+      "~/nltk_data"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "whisper-models",
+    "group": "AI models",
+    "label": "Whisper models",
+    "patterns": [
+      "~/.cache/whisper"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pre-commit-cache",
+    "group": "Package caches",
+    "label": "pre-commit cache",
+    "patterns": [
+      "~/.cache/pre-commit"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "pre-commit",
+      "clean"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "pre-commit"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cargo-target",
+    "group": "Build output",
+    "label": "Rust build output",
+    "patterns": [
+      "**/target"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Cargo.toml, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Cargo.toml"
+    ],
+    "rule": {
+      "processes": [
+        "cargo",
+        "rustc"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "cargo-registry",
+    "group": "Package caches",
+    "label": "Cargo registry",
+    "patterns": [
+      "~/.cargo/registry/cache",
+      "~/.cargo/registry/src"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cargo-git",
+    "group": "Package caches",
+    "label": "Cargo git checkouts",
+    "patterns": [
+      "~/.cargo/git/checkouts",
+      "~/.cargo/git/db"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "cargo",
+        "rustc"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "rustup-toolchains",
+    "group": "Toolchains and SDKs",
+    "label": "Rust toolchains",
+    "patterns": [
+      "~/.rustup/toolchains/*"
+    ],
+    "tier": "costly",
+    "smartRule": "not the default toolchain",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "rustup",
+        "cargo",
+        "rustc"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "swift-toolchains",
+    "group": "Toolchains and SDKs",
+    "label": "Swift toolchains",
+    "patterns": [
+      "~/Library/Developer/Toolchains/*.xctoolchain",
+      "/Library/Developer/Toolchains/*.xctoolchain"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the one swift-latest points to and the newest other",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/Library/Developer/Toolchains/swift-latest.xctoolchain",
+        "/Library/Developer/Toolchains/swift-latest.xctoolchain"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "rustup-downloads",
+    "group": "Package caches",
+    "label": "rustup downloads",
+    "patterns": [
+      "~/.rustup/downloads",
+      "~/.rustup/tmp"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "rustup",
+        "cargo",
+        "rustc"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "go-build-cache",
+    "group": "Package caches",
+    "label": "Go build cache",
+    "patterns": [
+      "~/Library/Caches/go-build"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "go",
+      "clean",
+      "-cache"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "go",
+        "gopls"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "go-mod-cache",
+    "group": "Package caches",
+    "label": "Go modules",
+    "patterns": [
+      "~/go/pkg/mod"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "go",
+      "clean",
+      "-modcache"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "go",
+        "gopls"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "go-toolchains",
+    "group": "Toolchains and SDKs",
+    "label": "Go toolchains",
+    "patterns": [
+      "~/go/pkg/mod/golang.org/toolchain@*",
+      "~/sdk/go*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "processes": [
+        "go",
+        "gopls"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "nuget-packages",
+    "group": "Package caches",
+    "label": "NuGet packages",
+    "patterns": [
+      "~/.nuget/packages"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "dotnet",
+      "nuget",
+      "locals",
+      "global-packages",
+      "--clear"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "dotnet"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "dotnet-build",
+    "group": "Build output",
+    "label": ".NET build output",
+    "patterns": [
+      "**/bin/Debug",
+      "**/obj"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .csproj or .fsproj, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "*.csproj",
+      "*.fsproj"
+    ],
+    "rule": {
+      "processes": [
+        "dotnet"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "ruby-gems",
+    "group": "Package caches",
+    "label": "Ruby gems",
+    "patterns": [
+      "~/.gem",
+      "~/.local/share/gem",
+      "~/.cache/gem"
+    ],
+    "tier": "regenerable",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "gem",
+        "bundle"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "bundler-cache",
+    "group": "Project dependencies",
+    "label": "Bundler cache",
+    "patterns": [
+      "**/vendor/bundle"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Gemfile, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "Gemfile"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "ruby-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Ruby versions",
+    "patterns": [
+      "~/.rbenv/versions/*",
+      "~/.rubies/*",
+      "~/.rvm/rubies/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the global, the newest and any version a project pins; others unused 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.rbenv/version"
+      ],
+      "keepPinned": "ruby"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "pub-cache",
+    "group": "Package caches",
+    "label": "Dart and Flutter packages",
+    "patterns": [
+      "~/.pub-cache/hosted",
+      "~/.pub-cache/git"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "flutter",
+        "dart"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "flutter-build",
+    "group": "Build output",
+    "label": "Flutter build output",
+    "patterns": [
+      "**/build",
+      "**/.dart_tool"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to pubspec.yaml, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "pubspec.yaml"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fvm-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Flutter versions (FVM)",
+    "patterns": [
+      "~/fvm/versions/*",
+      "~/.fvm/versions/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "haskell-stack",
+    "group": "Build output",
+    "label": "Haskell Stack",
+    "patterns": [
+      "~/.stack/programs",
+      "~/.stack/snapshots",
+      "**/.stack-work"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "haskell-cabal",
+    "group": "Package caches",
+    "label": "Cabal cache",
+    "patterns": [
+      "~/.cabal/packages",
+      "**/dist-newstyle"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "ghcup",
+    "group": "Toolchains and SDKs",
+    "label": "GHC versions",
+    "patterns": [
+      "~/.ghcup/ghc/*",
+      "~/.ghcup/cache"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "elixir-hex",
+    "group": "Build output",
+    "label": "Elixir packages",
+    "patterns": [
+      "**/_build",
+      "**/deps"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to mix.exs, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "mix.exs"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "zig-cache",
+    "group": "Build output",
+    "label": "Zig cache",
+    "patterns": [
+      "**/.zig-cache",
+      "**/zig-cache",
+      "**/zig-out"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to build.zig, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "build.zig"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "bazel-cache",
+    "group": "Package caches",
+    "label": "Bazel cache",
+    "patterns": [
+      "~/Library/Caches/bazel",
+      "~/Library/Caches/bazelisk"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "bazel",
+        "bazelisk",
+        "bazel-real"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "bazel-cache-system",
+    "group": "Package caches",
+    "label": "Bazel build data",
+    "patterns": [
+      "/private/var/tmp/_bazel_*"
+    ],
+    "tier": "regenerable",
+    "listOnly": true,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "ccache",
+    "group": "Package caches",
+    "label": "ccache",
+    "patterns": [
+      "~/Library/Caches/ccache",
+      "~/.ccache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "ccache"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "sccache",
+    "group": "Package caches",
+    "label": "sccache",
+    "patterns": [
+      "~/Library/Caches/Mozilla.sccache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "sccache"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "conan-cache",
+    "group": "Package caches",
+    "label": "Conan packages",
+    "patterns": [
+      "~/.conan2/p",
+      "~/.conan/data"
+    ],
+    "tier": "regenerable",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "vcpkg-cache",
+    "group": "Package caches",
+    "label": "vcpkg cache",
+    "patterns": [
+      "~/.cache/vcpkg/archives"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "composer-cache",
+    "group": "Package caches",
+    "label": "Composer cache",
+    "patterns": [
+      "~/Library/Caches/composer",
+      "~/.composer/cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "composer"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "php-vendor",
+    "group": "Project dependencies",
+    "label": "PHP vendor",
+    "patterns": [
+      "**/vendor"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to composer.json, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "composer.json"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cmake-build",
+    "group": "Build output",
+    "label": "CMake build folders",
+    "patterns": [
+      "**/cmake-build-debug",
+      "**/cmake-build-release"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to CMakeLists.txt, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "CMakeLists.txt"
+    ],
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "terraform-plugins",
+    "group": "Project dependencies",
+    "label": "Terraform providers",
+    "patterns": [
+      "**/.terraform"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .tf file, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "*.tf"
+    ],
+    "rule": {
+      "processes": [
+        "terraform"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "asdf-mise-installs",
+    "group": "Toolchains and SDKs",
+    "label": "asdf and mise versions",
+    "patterns": [
+      "~/.asdf/installs/*/*",
+      "~/.local/share/mise/installs/*/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per tool",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "mise-cache",
+    "group": "Package caches",
+    "label": "mise cache",
+    "patterns": [
+      "~/Library/Caches/mise"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "mise",
+      "cache",
+      "clear"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "mise"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "docker-desktop-data",
+    "group": "Virtual machines and containers",
+    "label": "Docker data",
+    "patterns": [
+      "~/Library/Containers/com.docker.docker/Data/vms"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "com.docker.backend",
+        "Docker Desktop"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "orbstack-data",
+    "group": "Virtual machines and containers",
+    "label": "OrbStack data",
+    "patterns": [
+      "~/.orbstack",
+      "~/Library/Group Containers/*.dev.orbstack/data"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "OrbStack"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "colima-lima",
+    "group": "Virtual machines and containers",
+    "label": "Colima and Lima VMs",
+    "patterns": [
+      "~/.colima/_lima/*",
+      "~/.lima/*"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "colima",
+        "limactl"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "lima-cache",
+    "group": "Package caches",
+    "label": "Lima image cache",
+    "patterns": [
+      "~/Library/Caches/lima",
+      "~/Library/Caches/colima"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "colima",
+        "limactl"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "podman-data",
+    "group": "Virtual machines and containers",
+    "label": "Podman data",
+    "patterns": [
+      "~/.local/share/containers/podman/machine/*",
+      "~/.local/share/containers/storage"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "podman"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "utm-vms",
+    "group": "Virtual machines and containers",
+    "label": "UTM virtual machines",
+    "patterns": [
+      "~/Library/Containers/com.utmapp.UTM/Data/Documents/*.utm"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "parallels-vms",
+    "group": "Virtual machines and containers",
+    "label": "Parallels virtual machines",
+    "patterns": [
+      "~/Parallels/*.pvm",
+      "~/Parallels/*.macvm"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "vmware-vms",
+    "group": "Virtual machines and containers",
+    "label": "VMware virtual machines",
+    "patterns": [
+      "~/Virtual Machines.localized/*.vmwarevm",
+      "~/Documents/Virtual Machines.localized/*.vmwarevm"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "virtualbox-vms",
+    "group": "Virtual machines and containers",
+    "label": "VirtualBox virtual machines",
+    "patterns": [
+      "~/VirtualBox VMs/*"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "tart-vms",
+    "group": "Virtual machines and containers",
+    "label": "Tart virtual machines",
+    "patterns": [
+      "~/.tart/vms/*"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "tart"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "vagrant-boxes",
+    "group": "Virtual machines and containers",
+    "label": "Vagrant boxes",
+    "patterns": [
+      "~/.vagrant.d/boxes/*"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "vagrant"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "minikube",
+    "group": "Virtual machines and containers",
+    "label": "minikube",
+    "patterns": [
+      "~/.minikube/machines",
+      "~/.minikube/cache"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "minikube"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "claude-desktop-vm",
+    "group": "Virtual machines and containers",
+    "label": "Claude workspace VM",
+    "patterns": [
+      "~/Library/Application Support/Claude/**/*.bundle"
+    ],
+    "tier": "costly",
+    "smartRule": "app not installed, untouched 7 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 7,
+      "appNotInstalled": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "docker-buildx-cache",
+    "group": "Virtual machines and containers",
+    "label": "Docker build cache",
+    "patterns": [
+      "~/.docker/buildx/cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "docker-buildx",
+        "com.docker.backend",
+        "Docker Desktop"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "kind-k3d",
+    "group": "Package caches",
+    "label": "Kubernetes caches",
+    "patterns": [
+      "~/.kube/cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "js-tool-caches",
+    "group": "Package caches",
+    "label": "JavaScript tool caches",
+    "patterns": [
+      "~/.cache/typescript",
+      "~/.cache/eslint",
+      "~/.cache/prettier",
+      "~/.cache/webpack",
+      "~/.cache/vite",
+      "~/Library/Caches/typescript"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "js-tool-downloads",
+    "group": "Package caches",
+    "label": "JavaScript tool downloads",
+    "patterns": [
+      "~/.cache/prisma",
+      "~/.cache/node/corepack",
+      "~/.expo/versions"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "gradle-build-cache",
+    "group": "Package caches",
+    "label": "Gradle build cache",
+    "patterns": [
+      "~/.gradle/caches/build-cache-*",
+      "~/.gradle/notifications",
+      "~/.gradle/workers"
+    ],
+    "tier": "regenerable",
+    "smartRule": "no Gradle daemon running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "gradle-version-caches",
+    "group": "Package caches",
+    "label": "Gradle per-version caches",
+    "patterns": [
+      "~/.gradle/caches/[0-9]*",
+      "~/.gradle/caches/transforms-*",
+      "~/.gradle/caches/kotlin-dsl"
+    ],
+    "tier": "regenerable",
+    "smartRule": "untouched 7 days, no Gradle daemon running",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7,
+      "processes": [
+        "GradleDaemon",
+        "GradleWrapperMain"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "tart-cache",
+    "group": "Package caches",
+    "label": "Tart image cache",
+    "patterns": [
+      "~/.tart/cache"
+    ],
+    "tier": "regenerable",
+    "cleanCommand": [
+      "tart",
+      "prune",
+      "--entries",
+      "caches",
+      "--older-than",
+      "30"
+    ],
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "tart"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "misc-dev-caches",
+    "group": "Package caches",
+    "label": "Other build tool caches",
+    "patterns": [
+      "~/.opam/download-cache",
+      "~/.cpan/build",
+      "~/.hex/cache",
+      "~/.cache/terraform",
+      "~/.sonar/cache",
+      "~/.cache/gitlab-runner",
+      "~/.cache/gh",
+      "~/.cache/firebase/emulators",
+      "~/Library/Caches/terragrunt",
+      "~/.bundle/cache",
+      "~/.hex/packages",
+      "~/.cache/zig",
+      "~/.terraform.d/plugin-cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "unity-project-library",
+    "group": "Build output",
+    "label": "Unity project cache",
+    "patterns": [
+      "**/Library"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Assets and ProjectSettings, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "ProjectSettings"
+    ],
+    "rule": {
+      "processes": [
+        "Unity",
+        "Unity Hub"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unity-project-temp",
+    "group": "Build output",
+    "label": "Unity project temp",
+    "patterns": [
+      "**/Temp",
+      "**/Logs",
+      "**/obj"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Assets and ProjectSettings, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "ProjectSettings"
+    ],
+    "rule": {
+      "processes": [
+        "Unity",
+        "Unity Hub"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unity-cache",
+    "group": "App caches",
+    "label": "Unity cache",
+    "patterns": [
+      "~/Library/Unity/cache",
+      "~/Library/Unity/Asset Store-5.x",
+      "~/Library/Caches/com.unity3d.*",
+      "~/Library/Caches/com.unity.*"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "Unity",
+        "Unity Hub"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "unity-editors",
+    "group": "Toolchains and SDKs",
+    "label": "Unity editors",
+    "patterns": [
+      "/Applications/Unity/Hub/Editor/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest per major version",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product",
+      "processes": [
+        "Unity",
+        "Unity Hub"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "unity-logs",
+    "group": "Logs and crash reports",
+    "label": "Unity logs",
+    "patterns": [
+      "~/Library/Logs/Unity"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "Unity",
+        "Unity Hub"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unreal-ddc",
+    "group": "Build output",
+    "label": "Unreal shared cache",
+    "patterns": [
+      "**/DerivedDataCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .uproject file, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "*.uproject"
+    ],
+    "rule": {
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unreal-ddc-shared",
+    "group": "Build output",
+    "label": "Unreal shared cache",
+    "patterns": [
+      "~/Library/Application Support/Epic/UnrealEngine/Common/DerivedDataCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Unreal not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "Epic Games, Derived Data Cache (docs.unrealengine.com, Unreal Engine 5.x), read 2026-11-06"
+  },
+  {
+    "id": "unreal-intermediate",
+    "group": "Build output",
+    "label": "Unreal build output",
+    "patterns": [
+      "**/Intermediate",
+      "**/Binaries"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .uproject file, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "*.uproject"
+    ],
+    "rule": {
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unreal-saved",
+    "group": "Build output",
+    "label": "Unreal saved logs",
+    "patterns": [
+      "**/Saved/Logs",
+      "**/Saved/Crashes"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .uproject file, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "*.uproject"
+    ],
+    "rule": {
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "unreal-autosaves",
+    "group": "Build output",
+    "label": "Unreal autosaves",
+    "patterns": [
+      "**/Saved/Autosaves"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "near": [
+      "*.uproject"
+    ],
+    "rule": {
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ]
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "unreal-engines",
+    "group": "Toolchains and SDKs",
+    "label": "Unreal engines",
+    "patterns": [
+      "/Users/Shared/Epic Games/UE_*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "processes": [
+        "UnrealEditor",
+        "UnrealBuildTool"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "epic-launcher-cache",
+    "group": "App caches",
+    "label": "Epic launcher cache",
+    "patterns": [
+      "~/Library/Caches/com.epicgames.EpicGamesLauncher",
+      "~/Library/Application Support/Epic/EpicGamesLauncher/Saved/webcache*",
+      "~/Library/Logs/Unreal Engine"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "godot-cache",
+    "group": "Build output",
+    "label": "Godot project cache",
+    "patterns": [
+      "**/.godot",
+      "**/.import"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to project.godot, project untouched 14 days",
+    "listOnly": false,
+    "near": [
+      "project.godot"
+    ],
+    "rule": {
+      "processes": [
+        "Godot"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "godot-editor-cache",
+    "group": "App caches",
+    "label": "Godot editor cache",
+    "patterns": [
+      "~/Library/Caches/Godot"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "Godot"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "steam-games",
+    "group": "Games",
+    "label": "Steam games",
+    "patterns": [
+      "~/Library/Application Support/Steam/steamapps/common/*"
+    ],
+    "tier": "costly",
+    "smartRule": "not played in 90 days",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "steam-cache",
+    "group": "App caches",
+    "label": "Steam cache",
+    "patterns": [
+      "~/Library/Application Support/Steam/appcache",
+      "~/Library/Application Support/Steam/depotcache",
+      "~/Library/Application Support/Steam/logs",
+      "~/Library/Application Support/Steam/steamapps/shadercache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "steam_osx",
+        "Steam"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "fcp-render-files",
+    "group": "Render and preview files",
+    "label": "Final Cut render files",
+    "patterns": [
+      "~/**/*.fcpbundle/*/Render Files"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Final Cut Pro"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fcp-render-files-volumes",
+    "group": "Render and preview files",
+    "label": "Final Cut render files on drives",
+    "patterns": [
+      "/Volumes/*/**/*.fcpbundle/*/Render Files"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Final Cut Pro"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fcp-proxy-media",
+    "group": "Render and preview files",
+    "label": "Final Cut proxy and optimised media",
+    "patterns": [
+      "~/**/*.fcpbundle/*/Transcoded Media",
+      "/Volumes/*/**/*.fcpbundle/*/Transcoded Media"
+    ],
+    "tier": "costly",
+    "smartRule": "app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Final Cut Pro"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fcp-analysis",
+    "group": "Render and preview files",
+    "label": "Final Cut analysis files",
+    "patterns": [
+      "~/**/*.fcpbundle/*/Analysis Files"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Final Cut Pro"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fcp-caches",
+    "group": "App caches",
+    "label": "Final Cut cache",
+    "patterns": [
+      "~/Library/Caches/com.apple.FinalCut",
+      "~/**/*.fcpcache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Final Cut Pro"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "fcp-libraries",
+    "group": "Large media files",
+    "label": "Final Cut libraries",
+    "patterns": [
+      "~/**/*.fcpbundle",
+      "/Volumes/*/**/*.fcpbundle"
+    ],
+    "tier": "never",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "adobe-media-cache",
+    "group": "Render and preview files",
+    "label": "Adobe media cache",
+    "patterns": [
+      "~/Library/Application Support/Adobe/Common/Media Cache Files",
+      "~/Library/Application Support/Adobe/Common/Media Cache",
+      "~/Library/Application Support/Adobe/Common/Peak Files"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Adobe Premiere Pro",
+        "After Effects",
+        "Adobe Media Encoder"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "adobe-caches",
+    "group": "App caches",
+    "label": "Adobe caches",
+    "patterns": [
+      "~/Library/Caches/Adobe",
+      "~/Library/Caches/com.adobe.*",
+      "~/Library/Logs/Adobe"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Creative Cloud",
+        "Adobe Desktop Service",
+        "Adobe Photoshop",
+        "Adobe Lightroom",
+        "Adobe Premiere Pro",
+        "Adobe Illustrator"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "after-effects-disk-cache",
+    "group": "Render and preview files",
+    "label": "After Effects disk cache",
+    "patterns": [
+      "~/Library/Caches/Adobe/After Effects/*/Disk Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "photoshop-temp",
+    "group": "Render and preview files",
+    "label": "Photoshop recovered files",
+    "patterns": [
+      "~/Library/Application Support/Adobe/Adobe Photoshop */AutoRecover"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "photoshop-temp-system",
+    "group": "Render and preview files",
+    "label": "Photoshop scratch files",
+    "patterns": [
+      "/private/var/folders/*/*/T/Photoshop Temp*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Adobe Photoshop"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "lightroom-previews",
+    "group": "Render and preview files",
+    "label": "Lightroom previews",
+    "patterns": [
+      "**/*Previews.lrdata",
+      "**/*Smart Previews.lrdata"
+    ],
+    "tier": "costly",
+    "smartRule": "app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Adobe Lightroom Classic",
+        "Adobe Lightroom"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "lightroom-cc-cache",
+    "group": "App caches",
+    "label": "Lightroom cache",
+    "patterns": [
+      "~/Library/Caches/Adobe Camera Raw*",
+      "~/Pictures/Lightroom Library.lrlibrary/*/cache.lrcat-data"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Adobe Lightroom Classic",
+        "Adobe Lightroom",
+        "Adobe Photoshop"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "resolve-cache",
+    "group": "Render and preview files",
+    "label": "DaVinci Resolve cache",
+    "patterns": [
+      "~/Movies/CacheClip",
+      "**/CacheClip",
+      "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "DaVinci Resolve"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "resolve-gallery",
+    "group": "Large media files",
+    "label": "DaVinci Resolve stills",
+    "patterns": [
+      "**/.gallery"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "garageband-content",
+    "group": "Sound libraries",
+    "label": "GarageBand sounds",
+    "patterns": [
+      "/Library/Application Support/GarageBand"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "logic-content",
+    "group": "Sound libraries",
+    "label": "Logic Pro sounds",
+    "patterns": [
+      "/Library/Application Support/Logic",
+      "/Library/Application Support/Apple/AudioContent"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "sketch-caches",
+    "group": "App caches",
+    "label": "Sketch cache",
+    "patterns": [
+      "~/Library/Caches/com.bohemiancoding.sketch3",
+      "~/Library/Application Support/com.bohemiancoding.sketch3/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "figma-caches",
+    "group": "App caches",
+    "label": "Figma cache",
+    "patterns": [
+      "~/Library/Application Support/Figma/DesktopProfile/*/Cache",
+      "~/Library/Application Support/Figma/DesktopProfile/*/Code Cache",
+      "~/Library/Caches/com.figma.Desktop"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Figma"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "blender-cache",
+    "group": "Render and preview files",
+    "label": "Blender cache",
+    "patterns": [
+      "~/Library/Caches/Blender",
+      "**/blendcache_*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Blender"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "capture-one-cache",
+    "group": "App caches",
+    "label": "Capture One cache",
+    "patterns": [
+      "~/Library/Caches/com.captureone.captureone*",
+      "**/CaptureOne/Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Capture One"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "affinity-caches",
+    "group": "App caches",
+    "label": "Affinity cache",
+    "patterns": [
+      "~/Library/Caches/com.seriflabs.*",
+      "~/Library/Containers/com.seriflabs.*/Data/Library/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "ableton-cache",
+    "group": "Sound libraries",
+    "label": "Ableton cache",
+    "patterns": [
+      "~/Music/Ableton/Factory Packs",
+      "~/Library/Caches/Ableton"
+    ],
+    "tier": "costly",
+    "smartRule": "app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Live"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "ableton-decoding-cache",
+    "group": "Render and preview files",
+    "label": "Ableton decoding cache",
+    "patterns": [
+      "~/Library/Application Support/Ableton/Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "safari-cache",
+    "group": "App caches",
+    "label": "Safari cache",
+    "patterns": [
+      "~/Library/Caches/com.apple.Safari",
+      "~/Library/Containers/com.apple.Safari/Data/Library/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "chrome-cache",
+    "group": "App caches",
+    "label": "Chrome cache",
+    "patterns": [
+      "~/Library/Caches/Google/Chrome",
+      "~/Library/Application Support/Google/Chrome/*/GPUCache",
+      "~/Library/Application Support/Google/Chrome/*/DawnGraphiteCache",
+      "~/Library/Application Support/Google/Chrome/*/DawnWebGPUCache",
+      "~/Library/Application Support/Google/Chrome/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/Google/Chrome/GrShaderCache",
+      "~/Library/Application Support/Google/Chrome/GraphiteDawnCache",
+      "~/Library/Application Support/Google/Chrome/ShaderCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Google Chrome"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "chrome-on-device-models",
+    "group": "AI models",
+    "label": "Chrome on-device AI models",
+    "patterns": [
+      "~/Library/Application Support/Google/Chrome/OptGuideOnDeviceModel",
+      "~/Library/Application Support/Google/Chrome/OptGuideOnDeviceClassifierModel",
+      "~/Library/Application Support/Google/Chrome/optimization_guide_model_store",
+      "~/Library/Application Support/Google/Chrome Beta/OptGuideOnDeviceModel",
+      "~/Library/Application Support/Google/Chrome Beta/optimization_guide_model_store",
+      "~/Library/Application Support/Google/Chrome Dev/OptGuideOnDeviceModel",
+      "~/Library/Application Support/Google/Chrome Dev/optimization_guide_model_store",
+      "~/Library/Application Support/Google/Chrome Canary/OptGuideOnDeviceModel",
+      "~/Library/Application Support/Google/Chrome Canary/optimization_guide_model_store"
+    ],
+    "tier": "costly",
+    "listOnly": true,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "arc-cache",
+    "group": "App caches",
+    "label": "Arc cache",
+    "patterns": [
+      "~/Library/Caches/Arc",
+      "~/Library/Caches/company.thebrowser.Browser",
+      "~/Library/Application Support/Arc/User Data/*/GPUCache",
+      "~/Library/Application Support/Arc/User Data/*/DawnGraphiteCache",
+      "~/Library/Application Support/Arc/User Data/*/DawnWebGPUCache",
+      "~/Library/Application Support/Arc/User Data/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/Arc/User Data/GrShaderCache",
+      "~/Library/Application Support/Arc/User Data/GraphiteDawnCache",
+      "~/Library/Application Support/Arc/User Data/ShaderCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "brave-cache",
+    "group": "App caches",
+    "label": "Brave cache",
+    "patterns": [
+      "~/Library/Caches/BraveSoftware",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/*/GPUCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/*/DawnGraphiteCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/*/DawnWebGPUCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/GrShaderCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/GraphiteDawnCache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/ShaderCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Brave Browser",
+        "Brave Browser Beta",
+        "Brave Browser Nightly"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "edge-cache",
+    "group": "App caches",
+    "label": "Edge cache",
+    "patterns": [
+      "~/Library/Caches/Microsoft Edge",
+      "~/Library/Application Support/Microsoft Edge*/*/GPUCache",
+      "~/Library/Application Support/Microsoft Edge*/*/DawnGraphiteCache",
+      "~/Library/Application Support/Microsoft Edge*/*/DawnWebGPUCache",
+      "~/Library/Application Support/Microsoft Edge*/*/Service Worker/ScriptCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "firefox-cache",
+    "group": "App caches",
+    "label": "Firefox cache",
+    "patterns": [
+      "~/Library/Caches/Firefox/Profiles/*/cache2",
+      "~/Library/Caches/Mozilla/updates"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "opera-vivaldi-cache",
+    "group": "App caches",
+    "label": "Opera and Vivaldi cache",
+    "patterns": [
+      "~/Library/Caches/com.operasoftware.Opera",
+      "~/Library/Caches/Vivaldi",
+      "~/Library/Application Support/Vivaldi*/*/GPUCache",
+      "~/Library/Application Support/Vivaldi*/*/DawnGraphiteCache",
+      "~/Library/Application Support/Vivaldi*/*/DawnWebGPUCache",
+      "~/Library/Application Support/Vivaldi*/*/Service Worker/ScriptCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "slack-cache",
+    "group": "App caches",
+    "label": "Slack cache",
+    "patterns": [
+      "~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Cache",
+      "~/Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack/Service Worker/CacheStorage",
+      "~/Library/Application Support/Slack/Cache",
+      "~/Library/Application Support/Slack/Service Worker/CacheStorage"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "discord-cache",
+    "group": "App caches",
+    "label": "Discord cache",
+    "patterns": [
+      "~/Library/Application Support/discord/Cache",
+      "~/Library/Application Support/discord/Code Cache",
+      "~/Library/Application Support/discord/GPUCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Discord"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "teams-cache",
+    "group": "App caches",
+    "label": "Teams cache",
+    "patterns": [
+      "~/Library/Containers/com.microsoft.teams2/Data/Library/Caches",
+      "~/Library/Application Support/Microsoft/Teams/Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "whatsapp-cache",
+    "group": "App caches",
+    "label": "WhatsApp cache",
+    "patterns": [
+      "~/Library/Containers/net.whatsapp.WhatsApp/Data/Library/Caches",
+      "~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Library/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "whatsapp-media",
+    "group": "Chat attachments",
+    "label": "WhatsApp media",
+    "patterns": [
+      "~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Message/Media",
+      "~/Library/Group Containers/group.net.whatsapp.WhatsAppSMB.shared/Message/Media"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "telegram-cache",
+    "group": "App caches",
+    "label": "Telegram media cache",
+    "patterns": [
+      "~/Library/Group Containers/*.ru.keepcoder.Telegram/*/postbox/media",
+      "~/Library/Group Containers/*.ru.keepcoder.Telegram/account-*/postbox/media"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "zoom-cache",
+    "group": "App caches",
+    "label": "Zoom cache",
+    "patterns": [
+      "~/Library/Caches/us.zoom.xos",
+      "~/Library/Logs/zoom.us"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "zoom.us"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "zoom-recordings",
+    "group": "Large media files",
+    "label": "Zoom recordings",
+    "patterns": [
+      "~/Documents/Zoom"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "signal-media",
+    "group": "Chat attachments",
+    "label": "Signal media",
+    "patterns": [
+      "~/Library/Application Support/Signal/attachments.noindex"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "spotify-cache",
+    "group": "App caches",
+    "label": "Spotify cache",
+    "patterns": [
+      "~/Library/Caches/com.spotify.client",
+      "~/Library/Application Support/Spotify/PersistentCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "apple-music-cache",
+    "group": "App caches",
+    "label": "Apple Music cache",
+    "patterns": [
+      "~/Library/Caches/com.apple.Music",
+      "~/Library/Containers/com.apple.AMPArtworkAgent/Data/Library/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "podcasts-downloads",
+    "group": "Podcast and media downloads",
+    "label": "Podcast downloads",
+    "patterns": [
+      "~/Library/Group Containers/*.groups.com.apple.podcasts/Library/Cache"
+    ],
+    "tier": "costly",
+    "smartRule": "older than 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "mail-downloads",
+    "group": "App caches",
+    "label": "Mail downloads",
+    "patterns": [
+      "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, older than 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "ios-backups",
+    "group": "Backups and archives",
+    "label": "iPhone and iPad backups",
+    "patterns": [
+      "~/Library/Application Support/MobileSync/Backup/*"
+    ],
+    "tier": "userData",
+    "smartRule": "keep newest per device",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "device"
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "ios-software-updates",
+    "group": "Downloads and installers",
+    "label": "iPhone software updates",
+    "patterns": [
+      "~/Library/iTunes/iPhone Software Updates",
+      "~/Library/iTunes/iPad Software Updates"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "macos-installers",
+    "group": "Downloads and installers",
+    "label": "macOS installers",
+    "patterns": [
+      "/Applications/Install macOS *.app"
+    ],
+    "tier": "costly",
+    "smartRule": "not the running macOS major, no update pending, untouched 14 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 14
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "downloads-installers",
+    "group": "Downloads and installers",
+    "label": "Old installers",
+    "patterns": [
+      "~/Downloads/*.dmg",
+      "~/Downloads/*.pkg",
+      "~/Downloads/*.xip",
+      "~/Downloads/*.iso",
+      "~/Downloads/*.mpkg",
+      "~/Desktop/*.dmg",
+      "~/Desktop/*.pkg",
+      "~/Desktop/*.mpkg",
+      "~/Desktop/*.xip",
+      "~/Desktop/*.iso"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "downloads-archives",
+    "group": "Downloads and installers",
+    "label": "Old archives in Downloads",
+    "patterns": [
+      "~/Downloads/*.zip",
+      "~/Downloads/*.tar.gz",
+      "~/Downloads/*.7z",
+      "~/Downloads/*.rar"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "unfinished-downloads",
+    "group": "Downloads and installers",
+    "label": "Unfinished downloads",
+    "patterns": [
+      "~/Downloads/*.download",
+      "~/Downloads/*.crdownload",
+      "~/Downloads/*.part"
+    ],
+    "tier": "costly",
+    "smartRule": "not open, untouched 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "configurator-firmware",
+    "group": "Downloads and installers",
+    "label": "Apple Configurator firmware",
+    "patterns": [
+      "~/Library/Group Containers/*.group.com.apple.configurator/**/*.ipsw"
+    ],
+    "tier": "costly",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "trash",
+    "group": "Trash",
+    "label": "Trash",
+    "patterns": [
+      "~/.Trash"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "large-old-files",
+    "group": "Large media files",
+    "label": "Large old files",
+    "patterns": [
+      "~/**/*.mov",
+      "~/**/*.mp4",
+      "~/**/*.mkv",
+      "~/**/*.m4v",
+      "~/**/*.webm"
+    ],
+    "tier": "userData",
+    "smartRule": "over 1 GB, untouched 180 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 180,
+      "minBytes": 1073741824
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "docker-model-runner-models",
+    "group": "AI models",
+    "label": "Docker AI models",
+    "patterns": [
+      "~/.docker/models"
+    ],
+    "tier": "costly",
+    "smartRule": "list only; Docker Desktop not running",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "com.docker.backend",
+        "Docker Desktop",
+        "model-runner"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "docker/model-runner v1.2.9 (2026-10-22), pkg/envconfig/envconfig.go ModelsPath(): default filepath.Join(home, \".docker\", \"models\") unless MODELS_PATH is set; https://docs.docker.com/ai/model-runner/ read 2026-11-06"
+  },
+  {
+    "id": "docker-scout-sbom-cache",
+    "group": "Package caches",
+    "label": "Docker Scout cache",
+    "patterns": [
+      "~/.docker/scout/sbom"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Docker Desktop not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "com.docker.backend",
+        "Docker Desktop",
+        "docker-scout"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "Docker docs, docker scout cache df and docker scout cache prune --sboms (https://docs.docker.com/reference/cli/docker/scout/cache/prune/, read 2026-11-06): cached SBOMs live in ~/.docker/scout/sbom, keyed by image digest, and are regenerated on the next scan; devtrim v0.12.6 src/ops/docker.rs (Docker category) for the category"
+  },
+  {
+    "id": "apple-container-data",
+    "group": "Virtual machines and containers",
+    "label": "Apple container data",
+    "patterns": [
+      "~/Library/Application Support/com.apple.container"
+    ],
+    "tier": "costly",
+    "smartRule": "list only; container service not running",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "container-apiserver",
+        "container-runtime-linux"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "apple/container 1.6.1 (2026-10-23), Sources/ContainerPersistence/PathUtils.swift (applicationSupportDirectory + com.apple.container) and BUILDING.md: images, containers and volumes live in ~/Library/Application Support/com.apple.container"
+  },
+  {
+    "id": "rancher-desktop-vm",
+    "group": "Virtual machines and containers",
+    "label": "Rancher Desktop data",
+    "patterns": [
+      "~/Library/Application Support/rancher-desktop/lima",
+      "~/Library/Application Support/rancher-desktop/snapshots"
+    ],
+    "tier": "costly",
+    "smartRule": "list only; Rancher Desktop not running",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "Rancher Desktop",
+        "limactl"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "rancher-sandbox/rancher-desktop v1.25.0 (2026-11-05), pkg/rancher-desktop/utils/__tests__/paths.spec.ts darwin paths: lima = ~/Library/Application Support/rancher-desktop/lima/, snapshots = ~/Library/Application Support/rancher-desktop/snapshots/"
+  },
+  {
+    "id": "rancher-desktop-cache",
+    "group": "Package caches",
+    "label": "Rancher Desktop downloads",
+    "patterns": [
+      "~/Library/Caches/rancher-desktop"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Rancher Desktop not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Rancher Desktop",
+        "limactl"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "rancher-sandbox/rancher-desktop v1.25.0 (2026-11-05), pkg/rancher-desktop/utils/paths.ts (Paths.cache: \"Directory which holds caches that may be removed\") and paths.spec.ts darwin: ~/Library/Caches/rancher-desktop/"
+  },
+  {
+    "id": "podman-machine-image-cache",
+    "group": "Package caches",
+    "label": "Podman machine images",
+    "patterns": [
+      "~/.local/share/containers/podman/machine/*/cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Podman not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "podman",
+        "gvproxy",
+        "vfkit",
+        "krunkit"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "containers/podman main (read 2026-11-06), pkg/machine/env/dir.go GetMachineDirs: ImageCacheDir = <data dir>/<vm type>/cache, data dir ~/.local/share/containers/podman/machine"
+  },
+  {
+    "id": "screen-recording-projects",
+    "group": "Large media files",
+    "label": "Screen recording projects",
+    "patterns": [
+      "~/**/*.screenstudio",
+      "~/**/*.screenflow",
+      "~/**/*.cmproj",
+      "~/**/*.trec"
+    ],
+    "tier": "userData",
+    "smartRule": "list only; untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60
+    },
+    "comesBack": "gone",
+    "source": "devtrim v0.12.6 src/app_storage.rs (Screen Studio: saved .screenstudio bundles, metadata only, never deletion authority); Screen Studio guide https://screen.studio/guide/saving-your-project read 2026-11-06 (projects saved as .screenstudio in a projects folder the user can move); TechSmith https://support.techsmith.com/hc/en-us/articles/203727488 (Camtasia recordings are .trec) read 2026-11-06"
+  },
+  {
+    "id": "recorder-temporary-recordings",
+    "group": "Large media files",
+    "label": "Unfinished recordings",
+    "patterns": [
+      "~/Movies/Loom/Temporary/*",
+      "~/Movies/Camtasia*/Temporary Recordings/*"
+    ],
+    "tier": "userData",
+    "smartRule": "list only; untouched 30 days, recorder not running",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30,
+      "processes": [
+        "Loom",
+        "Camtasia",
+        "Camtasia 2023",
+        "Camtasia 2024",
+        "Camtasia 2025",
+        "Camtasia 2026"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "Loom/Atlassian KB 'Find the video parts stored on your computer when an upload fails (Mac app)' https://support.atlassian.com/loom/kb/find-the-video-parts-stored-on-your-computer-when-an-upload-fails-mac-app/ read 2026-11-06 (~/Movies/Loom/Temporary/<video id>); TechSmith 'Camtasia Mac Temporary Recording Location' https://support.techsmith.com/hc/en-us/articles/25839736381581 read 2026-11-06 (~/Movies/Camtasia/Temporary Recordings, .trec)"
+  },
+  {
+    "id": "terragrunt-cache",
+    "group": "Build output",
+    "label": "Terragrunt working copies",
+    "patterns": [
+      "**/.terragrunt-cache"
+    ],
+    "tier": "costly",
+    "smartRule": "list only; next to terragrunt.hcl, project untouched 14 days",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "terragrunt",
+        "terraform",
+        "tofu"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "terragrunt.hcl"
+    ],
+    "comesBack": "downloads",
+    "source": "devtrim v0.12.6 src/ops/artifacts.rs (.terragrunt-cache with sibling terragrunt.hcl; skips any copy holding *.tfstate); Terragrunt docs https://docs.terragrunt.com/features/units/terragrunt-cache/ read 2026-11-06 (Terragrunt v1.2.1): 'scratch space. You can safely delete it any time'"
+  },
+  {
+    "id": "xcode-documentation-cache-versions",
+    "group": "Xcode build data",
+    "label": "Old Xcode documentation",
+    "patterns": [
+      "~/Library/Developer/Xcode/DocumentationCache/*/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep the newest Xcode version; Xcode not running",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "appNotRunning": true,
+      "processes": [
+        "Xcode"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "DevCleaner for Xcode source at 8039d1b (2026-05-18), DevCleaner/Model/XcodeFiles.swift scanDocumentationCacheLocations(): DocumentationCache/<folder>/<Xcode version>, one entry per Xcode version, newest deselected"
+  },
+  {
+    "id": "continue-index",
+    "group": "Developer tool caches",
+    "label": "Continue codebase index",
+    "patterns": [
+      "~/.continue/index",
+      "~/.continue/logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "editors not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "Code",
+        "Cursor",
+        "Windsurf",
+        "idea",
+        "pycharm",
+        "webstorm"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "continuedev/continue v1.5.0 (2026-11-02), core/util/paths.ts getIndexFolderPath() = ~/.continue/index (embeddings and index.sqlite), getLogsDirPath() = ~/.continue/logs; Continue docs (codebase indexing) say deleting ~/.continue/index makes it reindex"
+  },
+  {
+    "id": "agent-checkpoints",
+    "group": "Agent and editor history",
+    "label": "Agent checkpoints",
+    "patterns": [
+      "~/.claude/file-history",
+      "~/.claude-*/file-history",
+      "~/.gemini/history/*",
+      "~/.qwen/history/*",
+      "~/Library/Application Support/*/User/globalStorage/saoudrizwan.claude-dev/checkpoints",
+      "~/Library/Application Support/*/User/globalStorage/rooveterinaryinc.roo-cline/checkpoints",
+      "~/Library/Application Support/*/User/globalStorage/kilocode.kilo-code/checkpoints"
+    ],
+    "tier": "userData",
+    "smartRule": "list only; untouched 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone",
+    "source": "Claude Code docs, .claude directory https://code.claude.com/docs/en/claude-directory read 2026-11-06 (file-history/<session>/ = pre-edit snapshots for checkpoint restore); Gemini CLI v0.67.0 docs/cli/checkpointing.md (shadow Git repo ~/.gemini/history/<project_hash>); Qwen Code docs https://qwenlm.github.io/qwen-code-docs/en/checkpointing read 2026-11-06 (~/.qwen/history/<project_hash>); cline/cline apps/vscode/src/utils/storage.ts (globalStorage/checkpoints); devtrim v0.12.6 src/ops/agents.rs (history tier: nothing regenerates it, offered only past a retention window)"
+  },
+  {
+    "id": "agent-sessions-other",
+    "group": "Agent and editor history",
+    "label": "Other agent sessions",
+    "patterns": [
+      "~/.pi/agent/sessions",
+      "~/.local/share/goose/sessions",
+      "~/.continue/sessions",
+      "~/.cline/data/tasks",
+      "~/Library/Application Support/*/User/globalStorage/saoudrizwan.claude-dev/tasks",
+      "~/Library/Application Support/*/User/globalStorage/rooveterinaryinc.roo-cline/tasks",
+      "~/Library/Application Support/*/User/globalStorage/kilocode.kilo-code/tasks"
+    ],
+    "tier": "userData",
+    "smartRule": "list only; untouched 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone",
+    "source": "Pi coding agent docs/session.md (@mariozechner/pi-coding-agent 0.64.0, sessions under ~/.pi/agent/sessions/); Goose docs https://block.github.io/goose/docs/guides/sessions/session-management read 2026-11-06 (~/.local/share/goose/sessions, sessions.db from 1.10); continuedev/continue v1.5.0 core/util/paths.ts getSessionsFolderPath(); cline/cline apps/vscode/src/utils/storage.ts (globalStorage/tasks); devtrim v0.12.6 src/ops/agents.rs history tier"
+  },
+  {
+    "id": "pi-agent-cache",
+    "group": "Developer tool caches",
+    "label": "Pi web search cache",
+    "patterns": [
+      "~/.pi/web-search-cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "always",
+    "listOnly": false,
+    "comesBack": "downloads",
+    "source": "devtrim v0.12.6 src/ops/agents.rs REGENERABLE: vendor-documented private fetched-content cache, one-hour lifetime, 128 entries / 128 MiB, evicts oldest first"
+  },
+  {
+    "id": "vscode-family-caches",
+    "group": "Developer tool caches",
+    "label": "Other code editor caches",
+    "patterns": [
+      "~/Library/Application Support/Code - Insiders/CachedExtensionVSIXs",
+      "~/Library/Application Support/Code - Insiders/logs",
+      "~/Library/Application Support/VSCodium/CachedExtensionVSIXs",
+      "~/Library/Application Support/VSCodium/logs",
+      "~/Library/Application Support/Antigravity/CachedExtensionVSIXs",
+      "~/Library/Application Support/Antigravity/logs",
+      "~/Library/Application Support/Kiro/CachedExtensionVSIXs",
+      "~/Library/Application Support/Kiro/logs",
+      "~/Library/Application Support/Trae/CachedExtensionVSIXs",
+      "~/Library/Application Support/Trae/logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Code - Insiders",
+        "VSCodium",
+        "Antigravity",
+        "Kiro",
+        "Trae"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "VS Code docs, extension marketplace (extension cache and per-user data folder https://code.visualstudio.com/docs/configure/extensions/extension-marketplace, read 2026-11-06); same layout as Sōji's vscode-cache, cursor-cache and windsurf-cache; each fork keeps the VS Code user-data layout under its own product name"
+  },
+  {
+    "id": "vscode-family-old-extensions",
+    "group": "Editor extensions",
+    "label": "Other code editor extensions",
+    "patterns": [
+      "~/.vscode-insiders/extensions/*",
+      "~/.vscode-oss/extensions/*",
+      "~/.antigravity/extensions/*",
+      "~/.kiro/extensions/*",
+      "~/.trae/extensions/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "list only; app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Code - Insiders",
+        "VSCodium",
+        "Antigravity",
+        "Kiro",
+        "Trae"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "VS Code docs, 'Where are extensions installed?' (~/.vscode-insiders/extensions for Insiders) https://code.visualstudio.com/docs/configure/extensions/extension-marketplace read 2026-11-06; VSCodium docs (~/.vscode-oss); forks follow product.json dataFolderName"
+  },
+  {
+    "id": "premiere-preview-files",
+    "group": "Render and preview files",
+    "label": "Premiere Pro previews",
+    "patterns": [
+      "**/Adobe Premiere Pro Video Previews",
+      "**/Adobe Premiere Pro Audio Previews"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to a .prproj, Premiere Pro not running, project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Adobe Premiere Pro"
+      ],
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "*.prproj"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://helpx.adobe.com/premiere-pro/using/scratch-disks.html (Scratch disks, default 'Same as project'; page returns 403 to fetchers) and Adobe staff-acknowledged bug thread naming both folders beside the project: https://community.adobe.com/t5/premiere-pro-bugs/audio-previews-folder-keeps-appearing-in-the-same-directory-as-the-project-file/idc-p/15380491 (read 2026-11-06, Premiere Pro 24.x/25.x)"
+  },
+  {
+    "id": "premiere-auto-save",
+    "group": "Backups and archives",
+    "label": "Premiere Pro auto-saves",
+    "patterns": [
+      "**/Adobe Premiere Pro Auto-Save"
+    ],
+    "tier": "userData",
+    "smartRule": "next to a .prproj, project untouched 90 days",
+    "listOnly": true,
+    "rule": {
+      "projectUntouchedDays": 90
+    },
+    "near": [
+      "*.prproj"
+    ],
+    "comesBack": "gone",
+    "source": "https://helpx.adobe.com/premiere/desktop/get-started/preferences-and-settings/auto-save-preferences.html (auto-save every 5 min, keeps the last 20 project versions in the Auto-Save folder; read 2026-11-06 via search excerpt, page blocks fetchers)"
+  },
+  {
+    "id": "adobe-old-app-versions",
+    "group": "App leftovers",
+    "label": "Older Adobe app versions",
+    "patterns": [
+      "/Applications/Adobe * 20??"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the newest per app",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product"
+    },
+    "comesBack": "downloads",
+    "source": "Creative Cloud keeps the previous major version unless 'Remove older versions' is ticked: https://community.adobe.com/questions-617/why-is-my-cc-desktop-not-removing-older-versions-of-the-apps-1644489 and https://helpx.adobe.com/download-install/apps/troubleshoot/app-settings-issues/creative-cloud-apps-older-versions-fail-to-uninstall.html (read 2026-11-06)"
+  },
+  {
+    "id": "cinema4d-old-versions",
+    "group": "App leftovers",
+    "label": "Older Cinema 4D versions",
+    "patterns": [
+      "/Applications/Maxon Cinema 4D 20??",
+      "/Applications/Maxon Cinema 4D R??"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "processes": [
+        "Cinema 4D",
+        "Maxon App"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://support.maxon.net/hc/en-us/articles/5551135016348-How-to-uninstall-Cinema-4D-on-macOS (each version in its own 'Maxon Cinema 4D 20xx' folder; uninstall = quit and move the folder to the Trash; read 2026-11-06 via search excerpt, page blocks fetchers)"
+  },
+  {
+    "id": "redshift-cache",
+    "group": "Render and preview files",
+    "label": "Redshift shader and texture cache",
+    "patterns": [
+      "~/redshift/cache",
+      "~/Library/Preferences/Maxon/Maxon Cinema 4D */Redshift/Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Cinema 4D and Redshift hosts not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Cinema 4D",
+        "Redshift",
+        "Houdini",
+        "Maya",
+        "Blender"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://support.maxon.net/hc/en-us/articles/17329822396700 (macOS: delete Users > USERNAME > redshift > cache and Library > Preferences > Maxon > Maxon Cinema 4D 202* > redshift > cache) and https://support.maxon.net/hc/en-us/articles/25006553155484-Texture-Cache-Memory (baked shaders and converted textures, not cleaned automatically, recalculated when missing); read 2026-11-06 via search excerpts (C4D 2025 / RS 2025)"
+  },
+  {
+    "id": "imovie-render-files",
+    "group": "Render and preview files",
+    "label": "iMovie render files",
+    "patterns": [
+      "~/**/*.imovielibrary/Render Files",
+      "~/**/*.imovielibrary/*/Render Files"
+    ],
+    "tier": "regenerable",
+    "smartRule": "iMovie not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "iMovie"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "iMovie Settings > Render Files > Delete, files recreated when a project is reopened: https://discussions.apple.com/thread/254528350 and https://discussions.apple.com/thread/253576223 (Apple Community, read 2026-11-06; no Apple Support article found)"
+  },
+  {
+    "id": "lightroom-catalog-backups",
+    "group": "Backups and archives",
+    "label": "Lightroom Classic catalog backups",
+    "patterns": [
+      "~/Pictures/Lightroom/*/Backups/*"
+    ],
+    "tier": "userData",
+    "smartRule": "keep the newest 2",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 2,
+      "keepBy": "all",
+      "processes": [
+        "Adobe Lightroom Classic"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/back-catalog.html (default Mac location /Users/[user]/Pictures/Lightroom/[catalog]/Backups; 'delete or compress old backup files'; Lightroom Classic 14.2+ can delete them in Catalog Settings > Backups; read 2026-11-06)"
+  },
+  {
+    "id": "image-generator-models",
+    "group": "AI models",
+    "label": "Image generator models",
+    "patterns": [
+      "**/models"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "processes": [
+        "ComfyUI",
+        "Comfy Desktop",
+        "python3",
+        "python"
+      ]
+    },
+    "near": [
+      "comfyui_version.py",
+      "webui-macos-env.sh"
+    ],
+    "comesBack": "downloads",
+    "source": "https://docs.comfy.org/installation/desktop/macos (Comfy Desktop: ~/ComfyUI-Shared = shared model library and input/output; read 2026-11-06); repo roots with models/ beside comfyui_version.py (github.com/Comfy-Org/ComfyUI) and beside webui-macos-env.sh (github.com/AUTOMATIC1111/stable-diffusion-webui, github.com/lllyasviel/stable-diffusion-webui-forge), listed 2026-11-06"
+  },
+  {
+    "id": "diffusionbee-models",
+    "group": "AI models",
+    "label": "DiffusionBee models",
+    "patterns": [
+      "~/.diffusionbee/downloads"
+    ],
+    "tier": "costly",
+    "smartRule": "DiffusionBee not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "DiffusionBee"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://github.com/divamgupta/diffusionbee-stable-diffusion-ui/issues/121 and /issues/493 (weights in ~/.diffusionbee/downloads, images in ~/.diffusionbee/images; vendor repo, read 2026-11-06)"
+  },
+  {
+    "id": "gpt4all-models",
+    "group": "AI models",
+    "label": "GPT4All models",
+    "patterns": [
+      "~/Library/Application Support/nomic.ai/GPT4All/*.gguf",
+      "~/.cache/gpt4all/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days, GPT4All not running",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "appNotRunning": true,
+      "processes": [
+        "GPT4All",
+        "chat"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "GPT4All source: gpt4all-chat/src/mysettings.cpp defaultLocalModelsPath() = QStandardPaths::AppLocalDataLocation with org 'nomic.ai', app 'GPT4All' (main.cpp); Python bindings DEFAULT_MODEL_DIRECTORY = ~/.cache/gpt4all (gpt4all.py); github.com/nomic-ai/gpt4all main, read 2026-11-06"
+  },
+  {
+    "id": "jan-models",
+    "group": "AI models",
+    "label": "Jan models",
+    "patterns": [
+      "~/Library/Application Support/Jan/data/llamacpp/models/*/*",
+      "~/Library/Application Support/Jan/data/mlx/models/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 60 days, Jan not running",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "appNotRunning": true,
+      "processes": [
+        "Jan"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://docs.jan.ai/desktop/data-folder (llamacpp/models/<org>/<repo> and mlx/models/<id>) and https://docs.jan.ai/desktop/install/mac (default ~/Library/Application Support/Jan/data); read 2026-11-06"
+  },
+  {
+    "id": "jan-llamacpp-backends",
+    "group": "Toolchains and SDKs",
+    "label": "Jan engine versions",
+    "patterns": [
+      "~/Library/Application Support/Jan/data/llamacpp/backends/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "list only; keep the newest, Jan not running",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "appNotRunning": true,
+      "processes": [
+        "Jan"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://docs.jan.ai/desktop/data-folder ('llamacpp/backends/<version>/<backend>/ # downloaded llama.cpp builds'; read 2026-11-06)"
+  },
+  {
+    "id": "llamacpp-cache",
+    "group": "AI models",
+    "label": "llama.cpp downloaded models",
+    "patterns": [
+      "~/Library/Caches/llama.cpp"
+    ],
+    "tier": "costly",
+    "smartRule": "llama.cpp not running",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "llama-server",
+        "llama-cli",
+        "llama-run"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://github.com/ggml-org/llama.cpp/blob/master/common/common.cpp fs_get_cache_directory(): LLAMA_CACHE, else ~/Library/Caches + 'llama.cpp' on macOS (read 2026-11-06); newer builds may also use the Hugging Face hub cache, already covered by huggingface-cache"
+  },
+  {
+    "id": "pinokio-cache",
+    "group": "AI models",
+    "label": "Pinokio cache",
+    "patterns": [
+      "~/pinokio/cache"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 30 days, Pinokio not running",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "appNotRunning": true,
+      "processes": [
+        "Pinokio"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "Pinokio docs (github.com/pinokiocomputer/program.pinokio.computer README): 'It is OK to delete the cache folder as it will be re-populated by the apps you use'; holds pip, torch and huggingface-cli downloads; default home ~/pinokio (pinokiod server/index.js); read 2026-11-06"
+  },
+  {
+    "id": "pinokio-apps",
+    "group": "AI models",
+    "label": "Pinokio apps",
+    "patterns": [
+      "~/pinokio/api/*"
+    ],
+    "tier": "userData",
+    "smartRule": "untouched 60 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 60,
+      "processes": [
+        "Pinokio"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "Pinokio docs README: 'api: stores all the downloaded apps'; 'delete apps simply by deleting files' (read 2026-11-06)"
+  },
+  {
+    "id": "macwhisper-models",
+    "group": "AI models",
+    "label": "MacWhisper models",
+    "patterns": [
+      "~/Library/Application Support/MacWhisper/Models",
+      "~/Library/Containers/com.goodsnooze.MacWhisper/Data/Library/Application Support/MacWhisper/Models"
+    ],
+    "tier": "costly",
+    "smartRule": "MacWhisper not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "MacWhisper",
+        "Whisper Transcription"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://docs.macwhisper.com/article/54-file-locations ('Models: downloaded speech-to-text models'; App Store build in the com.goodsnooze.MacWhisper container; updated 2026-09-29, read 2026-11-06)"
+  },
+  {
+    "id": "wine-bottles",
+    "group": "Virtual machines and containers",
+    "label": "Windows app bottles",
+    "patterns": [
+      "~/Library/Application Support/CrossOver/Bottles/*",
+      "~/Library/Containers/com.isaacmarovitz.Whisky/Bottles/*",
+      "~/Games/Heroic/Prefixes",
+      "~/Games/Heroic/Prefixes/*/*"
+    ],
+    "tier": "userData",
+    "smartRule": "CrossOver, Whisky and Heroic not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "CrossOver",
+        "Whisky",
+        "wineserver",
+        "wine64-preloader",
+        "Heroic"
+      ]
+    },
+    "comesBack": "gone",
+    "source": "https://support.codeweavers.com/change-the-bottle-directory-in-crossover-mac (default ~/Library/Application Support/CrossOver/Bottles) and Whisky bottle paths in https://github.com/Whisky-App/Whisky/issues/1306 plus https://github.com/frankea/Whisky README (original app archived 2025-04-09); read 2026-11-06; Heroic source src/backend/constants/paths.ts: defaultWinePrefixDir = ~/Games/Heroic/Prefixes, one prefix per game under Prefixes/default (github.com/Heroic-Games-Launcher/HeroicGamesLauncher main, read 2026-11-06)"
+  },
+  {
+    "id": "heroic-games",
+    "group": "Games",
+    "label": "Heroic games",
+    "patterns": [
+      "~/Games/Heroic/*"
+    ],
+    "tier": "costly",
+    "smartRule": "Heroic not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Heroic"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "Heroic source src/backend/constants/paths.ts: heroicInstallPath = ~/Games/Heroic, defaultWinePrefixDir = ~/Games/Heroic/Prefixes (github.com/Heroic-Games-Launcher/HeroicGamesLauncher main, read 2026-11-06)"
+  },
+  {
+    "id": "steam-workshop",
+    "group": "Games",
+    "label": "Steam Workshop mods",
+    "patterns": [
+      "~/Library/Application Support/Steam/steamapps/workshop/content/*"
+    ],
+    "tier": "costly",
+    "smartRule": "Steam not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "steam_osx",
+        "Steam"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://developer.valvesoftware.com/wiki/Steamapps (steamapps layout with workshop content per app id; read 2026-11-06); Steam redownloads still-subscribed items, unsubscribed ones linger"
+  },
+  {
+    "id": "minecraft-worlds",
+    "group": "Never touched",
+    "label": "Minecraft worlds",
+    "patterns": [
+      "~/Library/Application Support/minecraft/saves"
+    ],
+    "tier": "never",
+    "smartRule": "never",
+    "listOnly": true,
+    "comesBack": "gone",
+    "source": "https://minecraft.wiki/w/.minecraft (macOS game directory ~/Library/Application Support/minecraft, saves = one folder per world; read 2026-11-06)"
+  },
+  {
+    "id": "resolve-project-database",
+    "group": "Never touched",
+    "label": "DaVinci Resolve projects",
+    "patterns": [
+      "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Resolve Disk Database",
+      "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Resolve Disk Database"
+    ],
+    "tier": "never",
+    "smartRule": "never",
+    "listOnly": true,
+    "comesBack": "gone",
+    "source": "https://thepostflow.com/post-production/post-production-workflows/resolve-project-file-locations/ (Resolve's local project library lives in Resolve Disk Database under Application Support; read 2026-11-06; Blackmagic's manual not reachable, both user and system locations listed)"
+  },
+  {
+    "id": "splice-samples",
+    "group": "Sound libraries",
+    "label": "Splice samples",
+    "patterns": [
+      "~/Splice"
+    ],
+    "tier": "costly",
+    "smartRule": "Splice not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Splice"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://support.splice.com/en/articles/8652662-where-is-my-splice-folder (default /Users/<user>/Splice) and https://support.splice.com/en/articles/9792288-how-do-i-re-download-sounds-i-previously-licensed (deleted sounds re-sync from the Splice library); read 2026-11-06"
+  },
+  {
+    "id": "chrome-channels-cache",
+    "group": "App caches",
+    "label": "Chrome Beta, Canary and Chromium cache",
+    "patterns": [
+      "~/Library/Application Support/Google/Chrome Beta/*/GPUCache",
+      "~/Library/Application Support/Google/Chrome Beta/*/DawnGraphiteCache",
+      "~/Library/Application Support/Google/Chrome Beta/*/DawnWebGPUCache",
+      "~/Library/Application Support/Google/Chrome Beta/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/Google/Chrome Beta/GrShaderCache",
+      "~/Library/Application Support/Google/Chrome Beta/GraphiteDawnCache",
+      "~/Library/Application Support/Google/Chrome Beta/ShaderCache",
+      "~/Library/Application Support/Google/Chrome Dev/*/GPUCache",
+      "~/Library/Application Support/Google/Chrome Dev/*/DawnGraphiteCache",
+      "~/Library/Application Support/Google/Chrome Dev/*/DawnWebGPUCache",
+      "~/Library/Application Support/Google/Chrome Dev/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/Google/Chrome Dev/GrShaderCache",
+      "~/Library/Application Support/Google/Chrome Dev/GraphiteDawnCache",
+      "~/Library/Application Support/Google/Chrome Dev/ShaderCache",
+      "~/Library/Application Support/Google/Chrome Canary/*/GPUCache",
+      "~/Library/Application Support/Google/Chrome Canary/*/DawnGraphiteCache",
+      "~/Library/Application Support/Google/Chrome Canary/*/DawnWebGPUCache",
+      "~/Library/Application Support/Google/Chrome Canary/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/Google/Chrome Canary/GrShaderCache",
+      "~/Library/Application Support/Google/Chrome Canary/GraphiteDawnCache",
+      "~/Library/Application Support/Google/Chrome Canary/ShaderCache",
+      "~/Library/Application Support/Chromium/*/GPUCache",
+      "~/Library/Application Support/Chromium/*/DawnGraphiteCache",
+      "~/Library/Application Support/Chromium/*/DawnWebGPUCache",
+      "~/Library/Application Support/Chromium/*/Service Worker/ScriptCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Google Chrome Beta",
+        "Google Chrome Dev",
+        "Google Chrome Canary",
+        "Chromium"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md (read 2026-11-06); folder names from https://github.com/chromium/chromium/blob/main/gpu/ipc/common/gpu_disk_cache_type.cc and components/services/storage/public/cpp/constants.cc (read 2026-11-06)"
+  },
+  {
+    "id": "browser-site-offline-caches",
+    "group": "App caches",
+    "label": "Website offline caches",
+    "patterns": [
+      "~/Library/Application Support/Google/Chrome/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Google/Chrome Beta/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Google/Chrome Dev/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Google/Chrome Canary/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Chromium/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Microsoft Edge*/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser*/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Arc/User Data/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/Vivaldi*/*/Service Worker/CacheStorage",
+      "~/Library/Application Support/com.operasoftware.Opera/Service Worker/CacheStorage",
+      "~/Library/Application Support/com.operasoftware.OperaGX/Service Worker/CacheStorage"
+    ],
+    "tier": "costly",
+    "smartRule": "browser not running; listed only, sites keep offline copies here",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Google Chrome",
+        "Google Chrome Beta",
+        "Google Chrome Dev",
+        "Google Chrome Canary",
+        "Chromium",
+        "Microsoft Edge",
+        "Microsoft Edge Beta",
+        "Microsoft Edge Dev",
+        "Microsoft Edge Canary",
+        "Brave Browser",
+        "Brave Browser Beta",
+        "Brave Browser Nightly",
+        "Arc",
+        "Vivaldi",
+        "Opera"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://github.com/chromium/chromium/blob/main/components/services/storage/public/cpp/constants.cc (CacheStorage is service worker storage, not the HTTP cache) (read 2026-11-06)"
+  },
+  {
+    "id": "dropbox-cache-folder",
+    "group": "App caches",
+    "label": "Dropbox cache",
+    "patterns": [
+      "~/Dropbox/.dropbox.cache/*",
+      "~/Dropbox (*)/.dropbox.cache/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Dropbox not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Dropbox"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://help.dropbox.com/delete-restore/cache-folder (read 2026-11-06)"
+  },
+  {
+    "id": "google-drive-logs",
+    "group": "Logs and crash reports",
+    "label": "Google Drive logs",
+    "patterns": [
+      "~/Library/Application Support/Google/DriveFS/Logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Google Drive not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Google Drive"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://knowledge.workspace.google.com/admin/drive/capture-google-drive-for-desktop-logs-for-support (read 2026-11-06)"
+  },
+  {
+    "id": "box-drive-cache",
+    "group": "App caches",
+    "label": "Box Drive cache",
+    "patterns": [
+      "~/Library/Application Support/Box/Box/cache"
+    ],
+    "tier": "userData",
+    "smartRule": "Box not running; listed only, may hold files not yet uploaded",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Box",
+        "Box Drive"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://support.box.com/hc/en-us/articles/360043695894-Technical-Information-for-Box-Drive-Administrators (read 2026-11-06)"
+  },
+  {
+    "id": "pcloud-drive-cache",
+    "group": "App caches",
+    "label": "pCloud Drive cache",
+    "patterns": [
+      "~/.pcloud/Cache"
+    ],
+    "tier": "userData",
+    "smartRule": "pCloud Drive not running; listed only, may hold files not yet uploaded",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "pCloud Drive"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://help.pcloud.com/article/low-disk-space-warning-in-pcloud-drive and pCloud's cache settings guide (default ~/.pcloud/Cache on macOS) (read 2026-11-06)"
+  },
+  {
+    "id": "mega-sync-debris",
+    "group": "Trash",
+    "label": "MEGA sync deleted files",
+    "patterns": [
+      "**/.debris"
+    ],
+    "tier": "userData",
+    "smartRule": "listed only; MEGA empties it after 30 days",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "MEGAsync",
+        "MEGA"
+      ]
+    },
+    "near": [
+      ".megaignore"
+    ],
+    "comesBack": "gone",
+    "source": "https://help.mega.io/installs-apps/desktop/restore-deleted-overwritten-data and https://help.mega.io/installs-apps/desktop/engine (read 2026-11-06)"
+  },
+  {
+    "id": "outlook-mail-data",
+    "group": "Never touched",
+    "label": "Outlook mail",
+    "patterns": [
+      "~/Library/Group Containers/UBF8T346G9.Office/Outlook"
+    ],
+    "tier": "never",
+    "listOnly": true,
+    "comesBack": "gone",
+    "source": "https://support.microsoft.com/kb/2800895 (Outlook for Mac caches mail in Outlook 15 Profiles) (read 2026-11-06)"
+  },
+  {
+    "id": "tv-app-library",
+    "group": "Never touched",
+    "label": "TV app library",
+    "patterns": [
+      "~/Movies/TV/Media",
+      "~/Movies/TV/Media.localized"
+    ],
+    "tier": "never",
+    "listOnly": true,
+    "comesBack": "gone",
+    "source": "https://support.apple.com/guide/tvapp-mac/tv0f5accea/mac (default media folder Movies/TV/Media) (read 2026-11-06)"
+  },
+  {
+    "id": "plex-photo-transcoder",
+    "group": "App caches",
+    "label": "Plex artwork cache",
+    "patterns": [
+      "~/Library/Application Support/Plex Media Server/Cache/PhotoTranscoder"
+    ],
+    "tier": "regenerable",
+    "smartRule": "Plex Media Server not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Plex Media Server"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://support.plex.tv/articles/202915258-where-is-the-plex-media-server-data-directory-located/ and https://forums.plex.tv/t/cache-phototranscoder-folder-size-sanity-check/639837 (read 2026-11-06)"
+  },
+  {
+    "id": "macports-downloads",
+    "group": "Package caches",
+    "label": "MacPorts downloads",
+    "patterns": [
+      "/opt/local/var/macports/distfiles",
+      "/opt/local/var/macports/build"
+    ],
+    "tier": "regenerable",
+    "smartRule": "port not running; listed only, needs an administrator",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "port"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://man.macports.org/port-reclaim.1.html and https://guide.macports.org/#using.port.clean (read 2026-11-06)"
+  },
+  {
+    "id": "nix-store",
+    "group": "Never touched",
+    "label": "Nix store",
+    "patterns": [
+      "/nix/store"
+    ],
+    "tier": "never",
+    "listOnly": true,
+    "comesBack": "gone",
+    "source": "https://nix.dev/manual/nix/stable/package-management/garbage-collection (read 2026-11-06)"
+  },
+  {
+    "id": "nix-user-cache",
+    "group": "Package caches",
+    "label": "Nix cache",
+    "patterns": [
+      "~/.cache/nix"
+    ],
+    "tier": "regenerable",
+    "smartRule": "nix not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "nix"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://github.com/NixOS/nix/blob/master/src/libstore/include/nix/store/globals.hh (narinfo-cache settings: rm $HOME/.cache/nix/binary-cache-v*.sqlite*) (read 2026-11-06)"
+  },
+  {
+    "id": "julia-compiled",
+    "group": "Package caches",
+    "label": "Julia compiled packages",
+    "patterns": [
+      "~/.julia/compiled"
+    ],
+    "tier": "regenerable",
+    "smartRule": "julia not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "julia"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://docs.julialang.org/en/v1/manual/environment-variables/#JULIA_DEPOT_PATH (depot holds cached compiled package images) (read 2026-11-06)"
+  },
+  {
+    "id": "julia-packages",
+    "group": "Package caches",
+    "label": "Julia packages and artifacts",
+    "patterns": [
+      "~/.julia/packages",
+      "~/.julia/artifacts"
+    ],
+    "tier": "costly",
+    "smartRule": "julia not running; Pkg.gc() removes the unused ones",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "julia"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://pkgdocs.julialang.org/v1/managing-packages/ (Pkg.gc, 30-day orphan window) (read 2026-11-06)"
+  },
+  {
+    "id": "r-package-libraries",
+    "group": "Toolchains and SDKs",
+    "label": "R package libraries",
+    "patterns": [
+      "~/Library/R/arm64/*",
+      "~/Library/R/x86_64/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest 1; listed only",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "processes": [
+        "R",
+        "rsession"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Installing-R-under-macOS (personal library ~/Library/R/arm64/4.4/library) (read 2026-11-06)"
+  },
+  {
+    "id": "dart-analysis-cache",
+    "group": "Developer tool caches",
+    "label": "Dart analysis cache",
+    "patterns": [
+      "~/.dartServer/.analysis-driver"
+    ],
+    "tier": "regenerable",
+    "smartRule": "dart not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "dart"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://github.com/flutter/dart-intellij-third-party/pull/58 (Invalidate Caches removes .dartServer) (read 2026-11-06)"
+  },
+  {
+    "id": "flutter-sdk-cache",
+    "group": "Package caches",
+    "label": "Flutter SDK downloads",
+    "patterns": [
+      "**/bin/cache"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 30 days, flutter and dart not running",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "processes": [
+        "flutter",
+        "dart"
+      ]
+    },
+    "inside": [
+      "flutter_tools.stamp"
+    ],
+    "comesBack": "downloads",
+    "source": "https://github.com/flutter/flutter/blob/master/bin/internal/shared.sh (rebuilds bin/cache when flutter_tools.stamp is missing) (read 2026-11-06)"
+  },
+  {
+    "id": "mint-packages",
+    "group": "Package caches",
+    "label": "Mint packages",
+    "patterns": [
+      "~/.mint/packages"
+    ],
+    "tier": "costly",
+    "smartRule": "mint not running; listed only, global installs link here",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "mint"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://github.com/yonaskolb/Mint#advanced (MINT_PATH defaults to ~/.mint) (read 2026-11-06)"
+  },
+  {
+    "id": "pipx-venvs",
+    "group": "Toolchains and SDKs",
+    "label": "pipx apps",
+    "patterns": [
+      "~/Library/Application Support/pipx/venvs/*",
+      "~/.local/pipx/venvs/*"
+    ],
+    "tier": "costly",
+    "smartRule": "listed only",
+    "listOnly": true,
+    "rule": {
+      "processes": [
+        "pipx"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://pipx.pypa.io/latest/reference/environment-variables.html (PIPX_HOME default ~/Library/Application Support/pipx, legacy ~/.local/pipx) (read 2026-11-06)"
+  },
+  {
+    "id": "hatch-envs",
+    "group": "Project dependencies",
+    "label": "Hatch environments",
+    "patterns": [
+      "~/Library/Application Support/hatch/env/virtual/*"
+    ],
+    "tier": "costly",
+    "smartRule": "untouched 30 days, hatch not running",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "processes": [
+        "hatch"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://hatch.pypa.io/latest/config/hatch/ (data dir ~/Library/Application Support/hatch; environments under dirs.env, default <data>/env/<type>) (read 2026-11-06)"
+  },
+  {
+    "id": "hatch-pythons",
+    "group": "Toolchains and SDKs",
+    "label": "Hatch Python versions",
+    "patterns": [
+      "~/Library/Application Support/hatch/pythons/*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep newest 1 per version; listed only",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "product",
+      "processes": [
+        "hatch"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://hatch.pypa.io/latest/config/hatch/ (pythons kept in the data directory's pythons folder) (read 2026-11-06)"
+  },
+  {
+    "id": "pixi-envs",
+    "group": "Project dependencies",
+    "label": "Pixi environments",
+    "patterns": [
+      "**/.pixi/envs"
+    ],
+    "tier": "costly",
+    "smartRule": "project untouched 30 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 30,
+      "processes": [
+        "pixi"
+      ]
+    },
+    "near": [
+      "pixi.toml",
+      "pixi.lock",
+      "pyproject.toml"
+    ],
+    "comesBack": "downloads",
+    "source": "https://pixi.prefix.dev/latest/workspace/environment/ (delete .pixi/envs or pixi clean; recreated when needed) (read 2026-11-06)"
+  },
+  {
+    "id": "rebar3-cache",
+    "group": "Package caches",
+    "label": "rebar3 cache",
+    "patterns": [
+      "~/.cache/rebar3/hex"
+    ],
+    "tier": "regenerable",
+    "smartRule": "rebar3 not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "rebar3"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://hex.pm/docs/rebar3-usage (packages cached in ~/.cache/rebar3/hex/default/packages) (read 2026-11-06)"
+  },
+  {
+    "id": "rebar3-build",
+    "group": "Build output",
+    "label": "Erlang build output",
+    "patterns": [
+      "**/_build"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14,
+      "processes": [
+        "rebar3",
+        "beam.smp"
+      ]
+    },
+    "near": [
+      "rebar.config"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://rebar3.org/docs/basic_usage/ (builds and dependencies go to _build) (read 2026-11-06)"
+  },
+  {
+    "id": "clojure-gitlibs",
+    "group": "Package caches",
+    "label": "Clojure git dependencies",
+    "patterns": [
+      "~/.gitlibs"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads",
+    "source": "https://github.com/clojure/tools.gitlibs#readme (cache dir ~/.gitlibs, GITLIBS overrides) (read 2026-11-06)"
+  },
+  {
+    "id": "scala-bloop",
+    "group": "Build output",
+    "label": "Scala Bloop build output",
+    "patterns": [
+      "**/.bloop"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14,
+      "processes": [
+        "bloop"
+      ]
+    },
+    "near": [
+      "build.sbt",
+      "build.sc",
+      "build.mill"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://scalameta.org/metals/docs/build-tools/sbt (Metals import creates the Bloop config and build) (read 2026-11-06)"
+  },
+  {
+    "id": "dune-build",
+    "group": "Build output",
+    "label": "OCaml build output",
+    "patterns": [
+      "**/_build"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14,
+      "processes": [
+        "dune"
+      ]
+    },
+    "near": [
+      "dune-project"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://dune.readthedocs.io/en/stable/usage.html (all targets live in _build; dune clean removes it) (read 2026-11-06)"
+  },
+  {
+    "id": "opam-local-switch",
+    "group": "Project dependencies",
+    "label": "OCaml project switches",
+    "patterns": [
+      "**/_opam"
+    ],
+    "tier": "costly",
+    "smartRule": "project untouched 30 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 30,
+      "processes": [
+        "opam",
+        "dune",
+        "ocaml"
+      ]
+    },
+    "near": [
+      "dune-project",
+      "*.opam",
+      "opam"
+    ],
+    "comesBack": "downloads",
+    "source": "https://opam.ocaml.org/doc/Manual.html (local switch is a _opam subdirectory; deleted local switches are collected automatically) (read 2026-11-06)"
+  },
+  {
+    "id": "elm-build",
+    "group": "Build output",
+    "label": "Elm build output",
+    "patterns": [
+      "**/elm-stuff"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "elm.json"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://github.com/elm/compiler/blob/master/installers/mac/README.md (remove elm-stuff/ directories) (read 2026-11-06)"
+  },
+  {
+    "id": "elm-package-cache",
+    "group": "Package caches",
+    "label": "Elm package cache",
+    "patterns": [
+      "~/.elm"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads",
+    "source": "https://github.com/elm/compiler/blob/master/installers/mac/README.md (rm -r ~/.elm removes cached files) (read 2026-11-06)"
+  },
+  {
+    "id": "nx-cache",
+    "group": "Build output",
+    "label": "Nx cache",
+    "patterns": [
+      "**/.nx/cache",
+      "**/.nx/workspace-data"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "nx.json"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://nx.dev/docs/kb/change-cache-location (older Nx and the fallback keep .nx in the checkout; nx reset clears it) (read 2026-11-06)"
+  },
+  {
+    "id": "nx-shared-cache",
+    "group": "Build output",
+    "label": "Nx shared cache",
+    "patterns": [
+      "~/.nx/*/cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 14
+    },
+    "comesBack": "rebuilds",
+    "source": "https://nx.dev/docs/kb/change-cache-location (cache in ~/.nx/<id>/cache; folders of workspaces no longer checked out must be removed by hand) (read 2026-11-06)"
+  },
+  {
+    "id": "docusaurus-build",
+    "group": "Build output",
+    "label": "Docusaurus build output",
+    "patterns": [
+      "**/.docusaurus",
+      "**/build"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "docusaurus.config.*"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://github.com/facebook/docusaurus/blob/main/packages/docusaurus/src/commands/clear/clear.ts (docusaurus clear removes .docusaurus, build and the bundler cache) (read 2026-11-06)"
+  },
+  {
+    "id": "gatsby-build",
+    "group": "Build output",
+    "label": "Gatsby build output",
+    "patterns": [
+      "**/.cache",
+      "**/public"
+    ],
+    "tier": "regenerable",
+    "smartRule": "project untouched 14 days",
+    "listOnly": false,
+    "rule": {
+      "projectUntouchedDays": 14
+    },
+    "near": [
+      "gatsby-config.*"
+    ],
+    "comesBack": "rebuilds",
+    "source": "https://www.gatsbyjs.com/docs/reference/gatsby-cli/#clean (gatsby clean deletes .cache and public) (read 2026-11-06)"
+  },
+  {
+    "id": "selenium-cache",
+    "group": "Toolchains and SDKs",
+    "label": "Selenium browsers and drivers",
+    "patterns": [
+      "~/.cache/selenium"
+    ],
+    "tier": "costly",
+    "smartRule": "selenium-manager not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "selenium-manager"
+      ]
+    },
+    "comesBack": "downloads",
+    "source": "https://www.selenium.dev/documentation/selenium_manager/ (default cache ~/.cache/selenium holds drivers and browsers) (read 2026-11-06)"
+  },
+  {
+    "id": "android-quickboot-snapshots",
+    "group": "Simulators and emulators",
+    "label": "Android emulator saved state",
+    "patterns": [
+      "~/.android/avd/*.avd/snapshots/default_boot"
+    ],
+    "tier": "regenerable",
+    "smartRule": "emulator not running",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "qemu-system-aarch64",
+        "qemu-system-x86_64",
+        "emulator"
+      ]
+    },
+    "comesBack": "rebuilds",
+    "source": "https://developer.android.com/studio/run/emulator-snapshots (Quick Boot snapshot saved on exit; folder name default_boot per the emulator tooling) (read 2026-11-06)"
+  },
+  {
+    "id": "sparkle-caches",
+    "group": "App caches",
+    "label": "App update downloads",
+    "patterns": [
+      "~/Library/Caches/*/org.sparkle-project.Sparkle"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "downloads"
+  },
+  {
+    "id": "app-store-updates",
+    "group": "Never touched",
+    "label": "Software update downloads",
+    "patterns": [
+      "/Library/Updates/*"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "photos-library",
+    "group": "Never touched",
+    "label": "Photos library",
+    "patterns": [
+      "~/Pictures/*.photoslibrary"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "messages-attachments",
+    "group": "Never touched",
+    "label": "Messages attachments",
+    "patterns": [
+      "~/Library/Messages/Attachments"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "icloud-drive",
+    "group": "Never touched",
+    "label": "iCloud Drive",
+    "patterns": [
+      "~/Library/Mobile Documents"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "music-library",
+    "group": "Never touched",
+    "label": "Music library",
+    "patterns": [
+      "~/Music/Music/Media.localized",
+      "~/Music/iTunes/iTunes Media"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "user-logs",
+    "group": "Logs and crash reports",
+    "label": "Logs",
+    "patterns": [
+      "~/Library/Logs/*/*",
+      "~/Library/Logs/*.log"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "user-caches",
+    "group": "App caches",
+    "label": "App caches",
+    "patterns": [
+      "~/Library/Caches/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "app-support-caches",
+    "group": "App caches",
+    "label": "App caches",
+    "patterns": [
+      "~/Library/Application Support/*/Caches",
+      "~/Library/Application Support/*/caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running; only when its app is known",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "knownApp": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "container-caches",
+    "group": "App caches",
+    "label": "Sandboxed app caches",
+    "patterns": [
+      "~/Library/Containers/*/Data/Library/Caches"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, not Apple's",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "notApple": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "app-support-leftovers",
+    "group": "App leftovers",
+    "label": "Leftovers of removed apps",
+    "patterns": [
+      "~/Library/Application Support/*"
+    ],
+    "tier": "userData",
+    "smartRule": "app not installed",
+    "listOnly": true,
+    "rule": {
+      "appNotInstalled": true
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "container-leftovers",
+    "group": "App leftovers",
+    "label": "Containers of removed apps",
+    "patterns": [
+      "~/Library/Containers/*",
+      "~/Library/Group Containers/*"
+    ],
+    "tier": "userData",
+    "smartRule": "app not installed",
+    "listOnly": true,
+    "rule": {
+      "appNotInstalled": true
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "preferences-leftovers",
+    "group": "App leftovers",
+    "label": "Settings of removed apps",
+    "patterns": [
+      "~/Library/Preferences/*.plist"
+    ],
+    "tier": "userData",
+    "smartRule": "app not installed",
+    "listOnly": true,
+    "rule": {
+      "appNotInstalled": true
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "saved-app-state",
+    "group": "App caches",
+    "label": "Saved window state",
+    "patterns": [
+      "~/Library/Saved Application State/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, untouched 30 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 30,
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "diagnostic-reports",
+    "group": "Logs and crash reports",
+    "label": "Crash reports",
+    "patterns": [
+      "~/Library/Logs/DiagnosticReports/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "diagnostic-reports-system",
+    "group": "Logs and crash reports",
+    "label": "System crash reports",
+    "patterns": [
+      "/Library/Logs/DiagnosticReports/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than 7 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "crash-reporter",
+    "group": "Logs and crash reports",
+    "label": "Crash reporter",
+    "patterns": [
+      "~/Library/Application Support/CrashReporter"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "quicklook-cache",
+    "group": "App caches",
+    "label": "QuickLook thumbnails",
+    "patterns": [
+      "/private/var/folders/*/*/C/com.apple.QuickLook.thumbnailcache"
+    ],
+    "tier": "regenerable",
+    "listOnly": true,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "temp-xcode-derived-data",
+    "group": "Xcode build data",
+    "label": "Xcode build data in a temp folder",
+    "patterns": [
+      "/private/tmp/*",
+      "/private/var/folders/*/*/T/*"
+    ],
+    "inside": [
+      "Build/Intermediates.noindex",
+      "Index.noindex",
+      "ModuleCache.noindex"
+    ],
+    "tier": "regenerable",
+    "smartRule": "untouched 3 days; not while Xcode or a build uses it, or within an hour of a change",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "processes": [
+        "Xcode",
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-frontend",
+        "xctest",
+        "clang",
+        "SWBBuildService"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "temp-package-checkouts",
+    "group": "Package caches",
+    "label": "Package checkouts in a temp folder",
+    "patterns": [
+      "/private/tmp/*",
+      "/private/var/folders/*/*/T/*"
+    ],
+    "inside": [
+      "workspace-state.json"
+    ],
+    "tier": "regenerable",
+    "smartRule": "untouched 3 days; not while a build uses them",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "processes": [
+        "xcodebuild",
+        "XCBBuildService",
+        "swift-package",
+        "swift-build"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "temp-folders",
+    "group": "Temporary files",
+    "label": "Temporary files",
+    "patterns": [
+      "/private/tmp/*",
+      "/private/var/folders/*/*/T/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "untouched 3 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "system-logs",
+    "group": "Never touched",
+    "label": "System logs",
+    "patterns": [
+      "/Library/Logs/*",
+      "/private/var/log/*"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "document-versions",
+    "group": "Never touched",
+    "label": "Document versions",
+    "patterns": [
+      "/System/Volumes/Data/.DocumentRevisions-V100",
+      "/.DocumentRevisions-V100"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "time-machine-local",
+    "group": "Never touched",
+    "label": "Local Time Machine snapshots",
+    "patterns": [
+      "/.MobileBackups",
+      "/Volumes/com.apple.TimeMachine.localsnapshots"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "system-vm",
+    "group": "Never touched",
+    "label": "Swap and sleep image",
+    "patterns": [
+      "/System/Volumes/VM",
+      "/private/var/vm"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "mail-data",
+    "group": "Never touched",
+    "label": "Mail data",
+    "patterns": [
+      "~/Library/Mail"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "keychains",
+    "group": "Never touched",
+    "label": "Keychains",
+    "patterns": [
+      "~/Library/Keychains"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "claude-memory",
+    "group": "Never touched",
+    "label": "Claude Code memory",
+    "patterns": [
+      "**/.claude*/projects/*/memory"
+    ],
+    "tier": "never",
+    "listOnly": true
+  },
+  {
+    "id": "claude-sessions",
+    "group": "Agent and editor history",
+    "label": "Claude Code sessions",
+    "patterns": [
+      "~/.claude/projects/*",
+      "~/.claude-*/projects/*"
+    ],
+    "tier": "userData",
+    "smartRule": "Sōji judges each session by idle time: the whole session 7 days (Careful), 2 days (Balanced), 3 hours (Aggressive); its subagents and tool output 3 days, 1 day, 3 hours; a level earlier once its folder is gone; never memory or a running session",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "claude-worktrees",
+    "group": "Agent worktrees",
+    "label": "Claude Code worktrees",
+    "patterns": [
+      "**/.claude/worktrees/*"
+    ],
+    "tier": "costly",
+    "smartRule": "clean and merged into the default branch, not locked, untouched 3 days; removed with git worktree remove",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "early": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "claude-old-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Old Claude Code versions",
+    "patterns": [
+      "~/.local/share/claude/versions/*",
+      "~/.claude/local"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep newest",
+    "listOnly": true,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.local/bin/claude"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "claude-desktop-code-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Claude Code copies in Claude",
+    "patterns": [
+      "~/Library/Application Support/Claude/claude-code/*",
+      "~/Library/Application Support/Claude/claude-code-vm/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep the version in claude-code-vm/.sdk-version and the newest other, app not running",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/Library/Application Support/Claude/claude-code-vm/.sdk-version"
+      ],
+      "appNotRunning": true,
+      "processes": [
+        "Claude"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cursor-agent-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Old Cursor Agent versions",
+    "patterns": [
+      "~/.local/share/cursor-agent/versions/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep the one ~/.local/bin/cursor-agent points to and the newest other",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.local/bin/cursor-agent"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "copilot-cli-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Old Copilot CLI versions",
+    "patterns": [
+      "~/.copilot/pkg/universal/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep the one ~/.local/bin/copilot points to and the newest other",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.local/bin/copilot"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "codex-daemon-releases",
+    "group": "Toolchains and SDKs",
+    "label": "Old Codex app server releases",
+    "patterns": [
+      "~/.codex/packages/app-server-daemon/releases/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep current, app not running",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "appNotRunning": true,
+      "processes": [
+        "codex",
+        "Codex"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "codex-cli-releases",
+    "group": "Toolchains and SDKs",
+    "label": "Old Codex CLI versions",
+    "patterns": [
+      "~/.codex/packages/standalone/releases/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "keep the one ~/.codex/packages/standalone/current points to and the newest other",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "keepActive": [
+        "~/.codex/packages/standalone/current"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "codex-runtimes",
+    "group": "Toolchains and SDKs",
+    "label": "Unfinished Codex runtimes",
+    "patterns": [
+      "~/.cache/codex-runtimes/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "no runtime.json inside, untouched 7 days",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "downloads",
+    "notInside": [
+      "runtime.json"
+    ]
+  },
+  {
+    "id": "agent-browser-builds",
+    "group": "Toolchains and SDKs",
+    "label": "Old agent-browser Chrome builds",
+    "patterns": [
+      "~/.agent-browser/browsers/chrome-*"
+    ],
+    "tier": "costly",
+    "smartRule": "keep the newest two, untouched 1 day",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 1,
+      "keepNewest": 2,
+      "keepBy": "all"
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "edge-updater-versions",
+    "group": "Toolchains and SDKs",
+    "label": "Old Edge updates",
+    "patterns": [
+      "~/Library/Application Support/Microsoft/EdgeUpdater/apps/msedge-stable/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "older than the installed Edge, app not running",
+    "listOnly": false,
+    "rule": {
+      "keepNewest": 1,
+      "keepBy": "all",
+      "appNotRunning": true,
+      "processes": [
+        "Microsoft Edge"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "claude-cache",
+    "group": "Developer tool caches",
+    "label": "Claude Code cache",
+    "patterns": [
+      "~/.claude/shell-snapshots",
+      "~/.claude/statsig",
+      "~/.claude/debug",
+      "~/.cache/claude",
+      "~/Library/Caches/claude-cli-nodejs",
+      "~/.claude/cache"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "claude-desktop-cache",
+    "group": "App caches",
+    "label": "Claude app cache",
+    "patterns": [
+      "~/Library/Application Support/Claude/Cache",
+      "~/Library/Application Support/Claude/Code Cache",
+      "~/Library/Caches/com.anthropic.claudefordesktop"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "electron-app-caches",
+    "group": "App caches",
+    "label": "App web caches",
+    "patterns": [
+      "~/Library/Application Support/*/Code Cache",
+      "~/Library/Application Support/*/GPUCache",
+      "~/Library/Application Support/*/DawnCache",
+      "~/Library/Application Support/*/DawnGraphiteCache",
+      "~/Library/Application Support/*/DawnWebGPUCache",
+      "~/Library/Application Support/*/GrShaderCache",
+      "~/Library/Application Support/*/GraphiteDawnCache",
+      "~/Library/Application Support/*/ShaderCache",
+      "~/Library/Application Support/*/Crashpad/completed",
+      "~/Library/Application Support/*/Service Worker/ScriptCache",
+      "~/Library/Application Support/*/Partitions/*/Code Cache",
+      "~/Library/Application Support/*/Partitions/*/GPUCache",
+      "~/Library/Application Support/*/Partitions/*/DawnGraphiteCache",
+      "~/Library/Application Support/*/Partitions/*/DawnWebGPUCache",
+      "~/Library/Application Support/*/Partitions/*/Service Worker/ScriptCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "electron-http-cache",
+    "group": "App caches",
+    "label": "App download caches",
+    "patterns": [
+      "~/Library/Application Support/*/Cache",
+      "~/Library/Application Support/*/CachedData",
+      "~/Library/Application Support/*/Partitions/*/Cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "next to Code Cache or GPUCache, app not running",
+    "listOnly": false,
+    "near": [
+      "Code Cache",
+      "GPUCache"
+    ],
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "group-container-caches",
+    "group": "App caches",
+    "label": "Shared app caches",
+    "patterns": [
+      "~/Library/Group Containers/*/Library/Caches",
+      "~/Library/Group Containers/*/Library/Logs",
+      "~/Library/Group Containers/*/Logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, not Apple's",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "notApple": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "container-temp",
+    "group": "App caches",
+    "label": "App temporary files",
+    "patterns": [
+      "~/Library/Containers/*/Data/tmp"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running, untouched 7 days, not Apple's",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 7,
+      "appNotRunning": true,
+      "notApple": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "browser-component-caches",
+    "group": "App caches",
+    "label": "Browser component downloads",
+    "patterns": [
+      "~/Library/Application Support/Google/Chrome/component_crx_cache",
+      "~/Library/Application Support/Google/GoogleUpdater/crx_cache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/component_crx_cache",
+      "~/Library/Application Support/Google/Chrome/extensions_crx_cache",
+      "~/Library/Application Support/BraveSoftware/Brave-Browser/extensions_crx_cache",
+      "~/Library/Application Support/Arc/User Data/component_crx_cache",
+      "~/Library/Application Support/Arc/User Data/extensions_crx_cache",
+      "~/Library/Application Support/Microsoft Edge/component_crx_cache",
+      "~/Library/Application Support/Vivaldi/component_crx_cache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Google Chrome",
+        "Brave Browser"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "codex-sessions",
+    "group": "Agent and editor history",
+    "label": "Codex sessions",
+    "patterns": [
+      "~/.codex/sessions",
+      "~/.codex/archived_sessions"
+    ],
+    "tier": "userData",
+    "smartRule": "Sōji judges each rollout file: idle 14 days (Balanced) or 7 days (Aggressive); never while Codex writes it",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "codex-logs-cache",
+    "group": "Logs and crash reports",
+    "label": "Codex logs and cache",
+    "patterns": [
+      "~/.codex/log",
+      "~/.codex/cache",
+      "~/.codex/shell_snapshots"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "codex-worktrees",
+    "group": "Agent worktrees",
+    "label": "Codex worktrees",
+    "patterns": [
+      "~/.codex/worktrees/*"
+    ],
+    "tier": "costly",
+    "smartRule": "clean and merged into the default branch, not locked, untouched 3 days; removed with git worktree remove",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "early": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cursor-worktrees",
+    "group": "Agent worktrees",
+    "label": "Cursor worktrees",
+    "patterns": [
+      "~/.cursor/worktrees/*"
+    ],
+    "tier": "costly",
+    "smartRule": "clean and merged into the default branch, not locked, untouched 3 days; removed with git worktree remove",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "early": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "cursor-cache",
+    "group": "Developer tool caches",
+    "label": "Cursor cache",
+    "patterns": [
+      "~/Library/Application Support/Cursor/Cache*",
+      "~/Library/Application Support/Cursor/Code Cache",
+      "~/Library/Application Support/Cursor/CachedData",
+      "~/Library/Application Support/Cursor/CachedExtensionVSIXs",
+      "~/Library/Application Support/Cursor/logs",
+      "~/Library/Caches/com.todesktop.230313mzl4w4u92.ShipIt",
+      "~/Library/Caches/com.todesktop.230313mzl4w4u92"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "cursor-old-extensions",
+    "group": "Editor extensions",
+    "label": "Old Cursor extensions",
+    "patterns": [
+      "~/.cursor/extensions/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "listed in the editor's extensions/.obsolete, app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Cursor"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "conductor-workspaces",
+    "group": "Agent worktrees",
+    "label": "Conductor workspaces",
+    "patterns": [
+      "~/conductor/workspaces/*/*"
+    ],
+    "tier": "userData",
+    "smartRule": "clean and merged worktree, untouched 7 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 7
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "t3-worktrees",
+    "group": "Agent worktrees",
+    "label": "T3 Code worktrees",
+    "patterns": [
+      "~/.t3/worktrees/*/*"
+    ],
+    "tier": "costly",
+    "smartRule": "clean and merged into the default branch, not locked, untouched 3 days; removed with git worktree remove",
+    "listOnly": false,
+    "rule": {
+      "untouchedDays": 3,
+      "early": true
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "vscode-cache",
+    "group": "Developer tool caches",
+    "label": "VS Code cache",
+    "patterns": [
+      "~/Library/Application Support/Code/Cache*",
+      "~/Library/Application Support/Code/Code Cache",
+      "~/Library/Application Support/Code/CachedData",
+      "~/Library/Application Support/Code/CachedExtensionVSIXs",
+      "~/Library/Application Support/Code/logs",
+      "~/Library/Caches/com.microsoft.VSCode.ShipIt",
+      "~/Library/Caches/com.microsoft.VSCode"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "vscode-old-extensions",
+    "group": "Editor extensions",
+    "label": "Old VS Code extensions",
+    "patterns": [
+      "~/.vscode/extensions/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "listed in the editor's extensions/.obsolete, app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Code",
+        "Electron"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "vscode-workspace-storage",
+    "group": "Agent and editor history",
+    "label": "VS Code workspace data",
+    "patterns": [
+      "~/Library/Application Support/Code/User/workspaceStorage/*",
+      "~/Library/Application Support/Cursor/User/workspaceStorage/*",
+      "~/Library/Application Support/Windsurf/User/workspaceStorage/*",
+      "~/Library/Application Support/Code - Insiders/User/workspaceStorage/*",
+      "~/Library/Application Support/VSCodium/User/workspaceStorage/*",
+      "~/Library/Application Support/Antigravity/User/workspaceStorage/*",
+      "~/Library/Application Support/Kiro/User/workspaceStorage/*"
+    ],
+    "tier": "userData",
+    "smartRule": "folder no longer exists",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "windsurf-cache",
+    "group": "Developer tool caches",
+    "label": "Windsurf cache",
+    "patterns": [
+      "~/Library/Application Support/Windsurf/Cache*",
+      "~/Library/Application Support/Windsurf/Code Cache",
+      "~/Library/Application Support/Windsurf/CachedData",
+      "~/Library/Application Support/Windsurf/CachedExtensionVSIXs",
+      "~/Library/Application Support/Windsurf/logs"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "windsurf-old-extensions",
+    "group": "Editor extensions",
+    "label": "Old Windsurf extensions",
+    "patterns": [
+      "~/.windsurf/extensions/*"
+    ],
+    "tier": "regenerable",
+    "smartRule": "listed in the editor's extensions/.obsolete, app not running",
+    "listOnly": true,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "Windsurf"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "zed-cache",
+    "group": "Developer tool caches",
+    "label": "Zed cache",
+    "patterns": [
+      "~/Library/Caches/Zed",
+      "~/Library/Logs/Zed",
+      "~/Library/Application Support/Zed/languages",
+      "~/Library/Application Support/Zed/node"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "zed",
+        "Zed"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "gemini-cli-tmp",
+    "group": "Agent and editor history",
+    "label": "Gemini CLI temp",
+    "patterns": [
+      "~/.gemini/tmp",
+      "~/.qwen/tmp"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "opencode-data",
+    "group": "Developer tool caches",
+    "label": "opencode cache",
+    "patterns": [
+      "~/.cache/opencode",
+      "~/.local/share/opencode/log"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "opencode-sessions",
+    "group": "Agent and editor history",
+    "label": "opencode sessions",
+    "patterns": [
+      "~/.local/share/opencode/storage"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone"
+  },
+  {
+    "id": "aider-cache",
+    "group": "Developer tool caches",
+    "label": "aider cache",
+    "patterns": [
+      "**/.aider.tags.cache.v*",
+      "~/.aider/caches"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "browser-mcp-profile-caches",
+    "group": "Developer tool caches",
+    "label": "Browser caches of coding agents",
+    "patterns": [
+      "~/.cache/chrome-devtools-mcp/chrome-profile/Default/Cache",
+      "~/.cache/chrome-devtools-mcp/chrome-profile/Default/Code Cache",
+      "~/.cache/chrome-devtools-mcp/chrome-profile/Default/GPUCache",
+      "~/.gemini/antigravity-browser-profile/Default/Cache",
+      "~/.gemini/antigravity-browser-profile/Default/Code Cache",
+      "~/.gemini/antigravity-browser-profile/Default/GPUCache",
+      "~/Library/Caches/ms-playwright/mcp-*/Default/Cache",
+      "~/Library/Caches/ms-playwright/mcp-*/Default/Code Cache",
+      "~/Library/Caches/ms-playwright/mcp-*/Default/GPUCache"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "chrome-devtools-mcp",
+        "Google Chrome for Testing",
+        "Antigravity",
+        "Chromium"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "simulator-device-caches",
+    "group": "Developer tool caches",
+    "label": "Simulator caches",
+    "patterns": [
+      "~/Library/Developer/CoreSimulator/Devices/*/data/Library/Caches",
+      "~/Library/Developer/CoreSimulator/Devices/*/data/tmp"
+    ],
+    "tier": "regenerable",
+    "smartRule": "device shut down",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "launchd_sim",
+        "Simulator"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "simulator-downloaded-assets",
+    "group": "Developer tool caches",
+    "label": "Simulator downloads",
+    "patterns": [
+      "~/Library/Developer/CoreSimulator/Devices/*/data/private/var/MobileAsset/AssetsV2"
+    ],
+    "tier": "regenerable",
+    "smartRule": "device shut down",
+    "listOnly": false,
+    "rule": {
+      "processes": [
+        "launchd_sim",
+        "Simulator"
+      ]
+    },
+    "comesBack": "downloads"
+  },
+  {
+    "id": "aider-history",
+    "group": "Agent and editor history",
+    "label": "aider history",
+    "patterns": [
+      "**/.aider.chat.history.md",
+      "**/.aider.input.history"
+    ],
+    "tier": "userData",
+    "listOnly": true,
+    "comesBack": "gone"
+  },
+  {
+    "id": "copilot-cache",
+    "group": "Logs and crash reports",
+    "label": "Copilot cache",
+    "patterns": [
+      "~/.copilot/logs",
+      "~/.config/github-copilot/logs"
+    ],
+    "tier": "regenerable",
+    "listOnly": false,
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "game-launcher-logs",
+    "group": "Logs and crash reports",
+    "label": "Game logs and web caches",
+    "patterns": [
+      "~/Library/Application Support/Steam/htmlcache",
+      "~/Library/Application Support/minecraft/logs",
+      "~/Library/Application Support/minecraft/crash-reports",
+      "~/Library/Application Support/minecraft/webcache2"
+    ],
+    "tier": "regenerable",
+    "smartRule": "app not running",
+    "listOnly": false,
+    "rule": {
+      "appNotRunning": true,
+      "processes": [
+        "steam_osx",
+        "Steam",
+        "minecraft",
+        "java"
+      ]
+    },
+    "comesBack": "rebuilds"
+  },
+  {
+    "id": "copilot-sessions",
+    "group": "Agent and editor history",
+    "label": "Copilot sessions",
+    "patterns": [
+      "~/.copilot/session-state"
+    ],
+    "tier": "userData",
+    "smartRule": "older than 30 days",
+    "listOnly": true,
+    "rule": {
+      "untouchedDays": 30
+    },
+    "comesBack": "gone"
+  }
+]

@@ -1,0 +1,441 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Sōji's live disk index: total indexed, folders it couldn't read, the largest folders and files, what grew lately and what is new or changed since the last analysis.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 30,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "index_summary",
+    "title": "Disk summary"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The largest folders and files under a path, by allocated size, from the index.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 20,
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "largest",
+    "title": "Largest under a folder"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "A folder's children with sizes, file counts and newest change.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "list",
+    "title": "List a folder"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Size, dates (including when it was added to its folder), the owning app and whether it is installed, git state, Sōji's hints and any cached verdict for one path.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "file_info",
+    "title": "About a path"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read-only git facts for a path: repository, branch, dirty, merged into the default branch, worktree and locked, ignored.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "git_status",
+    "title": "Git state"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Processes with files open under a path, or working in it.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "open_files",
+    "title": "Open files"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "The top processes by CPU, GPU or memory: pid, parent, user, CPU %, GPU %, memory, age, orphaned, executable, command.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sort": {
+          "default": "cpu",
+          "enum": [
+            "cpu",
+            "gpu",
+            "memory"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "processes",
+    "title": "Top processes"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "One process: command, parent tree, age, working folder, CPU, GPU and memory.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "pid": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pid"
+      ],
+      "type": "object"
+    },
+    "name": "process_info",
+    "title": "About a process"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "When coding agents (Claude Code, Codex, Cursor and others present on this Mac) last worked at or under a path.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Absolute path; ~ is the home folder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "agent_activity",
+    "title": "Coding agent activity"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Your answer to Sōji. Call once with everything you found; Sōji verifies, measures and guards every item itself. Disk runs send findings, process runs send processVerdicts.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "cleanCommand": {
+                "description": "The tool's official clean command, argv",
+                "items": {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              "comesBack": {
+                "description": "rebuilds: made again offline; downloads: fetched again; gone: lost",
+                "enum": [
+                  "rebuilds",
+                  "downloads",
+                  "gone"
+                ],
+                "type": "string"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "gitState": {
+                "description": "What git_status showed; shown to the user, never used to tick",
+                "enum": [
+                  "clean-merged",
+                  "dirty",
+                  "unmerged"
+                ],
+                "type": "string"
+              },
+              "group": {
+                "maxLength": 80,
+                "type": "string"
+              },
+              "howItComesBack": {
+                "maxLength": 500,
+                "type": "string"
+              },
+              "inUseEvidence": {
+                "maxLength": 500,
+                "type": "string"
+              },
+              "lastUsed": {
+                "description": "When it was last used (YYYY-MM-DD)",
+                "maxLength": 40,
+                "type": "string"
+              },
+              "levels": {
+                "additionalProperties": false,
+                "description": "Which level takes it, by idle time. {} with a reason: never",
+                "properties": {
+                  "aggressive": {
+                    "description": "Idle hours before this level takes it; 0 is now. Leave out: this level doesn't take it",
+                    "maximum": 8784,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "balanced": {
+                    "description": "Idle hours before this level takes it; 0 is now. Leave out: this level doesn't take it",
+                    "maximum": 8784,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "careful": {
+                    "description": "Idle hours before this level takes it; 0 is now. Leave out: this level doesn't take it",
+                    "maximum": 8784,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "reason": {
+                    "maxLength": 200,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "type": "object"
+              },
+              "minLevel": {
+                "description": "The least aggressive cleanup level at which you'd clean it",
+                "enum": [
+                  "careful",
+                  "balanced",
+                  "aggressive"
+                ],
+                "type": "string"
+              },
+              "path": {
+                "description": "Absolute path of the folder or file",
+                "type": "string"
+              },
+              "projectExists": {
+                "description": "Whether the project it belongs to still exists",
+                "type": "boolean"
+              },
+              "recommendation": {
+                "enum": [
+                  "remove",
+                  "trash",
+                  "keep",
+                  "review"
+                ],
+                "type": "string"
+              },
+              "regenerable": {
+                "description": "It comes back on its own if removed",
+                "type": "boolean"
+              },
+              "title": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "whatItIs": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "whySafe": {
+                "maxLength": 200,
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "title",
+              "group",
+              "regenerable",
+              "recommendation",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "processVerdicts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "executablePath": {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              "explanation": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "pid": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "reason": {
+                "maxLength": 500,
+                "type": "string"
+              },
+              "suggestion": {
+                "enum": [
+                  "quit",
+                  "leave",
+                  "never"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "pid",
+              "explanation",
+              "suggestion",
+              "reason",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "name": "submit_findings",
+    "title": "Submit findings"
+  }
+]

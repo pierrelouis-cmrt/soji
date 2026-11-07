@@ -1,0 +1,446 @@
+"""Independent, read-only disk classifier using Sōji's shipped hint catalog."""
+from __future__ import annotations
+import bisect
+import collections
+import dataclasses
+import fnmatch
+import json
+from importlib.resources import files as resource_files
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import threading
+import time
+
+DATA = resource_files('soji_cli').joinpath('data')
+MODES = ('careful', 'balanced', 'aggressive')
+ALIASES = {'safe':'careful','strict':'aggressive','smart':'balanced'}
+MODE_TEXT = {
+    'careful': 'Only clearly disposable items; per-item judgments and safety floors apply.',
+    'balanced': 'Stale items; preserve costly or uncertain data unless explicitly judged.',
+    'aggressive': 'Unused recoverable items; all activity and integrity guards still apply.',
+}
+PROJECT_MARKERS = ('package.json', 'Package.swift', 'Cargo.toml', 'pyproject.toml', 'setup.py', 'Gemfile', 'pom.xml', 'build.sbt', 'settings.gradle', 'settings.gradle.kts', 'build.gradle', 'build.gradle.kts', 'Podfile', 'pubspec.yaml', 'mix.exs', 'composer.json', 'CMakeLists.txt', 'Makefile', 'deno.json', 'project.godot', 'ProjectSettings')
+PRIVATE_NAMES = {'.ssh', '.gnupg', '.aws', '.kube', '.netrc', '.git', '.svn', '.hg'}
+PRIVATE_SUFFIXES = ('.photoslibrary', '.photolibrary', '.aplibrary', '.keychain-db')
+SECRET_SUFFIXES = ('.pem', '.key', '-keypair.json', '.p12', '.pfx')
+PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Library/CloudStorage', 'Library/Mobile Documents', 'Library/Application Support/com.apple.TCC', 'Library/Application Support/Soji')
+CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
+SPECIAL_RULES = {'deviceBuild', 'simulatorDevice', 'keepActive', 'keepPinned', 'knownApp', 'notApple', 'appNotInstalled', 'workspaceMissing'}
+
+
+def within(path: str, root: str) -> bool:
+    return path == root or path.startswith(root.rstrip('/') + '/')
+
+
+def human(n: int) -> str:
+    value = float(n)
+    for unit in ('B', 'KB', 'MB', 'GB', 'TB', 'PB'):
+        if abs(value) < 1000 or unit == 'PB':
+            return f'{value:.1f} {unit}' if unit != 'B' else f'{int(value)} B'
+        value /= 1000
+    return str(n)
+
+
+def glob_regex(pattern: str) -> re.Pattern:
+    """Segment-aware glob: * never crosses /; ** matches zero or more segments."""
+    parts = pattern.split('/')
+    pieces = []
+    for i, part in enumerate(parts):
+        if part == '**':
+            pieces.append(('/*' if i == 0 else '') + ('(?:[^/]+/)*' if i < len(parts)-1 else '.*'))
+        else:
+            part_re = fnmatch.translate(part)
+            # fnmatch's .* crosses separators; constrain every non-** segment.
+            body = part_re[4:-3].replace('.*', '[^/]*').replace('.', '.')
+            pieces.append('(?=[^/]*(?:/|$))'+body)
+            if i < len(parts)-1: pieces.append('/')
+    return re.compile('^' + ''.join(pieces) + '$', re.IGNORECASE)
+
+
+@dataclasses.dataclass(slots=True)
+class Node:
+    path: str
+    size: int = 0
+    apparent: int = 0
+    files: int = 0
+    newest: float = 0
+    own_newest: float = 0
+    errors: int = 0
+    secret: bool = False
+    skipped: bool = False
+    reason: str = ''
+    directory: bool = True
+    children: list[str] = dataclasses.field(default_factory=list)
+    device: int = 0
+    inode: int = 0
+    own_size: int = 0
+    own_apparent: int = 0
+    own_errors: int = 0
+    link_count: int = 0
+
+
+@dataclasses.dataclass
+class Finding:
+    path: str
+    size: int
+    apparent: int
+    files: int
+    newest: float
+    group: str
+    label: str
+    hint_id: str = ''
+    tier: str = 'userData'
+    comes_back: str = 'gone'
+    rule: dict = dataclasses.field(default_factory=dict)
+    smart_rule: str = ''
+    list_only: bool = True
+    holds: list[str] = dataclasses.field(default_factory=list)
+    limitations: list[str] = dataclasses.field(default_factory=list)
+    project_idle_hours: float | None = None
+    matched_pattern: str = ''
+    selected: bool = False
+    decision: str = ''
+    thresholds: dict = dataclasses.field(default_factory=dict)
+    levels: dict | None = None
+    last_activity: float | None = None
+    mode_holds: dict = dataclasses.field(default_factory=dict)
+    special_min_hours: float = 0
+    evidence: list = dataclasses.field(default_factory=list)
+    action: dict = dataclasses.field(default_factory=dict)
+    identity: dict = dataclasses.field(default_factory=dict)
+    source: str = 'hint'
+    managed: bool = False
+    recommendation: str = 'remove'
+    confidence: float | None = None
+    date_added: float | None = None
+    default_holds: list[str] = dataclasses.field(default_factory=list)
+    recent_activity_hours: float = 0
+    rule_min_hours: dict = dataclasses.field(default_factory=dict)
+    rule_project_min_hours: dict = dataclasses.field(default_factory=dict)
+    rule_early_reason: str | None = None
+
+
+    def decide(self, mode: str, now: float) -> tuple[bool, str]:
+        mode=ALIASES.get(mode,mode)
+        if mode not in MODES:raise ValueError('Unknown cleanup level: '+mode)
+        if self.holds: return False, '; '.join(dict.fromkeys(self.holds))
+        if mode in self.mode_holds:return False,self.mode_holds[mode]
+        if self.recommendation in ('keep','review'):return False,'Agent recommends '+self.recommendation
+        if (self.list_only or self.tier in ('never','userData')) and not self.managed:
+            return False, 'Listed for review; never automatically selected'
+        from .levels import effective_minimum,judged_minimum,judgment_level,selected_at
+        stamp=max(self.newest,self.date_added or self.newest)
+        idle=(now-max(stamp,self.last_activity or stamp))/3600
+        floor=max(300,self.recent_activity_hours*3600)
+        if now-stamp<floor:return False,'Changed within the recent-activity window'
+        if self.levels is None:
+            if self.default_holds:return False,'; '.join(self.default_holds)
+            minimum=self.rule_min_hours.get(mode,self.special_min_hours)
+            if idle<minimum:return False,f'Idle {idle:.1f} h; rule needs {minimum:g} h at {mode}'
+            project_min=self.rule_project_min_hours.get(mode)
+            if project_min is not None:
+                if self.project_idle_hours is None:return False,'Project inactivity not measurable'
+                if self.project_idle_hours<project_min:return False,f'Project idle {self.project_idle_hours:.1f} h; rule needs {project_min:g} h at {mode}'
+        if self.managed:
+            # Session and Trash rows carry their own FindingPart levels, not
+            # the general regenerable/costly risk policy.
+            effective=judgment_level(self.levels or {},idle*3600)
+        else:
+            judged=judged_minimum(self.tier,self.recommendation,self.list_only,
+                                  comes_back=self.comes_back)
+            effective=effective_minimum(judged,self.levels,self.tier,stamp,
+                self.last_activity,now,self.recent_activity_hours,
+                app_cache=self.group=='App caches')
+        if not selected_at(effective,mode):
+            return False,('Eligible from '+effective if effective else 'No eligible cleanup level at the current age/activity')
+        return True,f'Idle {idle/24:.1f} d; eligible from {effective}'
+
+
+
+
+class Catalog:
+    def __init__(self, home: str):
+        self.home = home
+        self.hints = json.loads((DATA/'hints.json').read_text())
+        self.groups = {g['group']:g for g in json.loads((DATA/'groups.json').read_text())}
+        self.by_last = collections.defaultdict(list)
+        self.wild = []
+        from .locations import cache_locations
+        dynamic=collections.defaultdict(list)
+        self.locations=cache_locations(home)
+        for hint_id,path,source in self.locations:dynamic[hint_id].append(path)
+        for hint in self.hints:
+            for pattern in hint['patterns']+dynamic[hint['id']]:
+                expanded = pattern.replace('~', home, 1) if pattern.startswith('~') else pattern
+                record = (glob_regex(expanded), hint, pattern)
+                last = expanded.rsplit('/', 1)[-1]
+                if any(c in last for c in '*?['): self.wild.append(record)
+                else: self.by_last[last.casefold()].append(record)
+        self.markers_cache = {}
+
+    def exists(self, folder: Path, markers: list[str]) -> bool:
+        key=(str(folder),tuple(markers))
+        if key not in self.markers_cache:
+            try:
+                names = os.listdir(folder)
+                self.markers_cache[key] = any(
+                    (any(fnmatch.fnmatchcase(n.casefold(), marker.casefold()) for n in names)
+                     if '/' not in marker else any(folder.glob(marker))) for marker in markers)
+            except OSError: self.markers_cache[key] = False
+        return self.markers_cache[key]
+
+    def match(self, path: str):
+        p=Path(path)
+        for regex,hint,pattern in self.by_last[p.name.casefold()] + self.wild:
+            if not regex.fullmatch(path): continue
+            if hint.get('inside') and not self.exists(p,hint['inside']):continue
+            if hint.get('notInside') and self.exists(p,hint['notInside']):continue
+            # Recovered marker semantics say nearby. Ancestor depth here is reconstructed.
+            if hint.get('near') and not any(self.exists(a,hint['near']) for a in list(p.parents)[:4]):continue
+            return hint,pattern
+        return None
+
+
+class Scanner:
+    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0):
+        self.home=os.path.realpath(home or str(Path.home()))
+        cleaned=sorted(set(os.path.realpath(os.path.expanduser(p)) for p in roots))
+        self.roots=[p for p in cleaned if not any(p != q and within(p,q) for q in cleaned)]
+        self.protected=[os.path.realpath(os.path.expanduser(p)) for p in protected]
+        self.catalog=Catalog(self.home)
+        self.nodes: dict[str,Node]={}
+        self.findings: list[Finding]=[]
+        self.cancel=threading.Event()
+        self.done=False;self.error='';self.current='';self.visited=0;self.bytes=0;self.unreadable=0
+        self.skipped=0;self.max_files=max_files;self.max_seconds=max_seconds;self.min_bytes=min_bytes
+        self.started=0.;self.finished=0.;self.now=time.time();self.limited=False
+        self.recent_activity_hours=max(0,float(recent_activity_hours))
+        self.context=context;self.processes=[];self.open_paths=[];self.context_warnings=[]
+        self._inodes=set();self._git_cache={}
+        self.activity=None;self.apps=None;self.tools=None;self.specialized=None;self.git=None
+
+    def private(self,path: str) -> str:
+        p=Path(path)
+        if any(within(path,r) for r in self.protected): return 'User protected path'
+        if p.name in PRIVATE_NAMES: return 'Credentials or repository metadata; contents not scanned'
+        if p.name.lower().endswith(PRIVATE_SUFFIXES):return 'Personal library; contents not scanned'
+        if any(within(path,os.path.join(self.home,r)) for r in PRIVATE_HOME):return 'Private or cloud data; contents not scanned'
+        if any(p.name == name or p.name.startswith(name+' ') or p.name.startswith(name+'-') for name in CLOUD_NAMES):return 'Cloud-synced folder; contents not scanned'
+        if p.name.lower() in ('memory','memories') and any(x in path for x in ['/.claude/', '/.codex/', '/.cursor/']):return 'Agent memory; contents not scanned'
+        if p.name.endswith('.app'):return 'Installed application bundle; contents not scanned'
+        return ''
+
+    def collect_context(self):
+        if not self.context:
+            self.context_warnings.append('Process and open-file checks disabled');return
+        try:
+            r=subprocess.run(['/bin/ps','-axo','comm='],capture_output=True,text=True,timeout=5)
+            if r.returncode:raise OSError('ps failed')
+            self.processes=[l.strip().casefold() for l in r.stdout.splitlines() if l.strip()]
+        except (OSError,subprocess.TimeoutExpired):self.context_warnings.append('Running processes unavailable')
+        try:
+            r=subprocess.run(['/usr/sbin/lsof','-nP','-w','-a','-u',str(os.getuid()),'-F','pn'],capture_output=True,text=True,timeout=8)
+            if r.returncode not in (0,1) or not r.stdout:raise OSError('lsof unavailable')
+            self.open_paths=sorted(set(l[1:].removesuffix(' (deleted)') for l in r.stdout.splitlines() if l.startswith('n/')))
+        except (OSError,subprocess.TimeoutExpired):self.context_warnings.append('Open-file check unavailable; activity only partially verified')
+
+    def budget(self) -> bool:
+        if self.cancel.is_set():return False
+        if self.visited >= self.max_files or time.monotonic()-self.started>self.max_seconds:
+            self.limited=True;return False
+        return True
+
+    def visit(self,path: str, depth=0, device=None) -> Node:
+        node=Node(path);self.nodes[path]=node;self.current=path
+        if not self.budget():node.errors=1;node.own_errors=1;node.reason='Scan stopped before measuring';return node
+        try:s=os.lstat(path)
+        except OSError:
+            node.errors=1;node.own_errors=1;node.reason='Unreadable entry';self.unreadable+=1;return node
+        self.visited+=1
+        node.device=s.st_dev;node.inode=s.st_ino
+        # Birth time approximates date added; ctime is not creation time on Unix.
+        stamp=max(s.st_mtime,getattr(s,'st_birthtime',0))
+        node.newest=node.own_newest=stamp
+        node.directory=stat.S_ISDIR(s.st_mode)
+        if stat.S_ISLNK(s.st_mode):
+            node.reason='Symlink; not followed';node.files=1;node.size=getattr(s,'st_blocks',0)*512;node.apparent=s.st_size;node.own_size=node.size;node.own_apparent=node.apparent;self.bytes+=node.size;self.skipped+=1;return node
+        if not node.directory:
+            if stat.S_ISREG(s.st_mode):
+                key=(s.st_dev,s.st_ino)
+                node.files=1
+                node.link_count=max(1,s.st_nlink)
+                node.own_size=(getattr(s,'st_blocks',0)*512)//node.link_count;node.own_apparent=s.st_size
+                node.size=node.own_size;self.bytes+=node.size
+                if key not in self._inodes:
+                    self._inodes.add(key);node.apparent=s.st_size
+                node.secret=Path(path).name.startswith('.env') or Path(path).name.endswith(SECRET_SUFFIXES) or Path(path).name in ('credentials.json','id_rsa','id_ed25519')
+            return node
+        reason=self.private(path)
+        if reason or depth>=128 or (device is not None and s.st_dev!=device):
+            node.skipped=True;node.reason=reason or 'Mount boundary or depth limit; contents not scanned';self.skipped+=1;return node
+        # Directory blocks count too; hardlinks are counted once per scan.
+        node.size=getattr(s,'st_blocks',0)*512;node.apparent=s.st_size;self.bytes+=node.size
+        node.own_size=node.size;node.own_apparent=node.apparent
+        try:
+            with os.scandir(path) as it:
+                for entry in it:
+                    if not self.budget():node.errors+=1;node.own_errors+=1;break
+                    child=self.visit(entry.path,depth+1,s.st_dev)
+                    node.children.append(entry.path)
+                    node.size+=child.size;node.apparent+=child.apparent;node.files+=child.files
+                    node.newest=max(node.newest,child.newest)
+                    node.errors+=child.errors;node.secret |= child.secret
+                    # Skipped descendants make candidate size/safety incomplete.
+                    if child.skipped:node.skipped=True
+        except OSError:node.errors+=1;node.own_errors+=1;self.unreadable+=1
+        return node
+
+    def project_for(self,path: str) -> str | None:
+        for parent in list(Path(path).parents)[:8]:
+            if str(parent)=='/':break
+            if self.catalog.exists(parent,list(PROJECT_MARKERS)) or (parent/'.git').exists():return str(parent)
+        return None
+
+    def git_hold(self,project: str) -> str:
+        if project in self._git_cache:return self._git_cache[project]
+        result=''
+        try:
+            env=dict(os.environ,GIT_OPTIONAL_LOCKS='0',GIT_TERMINAL_PROMPT='0',GIT_NO_LAZY_FETCH='1')
+            r=subprocess.run(['/usr/bin/git','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-C',project,'status','--porcelain','--untracked-files=normal'],capture_output=True,text=True,timeout=3,env=env)
+            if r.returncode==0 and r.stdout.strip():result='Project has uncommitted or untracked work'
+            elif r.returncode and (Path(project)/'.git').exists():result='Git state could not be confirmed'
+        except (OSError,subprocess.TimeoutExpired):result='Git state could not be confirmed'
+        self._git_cache[project]=result
+        return result
+
+    def project_age(self,project: str) -> float | None:
+        root=self.nodes.get(project)
+        if not root:return None
+        # Exclude output/dependencies when judging the source project's activity.
+        stamps=[root.own_newest]
+        for p in root.children:
+            if Path(p).name in ('.git','node_modules','target','.build','.venv','venv','Pods','build','dist','.next'):continue
+            stamps.append(self.nodes[p].newest)
+        return max(0,(self.now-max(stamps))/3600)
+
+    def is_open(self,path: str) -> bool:
+        i=bisect.bisect_left(self.open_paths,path)
+        # Exact path and descendants; bisect again for the directory prefix.
+        if i<len(self.open_paths) and self.open_paths[i]==path:return True
+        i=bisect.bisect_left(self.open_paths,path.rstrip('/')+'/')
+        return i<len(self.open_paths) and within(self.open_paths[i],path)
+
+    def classify(self,node: Node) -> Finding:
+        match=self.catalog.match(node.path)
+        if match:
+            hint,pattern=match
+            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,hint['group'],hint['label'],hint['id'],hint['tier'],hint.get('comesBack','gone'),hint.get('rule',{}),hint.get('smartRule',''),hint.get('listOnly',False),matched_pattern=pattern)
+        else:
+            name=Path(node.path).name.lower()
+            if not node.directory:
+                group='Large media files' if name.endswith(('.mov','.mp4','.mkv','.wav','.aiff','.mp3','.jpg','.heic','.png')) else 'Downloads and installers' if name.endswith(('.dmg','.pkg','.xip','.zip','.tar','.gz','.download','.part')) else 'Other files'
+            else:group='Other folders'
+            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,group,Path(node.path).name or '/',smart_rule='No shipped hint matched; review only')
+        f.recent_activity_hours=self.recent_activity_hours
+        if node.errors:f.holds.append(f'Incomplete measurement ({node.errors} errors or scan limit)')
+        if node.skipped:f.holds.append(node.reason or 'Contains an excluded or unreadable subtree')
+        if node.secret:f.holds.append('Contains credential or environment-file names')
+        if self.now-node.newest<300:f.holds.append('Changed or created within the last 5 minutes')
+        if self.is_open(node.path):f.holds.append('File open or process working in this folder')
+        running=[]
+        for proc in f.rule.get('processes',[]):
+            if any(Path(p).name==proc.casefold() or p.endswith('/'+proc.casefold()) for p in self.processes):running.append(proc)
+        if running:f.holds.append('Running: '+', '.join(running))
+        project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('projectUntouchedDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
+        if project:
+            f.project_idle_hours=self.project_age(project)
+            state=self.git.inspect(project,worktree=f.group=='Agent worktrees') if self.git else {}
+            if state.get('reason'):f.holds.append(state['reason'])
+            f.evidence.append({'check':'git','state':state})
+        if self.specialized:self.specialized.evaluate(f)
+        if self.context_warnings:f.holds.extend(self.context_warnings)
+        from .cleanup import file_identity
+        try:
+            f.identity=file_identity(f.path)
+            if f.identity['type']==stat.S_IFLNK:f.holds.append('Symlink itself is never a cleanup target')
+        except OSError:f.holds.append('File identity unavailable')
+        # Explicitly show original thresholds as provenance, separate from mode choices.
+        f.thresholds={'untouchedDays':f.rule.get('untouchedDays'),'projectUntouchedDays':f.rule.get('projectUntouchedDays')}
+        return f
+
+    def run(self):
+        self.started=time.monotonic()
+        try:
+            self.collect_context()
+            for root in self.roots:
+                if not self.budget():break
+                self.visit(root)
+            self._build_findings()
+        except Exception as exc:self.error=f'{type(exc).__name__}: {exc}'
+        finally:self.done=True;self.finished=time.monotonic()
+
+    def _build_findings(self):
+        from .activity import ActivityIndex
+        from .apps import AppCatalog,InstalledTools
+        from .specialized import SpecializedRules
+        from .gitstate import GitInspector
+        self.now=time.time();self.findings=[]
+        self.git=GitInspector()
+        self.activity=ActivityIndex(self.home).build() if self.context else ActivityIndex(self.home)
+        self.apps=AppCatalog(self.home,self.processes).build() if self.context else AppCatalog(self.home)
+        self.tools=InstalledTools(self.home).build() if self.context else InstalledTools(self.home)
+        self.specialized=SpecializedRules(self,self.apps,self.activity,self.tools) if self.context else None
+        # Every row is measured once. Select a non-overlapping frontier: known
+        # hint roots first; otherwise recurse to expose meaningful children.
+        known_ancestors=set()
+        for path,n in self.nodes.items():
+            if self.catalog.match(path):
+                for parent in Path(path).parents:
+                    if str(parent) in known_ancestors: break
+                    known_ancestors.add(str(parent))
+        def frontier(path,level=0):
+            n=self.nodes[path]
+            if n.size<self.min_bytes and not n.reason:return
+            match=self.catalog.match(path)
+            descend_review=bool(match and (match[0].get('listOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash'))
+            if (match and not descend_review) or not n.children or n.reason:
+                self.findings.append(self.classify(n));return
+            if level>=4 and n.size<500_000_000 and path not in known_ancestors:
+                self.findings.append(self.classify(n));return
+            if n.children:
+                own=n.size-sum(self.nodes[c].size for c in n.children)
+                if own>=self.min_bytes:
+                    direct=dataclasses.replace(n,size=own,apparent=own,children=[],directory=False)
+                    f=self.classify(direct);f.label='Directory metadata';f.group='Other files';self.findings.append(f)
+                for c in n.children:frontier(c,level+1)
+        for root in self.roots:
+            if root in self.nodes:frontier(root)
+        self.findings.sort(key=lambda f:f.size,reverse=True)
+        from .catalogs import expand_catalogs
+        self.findings=expand_catalogs(self)
+        if self.context:
+            from .platform import native
+            for start in range(0,len(self.findings),64):
+                batch=self.findings[start:start+64]
+                values=native('metadata',*[f.path for f in batch])
+                if isinstance(values,list):
+                    bypath={v['path']:v for v in values}
+                    for f in batch:
+                        meta=bypath.get(f.path,{})
+                        f.date_added=meta.get('added') or None
+                        if meta.get('cloud'):f.holds.append('Cloud-managed or online-only item')
+                        if meta:f.evidence.append({'check':'nativeMetadata',**meta})
+        self.findings.sort(key=lambda f:f.size,reverse=True)
+
+    def decisions(self,mode):
+        for f in self.findings:
+            f.recent_activity_hours=self.recent_activity_hours
+            f.selected,f.decision=f.decide(mode,self.now)
+        return self.findings
+
+    def report(self,mode):
+        findings=self.decisions(mode)
+        return {'format':'soji/1','roots':self.roots,'home':self.home,'mode':mode,'modeDescription':MODE_TEXT[ALIASES.get(mode,mode)], 'source':'375 shipped hints; reconstructed native rules, activity, index, AI integration and guarded cleanup', 'scannedAt':self.now,'visited':self.visited,'indexedEntries':len(self.nodes),'allocatedBytes':self.bytes,'selectedBytes':sum(f.size for f in findings if f.selected),'unreadable':self.unreadable,'excludedSubtrees':self.skipped,'limited':self.limited or self.cancel.is_set(),'error':self.error,'contextWarnings':self.context_warnings,'findings':[dataclasses.asdict(f) for f in findings]}
