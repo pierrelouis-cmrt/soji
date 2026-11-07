@@ -121,6 +121,9 @@ class Finding:
     rule_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_project_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_early_reason: str | None = None
+    # Compound unit (Claude session): explicit member paths, each measured once.
+    # Empty for ordinary single-path rows.
+    members: list = dataclasses.field(default_factory=list)
 
 
     def decide(self, mode: str, now: float) -> tuple[bool, str]:

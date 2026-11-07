@@ -44,7 +44,9 @@ class AdvancedRules(Fixture):
         self.file('.claude/projects/proj/memory/private.txt')
         self.file('.claude/projects/proj/one/subagents/agent.jsonl','{}\n')
         s=self.scan();parts=[f for f in s.findings if f.hint_id=='claude-sessions']
-        self.assertEqual(len(parts),2);self.assertTrue(all(f.managed for f in parts));self.assertFalse(any('private' in f.path for f in parts))
+        # One compound row: transcript plus its subagents sidecar folder.
+        self.assertEqual(len(parts),1);self.assertTrue(all(f.managed for f in parts));self.assertFalse(any('private' in f.path for f in parts))
+        self.assertEqual([m['role'] for m in parts[0].members],['transcript','subagents'])
     def test_configured_cache_root_without_shell_execution(self):
         from soji_cli.locations import cache_locations
         self.file('.zshrc','export UV_CACHE_DIR="$HOME/custom-cache"\nexport PIP_CACHE_DIR="$(touch /tmp/never-run)"\n')

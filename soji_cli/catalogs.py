@@ -17,18 +17,25 @@ def expand_catalogs(scanner):
         if finding.hint_id in ('claude-sessions','codex-sessions'):
             prefix=finding.path.rstrip('/')+'/'
             parts=[n for p,n in scanner.nodes.items() if p.startswith(prefix) and not n.directory and (p.endswith('.jsonl') or finding.hint_id=='codex-sessions' and p.endswith('.jsonl.zst')) and '/memory/' not in p and '/memories/' not in p]
+            units={}
+            if finding.hint_id=='claude-sessions':
+                units=claude_session_units(scanner,finding.path)
+                covered=[m.path for members in units.values() for m in members[1:]]
+                parts=[n for n in parts if not any(n.path==c or n.path.startswith(c+'/') for c in covered)]
             if not parts:result.append(finding);continue
             for n in parts:
                 f=scanner.classify(n);f.group='Agent and editor history';f.label=Path(n.path).name
+                if n.path in units:compound_session(scanner,f,units[n.path])
                 f.hint_id=finding.hint_id;f.tier='userData';f.list_only=False;f.managed=True;f.comes_back='gone'
                 f.recommendation='trash';f.source='catalog'
                 if finding.hint_id=='claude-sessions':
-                    sidecar='/subagents/' in n.path or '/tool-results/' in n.path
+                    sidecar=not f.members and ('/subagents/' in n.path or '/tool-results/' in n.path)
                     f.levels={'careful':72 if sidecar else 168,'balanced':24 if sidecar else 48,'aggressive':3,'reason':'Recovered Claude session/sidecar idle policy'}
                 else:
                     f.levels={'careful':168,'balanced':48,'aggressive':3,'reason':'Codex executable idle branches: 7 days / 2 days / 3 hours'}
-                activity=scanner.activity.last(n.path) if scanner.activity else None
-                if activity:f.last_activity=activity.at
+                for member in (f.members or [{'path':n.path}]):
+                    activity=scanner.activity.last(member['path']) if scanner.activity else None
+                    if activity and activity.at>(f.last_activity or 0):f.last_activity=activity.at
                 if finding.hint_id=='codex-sessions' and any(key in Path(n.path).name for key in live_codex):
                     f.last_activity=scanner.now
                     f.evidence.append({'check':'codexWriterLock','active':True})
@@ -58,6 +65,44 @@ def expand_catalogs(scanner):
                 f.action={'kind':'empty-trash'};f.recommendation='remove';result.append(f)
         else:result.append(finding)
     return result
+
+
+CLAUDE_SIDECARS=('subagents','tool-results')
+
+
+def claude_session_units(scanner,project):
+    """Map each main transcript `<project>/<id>.jsonl` to its member nodes.
+
+    Members are the transcript plus the existing `<id>/subagents` and
+    `<id>/tool-results` folders (measureProject 0x1006a0774). Never the
+    common `<id>` parent, never memory/memories.
+    """
+    units={}
+    node=scanner.nodes.get(project)
+    for child in (node.children if node else ()):
+        main=scanner.nodes.get(child)
+        if not main or main.directory or not child.endswith('.jsonl'):continue
+        members=[main];base=child[:-len('.jsonl')]
+        for name in CLAUDE_SIDECARS:
+            side=scanner.nodes.get(base+'/'+name)
+            if side is not None and Path(side.path).name.casefold() not in ('memory','memories'):members.append(side)
+        units[child]=members
+    return units
+
+
+def compound_session(scanner,f,members):
+    """Turn a transcript row into one unit: sums, newest member, merged holds."""
+    records=[]
+    for i,n in enumerate(members):
+        part=f if i==0 else scanner.classify(n)
+        for hold in part.holds:
+            if hold not in f.holds:f.holds.append(hold)
+        records.append({'path':n.path,'role':'transcript' if i==0 else Path(n.path).name,'size':n.size,'apparent':n.apparent,'files':n.files,'newest':n.newest,'identity':part.identity})
+    # Distinct, non-nested paths: each byte is counted once.
+    f.size=sum(r['size'] for r in records);f.apparent=sum(r['apparent'] for r in records)
+    f.files=sum(r['files'] for r in records);f.newest=max(r['newest'] for r in records)
+    f.members=records;f.label=Path(f.path).name+(f' + {len(records)-1} sidecar folder'+('s' if len(records)>2 else '') if len(records)>1 else '')
+    f.evidence.append({'check':'sessionMembers','paths':[r['path'] for r in records]})
 
 
 def codex_idle_ordinal(idle_seconds):
