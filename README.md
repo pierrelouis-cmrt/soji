@@ -22,7 +22,8 @@ Run it from Claude Code, Codex or any agent with a shell:
 ```sh
 ./soji --ai ~/Library/Caches ~/code      # agent instructions + rows with stable ids
 ./soji ai inspect ROW_ID                 # largest children, evidence, same-rule rows
-./soji ai propose verdicts.json          # {"verdicts":[{"id":"…","action":"remove|keep|review","reason":"…"}]}
+./soji --ai ~/code --rule node-modules    # one rule at a time (large briefings print a per-rule summary)
+./soji ai propose verdicts.json          # {"verdicts":[{"id":"…","action":"remove|keep|review","reason":"…","unusedDays":30}]}
 ./soji clean PLAN                        # review
 ./soji clean PLAN --apply                # Trash; undo with `soji undo ID --apply`
 ./soji ai skill > ~/.claude/skills/soji/SKILL.md

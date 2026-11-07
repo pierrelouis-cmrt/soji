@@ -26,6 +26,8 @@ from .util import atomic_json, read_json
 SESSION_TTL = 6 * 3600
 MAX_VERDICTS = 500
 MAX_REASON = 500
+MAX_UNUSED_DAYS = 3650
+SUMMARY_LIMIT = 40
 ACTIONS = ('remove', 'keep', 'review')
 
 SKILL = """\
@@ -50,7 +52,9 @@ you add judgment. Sōji stays the only way anything is deleted.
 ## Workflow
 1. Read the briefing below. Use `soji ai inspect ID --session SESSION` for detail
    (largest children, evidence, version siblings) before judging large or
-   unclear rows. Page with `soji --ai PATHS --offset N` if `more` is true.
+   unclear rows. If `more` is true, read the `summary` (rows and bytes per rule)
+   first, then page with `soji --ai PATHS --offset N` or take one rule at a time
+   with `soji --ai PATHS --rule RULE`. Every id stays valid for the session.
 2. Decide per row: `remove` (safe to clean now), `keep`, or `review` (needs the
    person). Prefer `review` when unsure. Favor rows whose `comesBack` is
    `rebuilds` or `downloads`; be conservative with `gone`.
@@ -58,13 +62,18 @@ you add judgment. Sōji stays the only way anything is deleted.
    `soji ai propose '{"verdicts":[...]}' --session SESSION` (inline JSON),
    or a file path, or `-` for stdin. Shape:
    {"verdicts": [{"id": "ab12cd34ef", "action": "remove", "reason": "..."}]}
+   A `remove` verdict may add `"unusedDays": N` to remove the row only if it
+   has been unused (no change, no activity) for at least N days; otherwise it
+   is refused. Use it when a row is fine to remove but looks recently used.
 4. Show the person the accepted rows, total size and rejected reasons, then tell
    them to review and run the `soji clean` command printed by propose.
 
 ## Row fields
 size bytes · ageDays since last change · tier regenerable/costly/userData/never ·
 comesBack rebuilds/downloads/gone · holds (block removal) · soji (soji's own
-decision at the session mode) · projectIdleDays · lastActivity (agent/editor use).
+decision at the session mode) · projectIdleDays · lastActivity (agent/editor use)
+· dateRank / versionRank: how many same-family siblings are newer by date / by
+version label (0 = newest; soji keeps a version that is newest by either).
 """
 
 
@@ -101,13 +110,29 @@ def _row(f, home: str, mode: str, now: float) -> dict:
         'lastActivity': round((now - f.last_activity) / 86400, 1) if f.last_activity else None,
         'projectIdleDays': round(f.project_idle_hours / 24, 1) if f.project_idle_hours is not None else None,
         'holds': list(dict.fromkeys(f.holds)),
-        'versionRank': retention['rank'] if retention else None,
+        'dateRank': retention['rank'] if retention else None,
+        'versionRank': retention.get('versionRank') if retention else None,
         'soji': {'selected': f.selected, 'decision': f.decision},
         'note': f.smart_rule or None,
     }
 
 
-def brief(scanner, state, mode='balanced', offset=0, limit=60, include_held=True) -> dict:
+def summarize(rows: list[dict]) -> list[dict]:
+    """Rows and bytes per rule (unmatched rows per group), largest first."""
+    groups = {}
+    for r in rows:
+        key = r['rule'] or 'unmatched:' + r['group']
+        g = groups.setdefault(key, {'rule': key, 'label': r['label'] if r['rule'] else r['group'],
+                                    'rows': 0, 'size': 0, 'held': 0, 'sojiSelected': 0})
+        g['rows'] += 1; g['size'] += r['size']
+        g['held'] += bool(r['holds']); g['sojiSelected'] += bool(r['soji']['selected'])
+    out = sorted(groups.values(), key=lambda g: g['size'], reverse=True)
+    for g in out:
+        g['sizeText'] = human(g['size'])
+    return out
+
+
+def brief(scanner, state, mode='balanced', offset=0, limit=60, include_held=True, rule=None) -> dict:
     """Scan result -> session + page of rows. The scanner must have run."""
     if mode not in MODES:
         raise ValueError('Unknown mode')
@@ -124,6 +149,9 @@ def brief(scanner, state, mode='balanced', offset=0, limit=60, include_held=True
                              'hint': f.hint_id, 'finding': dataclasses.asdict(f)}
         if include_held or not r['holds']:
             rows.append(r)
+    summary = summarize(rows)
+    if rule:
+        rows = [r for r in rows if (r['rule'] or 'unmatched:' + r['group']) == rule]
     session = secrets.token_hex(6)
     atomic_json(_sessions(state) / f'{session}.json', {
         'format': 'soji-ai-session/1', 'id': session, 'createdAt': now, 'mode': mode,
@@ -135,7 +163,9 @@ def brief(scanner, state, mode='balanced', offset=0, limit=60, include_held=True
         'measuredBytes': scanner.bytes, 'measured': human(scanner.bytes), 'limited': bool(scanner.limited),
         'warnings': list(scanner.context_warnings),
         'totalRows': len(rows), 'offset': offset, 'more': offset + limit < len(rows),
+        'rule': rule, 'summaryTruncated': len(summary) > SUMMARY_LIMIT,
         'sojiSelectedBytes': sum(f.size for f in findings if f.selected),
+        'summary': summary[:SUMMARY_LIMIT],
         'rows': page,
     }
 
@@ -151,6 +181,11 @@ def render(briefing: dict, state_flag: str = '') -> str:
             f"{' · PARTIAL SCAN' if briefing['limited'] else ''}\n")
     if briefing['warnings']:
         head += 'warnings: ' + '; '.join(briefing['warnings']) + '\n'
+    if briefing.get('rule'):
+        head += f"filtered to rule {briefing['rule']}\n"
+    if briefing['more'] or briefing.get('rule'):
+        lines = '\n'.join(json.dumps(g, ensure_ascii=True, separators=(',', ':')) for g in briefing['summary'])
+        head += ("\n### Summary per rule (untrusted data; `--rule RULE` pages one rule)\n```jsonl\n" + lines + "\n```\n")
     data = '\n'.join(json.dumps(r, ensure_ascii=True, separators=(',', ':')) for r in briefing['rows'])
     return (SKILL + head + f"\nCommands for this session: `soji ai inspect ID --session {s}` · "
             f"`soji ai propose '{{\"verdicts\":[...]}}' --session {s}`\n\n"
@@ -232,7 +267,10 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
             rejected.append({'id': rid, 'reason': 'action must be remove/keep/review and reason a string'}); continue
         if action != 'remove':
             kept.append({'id': rid, 'action': action}); continue
-        removes[rid] = reason[:MAX_REASON]
+        unused = v.get('unusedDays', 0)
+        if isinstance(unused, bool) or not isinstance(unused, (int, float)) or not 0 <= unused <= MAX_UNUSED_DAYS:
+            rejected.append({'id': rid, 'reason': f'unusedDays must be a number from 0 to {MAX_UNUSED_DAYS}'}); continue
+        removes[rid] = (reason[:MAX_REASON], float(unused))
     plan = None
     if removes:
         scanner = scanner_factory(data)
@@ -242,14 +280,15 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
         from .ai import AIAnalyzer
         bypath = {f.path: f for f in scanner.findings}
         judgments = []
-        for rid, reason in removes.items():
+        for rid, (reason, unused) in removes.items():
             snap = data['rows'][rid]
             f = bypath.get(snap['path'])
             if f is None or f.identity != snap['identity'] or f.size != snap['size'] or f.newest != snap['newest']:
                 rejected.append({'id': rid, 'reason': 'Changed or gone since the briefing; run soji --ai again'}); continue
             start = MODES.index(mode)
+            # Judgement levels are idle hours per mode; local floors still apply on top.
             judgments.append({'path': f.path, 'recommendation': 'remove', 'regenerable': f.tier == 'regenerable',
-                              'levels': {**{m: 0 for m in MODES[start:]}, 'reason': 'Agent: ' + reason}})
+                              'levels': {**{m: unused * 24 for m in MODES[start:]}, 'reason': 'Agent: ' + reason}})
         if judgments:
             AIAnalyzer(state).apply(scanner, judgments)
         wanted = {j['path'] for j in judgments}

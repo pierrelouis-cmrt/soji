@@ -172,6 +172,27 @@ class IndexRecovery(unittest.TestCase):
         self.assertEqual(s.index_info.get('externalChecked'),1)
         self.assertEqual(s.nodes[str(f)].size,f.stat().st_blocks*512)
         self.assertEqual(s.nodes[str(self.root)].size,first.nodes[str(self.root)].size+f.stat().st_blocks*512//2)
+    def test_new_outside_link_to_large_single_link_file_is_caught(self):
+        outside=self.base/'outside';outside.mkdir()
+        inner=self.root/'a';inner.mkdir()
+        big=inner/'big';big.write_bytes(b'x'*(2<<20))
+        small=inner/'small';small.write_bytes(b'x'*16384)
+        first=self.run_scan()
+        blocks=big.stat().st_blocks*512
+        self.assertEqual(first.nodes[str(big)].size,blocks)
+        os.link(big,outside/'big');os.link(small,outside/'small')  # no event inside the roots
+        s=self.run_scan(101,[{'checkpoint':101}])
+        self.assertEqual(s.index_info['strategy'],'incremental')
+        self.assertEqual(s.index_info.get('linkProbed'),1)
+        self.assertEqual(s.nodes[str(big)].size,blocks//2)
+        self.assertEqual(s.nodes[str(self.root)].size,first.nodes[str(self.root)].size-blocks//2)
+        # Below the probe size the share is left to the weekly full check.
+        self.assertEqual(s.nodes[str(small)].size,first.nodes[str(small)].size)
+        # The new identity is now tracked, so removing the outside link is seen too.
+        (outside/'big').unlink()
+        again=self.run_scan(102,[{'checkpoint':102}])
+        self.assertEqual(again.index_info.get('externalChecked'),1)
+        self.assertEqual(again.nodes[str(big)].size,blocks)
     def test_legacy_index_backfills_link_identities(self):
         import sqlite3
         a=self.root/'a';b=self.root/'b';a.mkdir();b.mkdir()

@@ -24,6 +24,10 @@ RECOVERED_DEFAULTS = {
 # In addition to lost history, mount/unmount changes invalidate device boundaries.
 RESCAN_FLAGS = 0x1 | 0x2 | 0x4 | 0x8 | 0x20 | 0x40 | 0x80
 HISTORY_DONE = 0x10
+# Port choice: per incremental run, re-stat at most this many cached single-link
+# files of at least this size to catch new hardlinks made outside the roots.
+LINK_PROBE_MIN_BYTES = 1 << 20
+LINK_PROBE_LIMIT = 20_000
 
 SCHEMA='''
 PRAGMA journal_mode=WAL;
@@ -198,7 +202,21 @@ class IndexedScanner(Scanner):
                 moved=(current.st_dev,current.st_ino)!=ident or current.st_nlink!=nlink
             except OSError:moved=True
             if moved:affected.add(ident)
+        # A new outside link to a file cached with nlink == 1 produces no event
+        # inside the roots. Re-stat the largest such files (bounded); smaller
+        # ones wait for the weekly full check, since they barely move estimates.
+        grown={};link_probed=0
+        candidates=[(n.own_size,p) for p,n in self.nodes.items() if not n.directory and not n.reason and n.inode
+                    and getattr(n,'link_count',0)==1 and n.own_size>=LINK_PROBE_MIN_BYTES and not inside(p) and identity(n) not in affected]
+        for _,p in sorted(candidates,reverse=True)[:LINK_PROBE_LIMIT]:
+            n=self.nodes[p];link_probed+=1
+            try:current=os.lstat(p)
+            except OSError:current=None
+            if current is None or (current.st_dev,current.st_ino)!=identity(n) or current.st_nlink!=1:
+                affected.add(identity(n));grown.setdefault(identity(n),[]).append(p)
         cached=store.links_for(affected)
+        for ident,paths in grown.items():
+            cached.setdefault(ident,[]).extend(q for q in paths if q not in cached[ident])
         # A brand-new link to a file cached with nlink == 1 is not in the
         # links table; fall back to an in-memory (stat-free) identity lookup.
         new_ids={i for i in added_ids-removed_ids if not cached.get(i)}
@@ -248,7 +266,7 @@ class IndexedScanner(Scanner):
         self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
         self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
         self.skipped=sum(bool(n.reason) for n in self.nodes.values())
-        return {'affectedIdentities':len(affected),'restatted':restatted,'externalChecked':external_checked,'recomputedDirectories':len(dirs)}
+        return {'affectedIdentities':len(affected),'restatted':restatted,'externalChecked':external_checked,'linkProbed':link_probed,'recomputedDirectories':len(dirs)}
     def run(self):
         self.started=time.monotonic();store=None
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()

@@ -36,6 +36,20 @@ class RecoveredRules(unittest.TestCase):
         old=self.node('v99.0',100);new=self.node('v1.0',200)
         self.assertEqual(self.rules.retained(self.finding(old,{'keepNewest':1}))[1],1)
         self.assertEqual(self.rules.retained(self.finding(new,{'keepNewest':1}))[1],0)
+    def test_highest_version_kept_even_when_touched_earlier(self):
+        # Seen in a real run: chromium-1248 older mtime than chromium-1234.
+        high=self.node('chromium-1248',100);low=self.node('chromium-1234',200)
+        rule={'keepNewest':1,'keepBy':'product'}
+        retained,rank,_,version_rank=self.rules.retained(self.finding(high,rule))
+        self.assertEqual((retained,rank,version_rank),(True,1,0))
+        for mode in ('careful','balanced','aggressive'):
+            self.assertIn(mode,self.rules.evaluate(self.finding(high,rule)).mode_holds)
+            self.assertIn(mode,self.rules.evaluate(self.finding(low,rule)).mode_holds)
+    def test_version_rank_never_releases_timestamp_newest(self):
+        old=self.node('tool-2.0',100);self.node('tool-10.0',50);self.node('tool-1.0',300)
+        f=self.rules.evaluate(self.finding(old,{'keepNewest':1,'keepBy':'product'}))
+        self.assertNotIn('balanced',f.mode_holds)
+        self.assertEqual(next(e for e in f.evidence if e['check']=='retention')['versionRank'],1)
     def test_equal_timestamps_share_rank(self):
         a=self.node('v1',100);self.node('v2',100)
         self.assertEqual(self.rules.retained(self.finding(a,{'keepNewest':1}))[1],0)

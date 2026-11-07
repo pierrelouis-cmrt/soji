@@ -91,7 +91,8 @@ class RecoveryTests(unittest.TestCase):
         app={'path':str(app_path),'bundle':'org.fixture.App','name':'Fixture','version':'1'}
         item={'path':str(leftover),'action':{'app':app,'appIdentity':file_identity(app_path)}}
         def build(cat):cat.apps=[dict(app)];cat.running=[];return cat
-        with patch.object(AppCatalog,'build',build):
+        # Hermetic: the fake app is unsigned and no codesign/pkgutil process runs.
+        with patch.object(AppCatalog,'build',build),patch('soji_cli.apps.command',return_value=(1,'','not signed')):
             verify_uninstall(item,str(self.home))
             app_path.rename(app_path.with_suffix('.old'));app_path.mkdir()
             with self.assertRaisesRegex(ValueError,'identity changed'):verify_uninstall(item,str(self.home))

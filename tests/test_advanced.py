@@ -110,8 +110,10 @@ class UninstallTests(Fixture):
         self.file('Library/Application Support/Example/data')
         app={'path':str(appdir),'bundle':'co.example.App','name':'Example','version':'1'}
         def build(cat):cat.apps=[app];cat.running=[];return cat
-        with patch.object(AppCatalog,'build',build):
+        # Hermetic: the fake app is unsigned and no codesign/pkgutil process runs.
+        with patch.object(AppCatalog,'build',build),patch('soji_cli.apps.command',return_value=(1,'','not signed')) as tool:
             plan=uninstall_plan('co.example.App',str(self.home))
+            self.assertTrue(all(c.args[0][0] in ('/usr/bin/codesign','/usr/sbin/pkgutil') for c in tool.call_args_list))
             self.assertEqual(len(plan['items']),2);validate_plan(plan)
             app['bundle']='com.apple.Example'
             with self.assertRaises(ValueError):uninstall_plan('com.apple.Example',str(self.home))

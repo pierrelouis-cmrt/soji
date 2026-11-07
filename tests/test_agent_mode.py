@@ -78,6 +78,38 @@ class AgentModeTests(unittest.TestCase):
         for item in plan['items']:
             self.assertEqual(cleaner.fresh(item, plan), item['identity'])
 
+    def test_unused_days_threshold_per_row(self):
+        b, ids = self.brief('balanced')
+        known = '~/Library/Caches/com.example.Known'
+        age = next(r['ageDays'] for r in b['rows'] if r['path'] == known)
+        rid = ids[known]
+        r = self.propose(b, [{'id': rid, 'action': 'remove', 'reason': 'x', 'unusedDays': age + 30}])
+        self.assertFalse(r['accepted'])
+        self.assertIn('Guard refused', r['rejected'][0]['reason'])
+        r = self.propose(b, [{'id': rid, 'action': 'remove', 'reason': 'x', 'unusedDays': max(0, age - 1)}])
+        self.assertEqual([a['path'] for a in r['accepted']], [known])
+        for bad in (-1, 'ten', True, 10 ** 6):
+            r = self.propose(b, [{'id': rid, 'action': 'remove', 'reason': 'x', 'unusedDays': bad}])
+            self.assertIn('unusedDays', r['rejected'][0]['reason'])
+
+    def test_summary_and_rule_filter_for_large_briefings(self):
+        s = self.scanner(); s.run()
+        full = agent.brief(s, self.state, limit=500)
+        self.assertEqual(sum(g['rows'] for g in full['summary']), full['totalRows'])
+        self.assertEqual(sum(g['size'] for g in full['summary']), sum(r['size'] for r in full['rows']))
+        page = agent.brief(s, self.state, limit=2)
+        self.assertTrue(page['more'])
+        self.assertIn('Summary per rule', agent.render(page))
+        top = next(g for g in full['summary'] if g['rows'] > 1)
+        only = agent.brief(s, self.state, limit=500, rule=top['rule'])
+        self.assertEqual(only['totalRows'], top['rows'])
+        self.assertTrue(all((r['rule'] or 'unmatched:' + r['group']) == top['rule'] for r in only['rows']))
+        # Ids from a filtered briefing still resolve in the session.
+        agent.inspect(self.state, only['session'], only['rows'][0]['id'])
+        fam = next(r for r in full['rows'] if r['rule'] == 'playwright-browsers')
+        self.assertIsNotNone(fam['versionRank'])
+        self.assertIsNotNone(fam['dateRank'])
+
     def test_changed_since_briefing_is_rejected(self):
         b, ids = self.brief()
         target = self.home / 'Library/Caches/com.example.Known/blob'

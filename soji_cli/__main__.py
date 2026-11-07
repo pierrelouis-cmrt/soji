@@ -187,6 +187,7 @@ def ai_command(p,argv):
     p.add_argument('--offset',type=int,default=0);p.add_argument('--limit',type=int,default=60)
     p.add_argument('--json',action='store_true',help='brief: JSON only, without the skill block')
     p.add_argument('--hide-held',action='store_true',help='brief: omit rows with holds')
+    p.add_argument('--rule',help='brief: only rows of this rule id (or unmatched:GROUP), as listed in the summary')
     p.add_argument('--protect',action='append',default=[]);p.add_argument('--home')
     p.add_argument('--max-seconds',type=float,default=300);p.add_argument('--max-files',type=int,default=1000000);p.add_argument('--min-mb',type=float,default=10)
     p.add_argument('--recent-activity-hours',type=float,default=24,help='Recent-use protection window (default 24 h in AI mode)')
@@ -207,7 +208,7 @@ def ai_command(p,argv):
             if not Path(path).expanduser().is_dir():p.error('Not a directory: '+path)
         scanner=make(roots,args.home,args.protect+[args.state],args.recent_activity_hours);scanner.run()
         if scanner.error:raise ValueError(scanner.error)
-        result=agent.brief(scanner,args.state,args.mode,args.offset,args.limit,include_held=not args.hide_held)
+        result=agent.brief(scanner,args.state,args.mode,args.offset,args.limit,include_held=not args.hide_held,rule=args.rule)
         if args.json:emit(result);return 0
         default_state=str(Path.home()/'Library/Application Support/Soji')
         sys.stdout.write(agent.render(result,'' if args.state==default_state else ' --state '+shlex.quote(args.state)))

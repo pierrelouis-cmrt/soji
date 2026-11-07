@@ -18,6 +18,20 @@ FIELDS={'untouchedDays','keepNewest','keepBy','keepActive','appNotRunning','appN
 def version_key(name):
     return tuple((0,int(t)) if t.isdigit() else (1,t.casefold()) for t in re.findall(r'\d+|[^\d]+',str(name)))
 
+def split_version(name):
+    """Leaf name -> (product tokens, first version-like token or '')."""
+    prefix=[]
+    for token in (t for t in re.split('[-_ ]+',str(name)) if t):
+        if token[0].isnumeric() or len(token)>1 and token[0]=='v' and token[1].isnumeric():
+            return prefix,token
+        prefix.append(token)
+    return prefix,''
+
+def version_number(name):
+    """Numeric parts of the leaf's version token, or None when it has none."""
+    parts=re.findall(r'\d+',split_version(Path(name).name)[1])
+    return tuple(int(n) for n in parts) if parts else None
+
 def version_match(version,pin):
     """ProjectPins.matches, 0x100694d48; literal major/minor prefixes only."""
     def bare(value):
@@ -199,12 +213,7 @@ class SpecializedRules:
             first=name.split(' ')[0]
             return first if ',' in first else ''
         if by in ('product','major'):
-            tokens=[t for t in re.split('[-_ ]+',name) if t]
-            prefix=[];version=''
-            for token in tokens:
-                if token[0].isnumeric() or len(token)>1 and token[0]=='v' and token[1].isnumeric():
-                    version=token;break
-                prefix.append(token)
+            prefix,version=split_version(name)
             product='-'.join(prefix).lower()
             return product+'@'+version.lstrip('v').split('.')[0] if by=='major' and version else product
         return ''
@@ -220,7 +229,15 @@ class SpecializedRules:
         target=stamp(f.path)
         rank=sum(stamp(p) is not None and target is not None and stamp(p)>target for p in siblings if p!=f.path)
         siblings.sort(key=lambda p:stamp(p) if stamp(p) is not None else float('-inf'),reverse=True)
-        return rank<int(f.rule.get('keepNewest',0)),rank,siblings
+        # Port choice (stricter than the original's timestamp-only rank): a
+        # higher version label also counts as newer, so the highest version is
+        # never removed because an older one was touched later. Bundle groups
+        # (archives) have no version label. None = no comparable version.
+        version_rank=None
+        mine=version_number(f.path) if by!='bundle' else None
+        if mine is not None:
+            version_rank=sum(v is not None and v>mine for v in (version_number(p) for p in siblings if p!=f.path))
+        return min(rank,version_rank if version_rank is not None else rank)<int(f.rule.get('keepNewest',0)),rank,siblings,version_rank
     def newest_uploaded(self,path,siblings):
         _,uploads,created=self.archive(path)
         if created is None:return True  # archiveRank conservatively retains unreadable dates
@@ -254,11 +271,12 @@ class SpecializedRules:
         if active:f.holds.append('Active version: '+active)
         if r.get('keepPinned') and self.pins.keeps(f.path,r['keepPinned']):f.holds.append('Version pinned by a project')
         if r.get('keepNewest'):
-            retained,rank,siblings=self.retained(f)
+            retained,rank,siblings,version_rank=self.retained(f)
             counts={mode:retention_count(r['keepNewest'],mode) for mode in ('careful','balanced','aggressive')}
-            f.evidence.append({'check':'retention','keepBy':r.get('keepBy'),'rank':rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'strictly newer timestamps, not version labels'})
+            f.evidence.append({'check':'retention','keepBy':r.get('keepBy'),'rank':rank,'versionRank':version_rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'kept if among the newest by timestamp (original) or by version label (port)'})
+            held=min(rank,version_rank) if version_rank is not None else rank
             for mode,count in counts.items():
-                if rank<count:
+                if held<count:
                     if mode=='aggressive' and r.get('newestAfterDays') is not None:
                         if (self.scanner.now-f.newest)/86400>=r['newestAfterDays']:continue
                     f.mode_holds[mode]='Retained newest version in '+r.get('keepBy','all')+' group'
