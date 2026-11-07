@@ -7,14 +7,79 @@ from pathlib import Path
 import re
 import shlex
 import shutil
-from .util import read_plist,read_json,inside
+import plistlib
+from .util import read_plist,read_json,inside,command
 from .platform import native
+
+CODESIGN='/usr/bin/codesign'
+PKGUTIL='/usr/sbin/pkgutil'
+TEAM_RE=re.compile(r'^[A-Z0-9]{10}$')
+NO_IDENTITY={'team':None,'groups':[]}
+
+
+def safe_component(value):
+    return isinstance(value,str) and bool(value) and value not in ('.','..') and '/' not in value and '\x00' not in value
+
+
+def code_identity(app_path):
+    """Read-only signing identity {'team','groups'} from codesign.
+    Unsigned, ad-hoc or unreadable apps yield no team and no groups."""
+    code,_,err=command([CODESIGN,'-dv','--verbose=4',str(app_path)],timeout=10)
+    if code!=0:return dict(NO_IDENTITY,groups=[])
+    team=next((l.split('=',1)[1].strip() for l in err.splitlines() if l.startswith('TeamIdentifier=')),None)
+    # Ad-hoc signatures print "TeamIdentifier=not set".
+    if not team or not TEAM_RE.match(team):return dict(NO_IDENTITY,groups=[])
+    code,out,_=command([CODESIGN,'-d','--entitlements','-','--xml',str(app_path)],timeout=10)
+    groups=[]
+    if code==0 and out.strip():
+        try:ent=plistlib.loads(out.encode())
+        except Exception:ent={}
+        raw=ent.get('com.apple.security.application-groups') if isinstance(ent,dict) else None
+        if isinstance(raw,list):groups=sorted({g for g in raw if safe_component(g)})
+    return {'team':team,'groups':groups}
+
+
+def user_receipts(home,limit=64):
+    """User-domain pkg receipts as {pkgid: [absolute paths]}: ~/Library/Receipts
+    plists plus read-only `pkgutil --volume HOME --files`. Bounded, best-effort."""
+    h=Path(home);result={}
+    for plist in sorted((h/'Library/Receipts').glob('*.plist'))[:limit]:
+        info=read_plist(plist);pkg=info.get('PackageIdentifier')
+        if not isinstance(pkg,str) or not pkg:continue
+        prefix=str(info.get('InstallPrefixPath') or '').strip('/')
+        code,out,_=command([PKGUTIL,'--volume',str(h),'--files',pkg],timeout=10)
+        if code!=0:continue
+        base=h/prefix if prefix else h
+        result[pkg]=[str(base/l.strip()) for l in out.splitlines() if l.strip() and '..' not in Path(l.strip()).parts]
+    return result
+
+
+def apple_group(group):
+    """group.com.apple.*, com.apple.* and TEAMID.com.apple.* are Apple-owned."""
+    g=group.casefold()
+    if g.startswith('group.'):g=g[6:]
+    elif len(group)>11 and group[10]=='.' and TEAM_RE.match(group[:10]):g=g[11:]
+    return g.startswith('com.apple.') or g=='com.apple'
+
 
 class AppCatalog:
     # System-wide roots are class-level so hermetic tests can pin them.
     SYSTEM_ROOTS=(Path('/Applications'),Path('/System/Applications'))
     def __init__(self,home,processes=()):
-        self.home=Path(home);self.apps=[];self.processes=processes;self.running=[]
+        self.home=Path(home);self.apps=[];self.processes=processes;self.running=[];self._identities={}
+    def identity(self,app):
+        """Signing identity, looked up lazily: only uninstall planning and verification call this."""
+        if app['path'] not in self._identities:
+            apple=app['bundle'].startswith('com.apple.') or app['path'].startswith('/System/')
+            self._identities[app['path']]=dict(NO_IDENTITY,groups=[]) if apple else code_identity(app['path'])
+        return self._identities[app['path']]
+    def group_owners(self,group):
+        """Installed apps attributable to a group container: entitlement or Team ID prefix."""
+        owners=[]
+        for app in self.apps:
+            ident=self.identity(app)
+            if group in ident['groups'] or (ident['team'] and group.startswith(ident['team']+'.')):owners.append(app)
+        return owners
     def build(self):
         for root in [*self.SYSTEM_ROOTS,self.home/'Applications']:
             if not root.exists():continue
