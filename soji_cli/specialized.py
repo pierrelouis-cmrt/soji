@@ -236,7 +236,7 @@ class SpecializedRules:
         thresholds={mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')}
         f.rule_min_hours={mode:v['untouchedDays']*24 for mode,v in thresholds.items() if 'untouchedDays' in v}
         f.rule_project_min_hours={mode:v['projectUntouchedDays']*24 for mode,v in thresholds.items() if 'projectUntouchedDays' in v}
-        f.rule_early_reason=None
+        f.rule_early_reason=None;f.rule_level=None
         unknown=set(r)-FIELDS
         if unknown:f.holds.append('Unknown rule fields: '+', '.join(sorted(unknown)))
         owners=self.apps.owner(f.path)
@@ -267,10 +267,13 @@ class SpecializedRules:
         f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'SmartRules.evaluate 0x1006ac904 onward; requires engine integration'})
         if r.get('workspaceMissing'):
             missing=workspace_missing(f.path)
-            if missing:f.rule_early_reason='workspaceMissing'
+            if missing:
+                # SmartRules early Outcome (0x1006ac248-0x1006ac2b4): level=Careful,
+                # earlier-collected holds kept, rank/age loop skipped. Generic
+                # holds, recency floor and age/activity policy still apply later.
+                f.rule_early_reason='workspaceMissing';f.rule_level='careful'
+                f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
             f.evidence.append({'check':'workspaceMissing','missing':missing,'basis':'literal WorkspacePath existence; absent/unreadable metadata is missing'})
-            # The executable returns an early Outcome here. Do not invent a
-            # one-hour threshold; coordinator must integrate that Outcome.
         if r.get('deviceBuild'):
             if not self.connected_checked:self.connected_known=self.devices.connected();self.connected_checked=True
             build_match=re.search(r'\(([A-Za-z0-9]+)\)',Path(f.path).name)

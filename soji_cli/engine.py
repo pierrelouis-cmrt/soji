@@ -121,6 +121,10 @@ class Finding:
     rule_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_project_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_early_reason: str | None = None
+    # SmartRules early Outcome level (e.g. workspaceMissing -> careful). When
+    # set, the rule's own age/rank gates were skipped; the level is combined
+    # with the judged risk level (consumer build 2026.11.14, 0x1006782cc).
+    rule_level: str | None = None
 
 
     def decide(self, mode: str, now: float) -> tuple[bool, str]:
@@ -136,7 +140,7 @@ class Finding:
         idle=(now-max(stamp,self.last_activity or stamp))/3600
         floor=max(300,self.recent_activity_hours*3600)
         if now-stamp<floor:return False,'Changed within the recent-activity window'
-        if self.levels is None:
+        if self.levels is None and self.rule_level is None:
             if self.default_holds:return False,'; '.join(self.default_holds)
             minimum=self.rule_min_hours.get(mode,self.special_min_hours)
             if idle<minimum:return False,f'Idle {idle:.1f} h; rule needs {minimum:g} h at {mode}'
@@ -151,6 +155,9 @@ class Finding:
         else:
             judged=judged_minimum(self.tier,self.recommendation,self.list_only,
                                   comes_back=self.comes_back)
+            if self.levels is None and self.rule_level is not None:
+                from .levels import combine_rule_level
+                judged=combine_rule_level(self.rule_level,judged)
             effective=effective_minimum(judged,self.levels,self.tier,stamp,
                 self.last_activity,now,self.recent_activity_hours,
                 app_cache=self.group=='App caches')

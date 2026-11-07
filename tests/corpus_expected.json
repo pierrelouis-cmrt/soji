@@ -615,8 +615,8 @@
   },
   "bytes": 135168,
   "careful": {
-   "decision": "Idle 480.0 h; rule needs 672 h at careful",
-   "selected": false
+   "decision": "Idle 20.0 d; eligible from careful",
+   "selected": true
   },
   "early": "workspaceMissing",
   "group": "Xcode build data",
@@ -652,16 +652,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Idle 72.0 h; rule needs 168 h at aggressive",
-   "selected": false
+   "decision": "Idle 3.0 d; eligible from balanced",
+   "selected": true
   },
   "balanced": {
-   "decision": "Idle 72.0 h; rule needs 336 h at balanced",
-   "selected": false
+   "decision": "Idle 3.0 d; eligible from balanced",
+   "selected": true
   },
   "bytes": 135168,
   "careful": {
-   "decision": "Idle 72.0 h; rule needs 672 h at careful",
+   "decision": "Eligible from balanced",
    "selected": false
   },
   "early": "workspaceMissing",

@@ -58,6 +58,19 @@ def judged_minimum(tier: str, recommendation: str, list_only: bool,
     return LEVELS[max(base, claim)]
 
 
+def combine_rule_level(rule: str | None, judged: str | None) -> str | None:
+    """FindingVerifier.verify continuation, consumer build 2026.11.14 0x1006782cc-f0.
+
+    The stricter (later) level wins; no level on either side gives no level.
+    The conditional costly-tier adjustment at 0x1006782f4-0x10067834c (judged
+    level replaced by the rebuilds/downloads base when an unidentified flag at
+    frame+0x3fe9 is set) is NOT ported: that flag's source is unresolved.
+    """
+    if rule not in LEVELS or judged not in LEVELS:
+        return None
+    return LEVELS[max(LEVELS.index(rule), LEVELS.index(judged))]
+
+
 def effective_minimum(judged: str | None, judgment: Mapping | None, tier: str,
                       newest_change: float | None, last_activity: float | None,
                       now: float, recent_activity_hours: float = 0,
