@@ -125,6 +125,9 @@ class Finding:
     # set, the rule's own age/rank gates were skipped; the level is combined
     # with the judged risk level (consumer build 2026.11.14, 0x1006782cc).
     rule_level: str | None = None
+    # Compound unit (Claude session): explicit member paths, each measured once.
+    # Empty for ordinary single-path rows.
+    members: list = dataclasses.field(default_factory=list)
 
 
     def decide(self, mode: str, now: float) -> tuple[bool, str]:

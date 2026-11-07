@@ -27,7 +27,8 @@ def create_plan(scanner,mode,paths=None,method='trash'):
     items=[]
     for f in selected:
         if not f.identity:continue
-        items.append({'path':f.path,'identity':f.identity,'size':f.size,'newest':f.newest,'files':f.files,'hint':f.hint_id,'group':f.group,'action':({} if method=='trash' and f.action.get('kind')=='official-command' else f.action),'method':method,'finding':dataclasses.asdict(f)})
+        items.append({'path':f.path,'identity':f.identity,'size':f.size,'newest':f.newest,'files':f.files,'hint':f.hint_id,'group':f.group,'action':({} if method=='trash' and f.action.get('kind')=='official-command' else f.action),'method':method,'finding':dataclasses.asdict(f),
+                      **({'members':[{'path':m['path'],'role':m['role'],'identity':m['identity'],'size':m['size'],'files':m['files'],'newest':m['newest']} for m in f.members]} if f.members else {})})
     value={'format':'soji-clean-plan/1','id':uuid.uuid4().hex,'createdAt':time.time(),'mode':mode,'roots':scanner.roots,'home':scanner.home,'protected':scanner.protected,'items':items,'method':method,'warnings':['Review paths before applying. Trash is reversible while its item exists; permanent cleanup is not.']}
     value['digest']=digest(value);return value
 
@@ -45,8 +46,31 @@ def validate_plan(plan):
         if len(items)>1 and not all(i.get('action',{}).get('kind')=='document-version' and i['action'].get('document')==path for i in items):
             raise ValueError('Duplicate plan paths')
     paths=list(by_path)
+    for item in plan['items']:
+        if 'members' not in item:continue
+        session_members(item)
+        for m in item['members']:
+            if m['path']!=item['path']:
+                if m['path'] in paths:raise ValueError('Duplicate plan paths')
+                paths.append(m['path'])
     if any(a!=b and inside(a,b) for a in paths for b in paths):raise ValueError('Overlapping cleanup targets')
     return plan
+
+
+SESSION_SIDECARS=('subagents','tool-results')
+
+
+def session_members(item):
+    """Structural check: transcript plus only its own sidecar folders."""
+    members=item.get('members')
+    if not isinstance(members,list) or not members:raise ValueError('Compound session has no members')
+    path=item['path']
+    if item.get('hint')!='claude-sessions' or not path.endswith('.jsonl'):raise ValueError('Compound members are only supported for Claude sessions')
+    allowed={path}|{path[:-len('.jsonl')]+'/'+name for name in SESSION_SIDECARS}
+    seen=[m.get('path') for m in members]
+    if seen[0]!=path or len(seen)!=len(set(seen)) or not set(seen)<=allowed:raise ValueError('Compound session members are not the transcript and its sidecars')
+    if any(Path(p).name.casefold() in ('memory','memories') or '/memory/' in p or '/memories/' in p for p in seen):raise ValueError('Memory folders are never session members')
+    return members
 
 
 def parent_fd(path):
@@ -77,6 +101,25 @@ def remove_at(fd,name,expected=None,device=None):
         os.rmdir(name,dir_fd=fd)
     else:os.unlink(name,dir_fd=fd)
 
+def compound_status(entry):
+    """Summarize member outcomes without ever claiming partial success as done."""
+    members=entry['members'];done=[m for m in members if m['status'] in ('done','restored')]
+    uncertain=[m for m in members if m['status']=='prepared']
+    if any(m.get('partialDeletionPossible') for m in members):entry['partialDeletionPossible']=True
+    if len(done)==len(members):
+        entry['status']='done';entry['method']=members[0].get('method',entry.get('method'));entry.pop('error',None)
+    elif uncertain:
+        entry['status']='prepared';entry['error']=f'Session member outcome uncertain: {len(done)} of {len(members)} members cleaned'
+    elif done or entry.get('partialDeletionPossible'):
+        entry['status']='partial';entry['partial']=True
+        failed=next((m for m in members if m['status']=='failed'),None)
+        entry['error']=f'Partial session cleanup: {len(done)} of {len(members)} members cleaned'+(f'; {failed["path"]}: {failed.get("error")}' if failed else '')
+    else:
+        entry['status']='failed';failed=next((m for m in members if m.get('error')),{})
+        entry['error']=failed.get('error','No session member was cleaned')
+    return entry
+
+
 class Cleaner:
     def __init__(self,state,*,context=True,trash_directory=None):
         self.state=Path(state).expanduser().resolve();self.state.mkdir(parents=True,exist_ok=True)
@@ -98,6 +141,12 @@ class Cleaner:
         if any(inside(path,p) or inside(p,path) for p in plan.get('protected',[])):raise ValueError('Protected path overlap')
         identity=file_identity(path)
         if identity!=item['identity']:raise ValueError('File or parent identity changed since analysis')
+        members=session_members(item) if 'members' in item else None
+        for m in members or ():
+            if any(inside(m['path'],p) or inside(p,m['path']) for p in plan.get('protected',[])):raise ValueError('Protected path overlap')
+            try:current=file_identity(m['path'])
+            except OSError:raise ValueError('Session member missing since analysis: '+m['path'])
+            if current!=m['identity']:raise ValueError('Session member identity changed since analysis: '+m['path'])
         if uninstall_action:
             from .uninstall import verify_uninstall
             verify_uninstall(item,plan['home']);return identity
@@ -128,10 +177,22 @@ class Cleaner:
             scan.tick_trash=item.get('hint')=='trash-item'
         scan.started=time.monotonic();scan.collect_context();scan.visit(measure_root);n=scan.nodes.get(path)
         if n is None:raise ValueError('Fresh target could not be measured')
-        if scan.limited or n.errors or n.skipped or n.secret:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
-        if n.size!=item['size'] or n.newest!=item['newest'] or n.files!=item['files']:raise ValueError('Contents changed since analysis')
+        if scan.limited:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
+        for m in members or [{'path':path,'size':item['size'],'newest':item['newest'],'files':item['files']}]:
+            mn=scan.nodes.get(m['path'])
+            if mn is None:raise ValueError('Fresh target could not be measured')
+            if mn.errors or mn.skipped or mn.secret:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
+            if mn.size!=m['size'] or mn.newest!=m['newest'] or mn.files!=m['files']:raise ValueError('Contents changed since analysis'+(': '+m['path'] if members else ''))
+        if item.get('hint')=='claude-sessions' and measure_root!=path:
+            # Rebuild the session catalog from its project row so the compound
+            # unit (and its FindingPart policy) is re-derived, not a bare file.
+            scan.roots=[measure_root]
         scan._build_findings()
         f=next((f for f in scan.findings if f.path==path),None)
+        if members is not None:
+            now_members=[(m['path'],m['identity']) for m in (f.members if f else [])]
+            if now_members!=[(m['path'],m['identity']) for m in members]:raise ValueError('Session members changed since analysis')
+        elif f is not None and f.members:raise ValueError('Target became a compound session; generate a new plan')
         if f is None:f=scan.classify(n)
         permit=plan.get('routinePermit')
         if permit:
@@ -160,7 +221,6 @@ class Cleaner:
         entries=[]
         for item in plan['items']:
             entry={'id':uuid.uuid4().hex,'plan':plan['id'],'path':item['path'],'group':item['group'],'sizeBytes':item['size'],'at':time.time(),'identity':item['identity'],'method':item.get('method','trash'),'status':'prepared'}
-            staged=None;fd=None;removal_started=False;moved=False
             try:
                 self.fresh(item,plan)
                 action=item.get('action') or {}
@@ -176,42 +236,69 @@ class Cleaner:
                 else:
                     want_permanent=item.get('method')=='permanent' or action.get('kind')=='empty-trash'
                     if want_permanent and not permanent:raise ValueError('Permanent cleanup requires --permanent')
-                    fd=parent_fd(item['path']);name=Path(item['path']).name
-                    original=os.stat(name,dir_fd=fd,follow_symlinks=False)
-                    parent=os.fstat(fd);expected=item['identity']
-                    current={'device':original.st_dev,'inode':original.st_ino,'type':stat.S_IFMT(original.st_mode),'parentDevice':parent.st_dev,'parentInode':parent.st_ino,'mtimeNs':original.st_mtime_ns,'ctimeNs':original.st_ctime_ns}
-                    if current!=expected:raise ValueError('Target or parent changed before operation')
-                    if want_permanent:
-                        staged='.soji-removing-'+entry['id'];entry['stagedName']=staged;self.append(entry)
-                        os.rename(name,staged,src_dir_fd=fd,dst_dir_fd=fd)
-                        staged_stat=os.stat(staged,dir_fd=fd,follow_symlinks=False)
-                        if staged_stat.st_ino!=original.st_ino:raise ValueError('Staged identity mismatch')
-                        entry.update(phase='removing',stagedPath=str(Path(item['path']).parent/staged))
-                        self.append(entry);removal_started=True
-                        remove_at(fd,staged,(original.st_dev,original.st_ino));staged=None;entry['method']='permanent';entry['status']='done'
-                    else:
-                        trash=Path(self.trash_directory or Path(plan['home'])/'.Trash')
-                        trash.mkdir(mode=0o700,parents=True,exist_ok=True)
-                        if trash.is_symlink():raise ValueError('Trash cannot be a symlink')
-                        tfd=os.open(trash,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
-                        try:
-                            if os.fstat(tfd).st_dev!=original.st_dev:raise ValueError('Cross-volume Trash move needs native-volume support; no copy/delete fallback')
-                            dest=name+'.soji-'+entry['id'];entry['trashedTo']=str(trash/dest);self.append(entry)
-                            os.rename(name,dest,src_dir_fd=fd,dst_dir_fd=tfd);moved=True
-                            entry['trashedIdentity']=file_identity(trash/dest);entry['method']='trash';entry['status']='done'
-                        finally:os.close(tfd)
+                    if item.get('members'):
+                        # One journal entry; sidecars first so a failure leaves
+                        # the transcript itself in place.
+                        entry['members']=[{'path':m['path'],'role':m.get('role',''),'identity':m['identity'],'sizeBytes':m['size'],'status':'prepared'} for m in item['members']]
+                        self.append(entry)
+                        order=list(range(1,len(entry['members'])))+[0]
+                        for k,i in enumerate(order):
+                            rec=entry['members'][i]
+                            if not self.move(rec,f"{entry['id']}-{i}",entry,plan,want_permanent):
+                                for j in order[k+1:]:entry['members'][j].update(status='skipped',error='Not attempted after an earlier member failed')
+                                break
+                        compound_status(entry)
+                    else:self.move(entry,entry['id'],entry,plan,want_permanent)
                 self.append(entry)
             except Exception as e:
-                if staged and fd is not None and not removal_started:
-                    try:os.rename(staged,Path(item['path']).name,src_dir_fd=fd,dst_dir_fd=fd)
-                    except OSError:pass
-                entry['status']='prepared' if moved else 'failed';entry['error']=str(e)
-                if removal_started:entry['partialDeletionPossible']=True
+                entry['status']='failed';entry['error']=str(e)
                 self.append(entry)
-            finally:
-                if fd is not None:os.close(fd)
             entries.append(entry)
-        return {'entries':entries,'completed':sum(e['status']=='done' for e in entries),'failed':sum(e['status']!='done' for e in entries)}
+        return {'entries':entries,'completed':sum(e['status']=='done' for e in entries),
+                'partial':sum(e['status']=='partial' for e in entries),
+                'failed':sum(e['status']!='done' for e in entries)}
+    def move(self,rec,tag,entry,plan,want_permanent):
+        """Identity-bound Trash move or staged removal of rec['path'].
+
+        Outcome is recorded on rec (the entry itself or one of its members);
+        entry is journaled at each checkpoint. Returns True when done.
+        """
+        staged=None;fd=None;removal_started=False;moved=False
+        try:
+            fd=parent_fd(rec['path']);name=Path(rec['path']).name
+            original=os.stat(name,dir_fd=fd,follow_symlinks=False)
+            parent=os.fstat(fd);expected=rec['identity']
+            current={'device':original.st_dev,'inode':original.st_ino,'type':stat.S_IFMT(original.st_mode),'parentDevice':parent.st_dev,'parentInode':parent.st_ino,'mtimeNs':original.st_mtime_ns,'ctimeNs':original.st_ctime_ns}
+            if current!=expected:raise ValueError('Target or parent changed before operation')
+            if want_permanent:
+                staged='.soji-removing-'+tag;rec['stagedName']=staged;self.append(entry)
+                os.rename(name,staged,src_dir_fd=fd,dst_dir_fd=fd)
+                staged_stat=os.stat(staged,dir_fd=fd,follow_symlinks=False)
+                if staged_stat.st_ino!=original.st_ino:raise ValueError('Staged identity mismatch')
+                rec.update(phase='removing',stagedPath=str(Path(rec['path']).parent/staged))
+                self.append(entry);removal_started=True
+                remove_at(fd,staged,(original.st_dev,original.st_ino));staged=None;rec['method']='permanent';rec['status']='done'
+            else:
+                trash=Path(self.trash_directory or Path(plan['home'])/'.Trash')
+                trash.mkdir(mode=0o700,parents=True,exist_ok=True)
+                if trash.is_symlink():raise ValueError('Trash cannot be a symlink')
+                tfd=os.open(trash,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+                try:
+                    if os.fstat(tfd).st_dev!=original.st_dev:raise ValueError('Cross-volume Trash move needs native-volume support; no copy/delete fallback')
+                    dest=name+'.soji-'+tag;rec['trashedTo']=str(trash/dest);self.append(entry)
+                    os.rename(name,dest,src_dir_fd=fd,dst_dir_fd=tfd);moved=True
+                    rec['trashedIdentity']=file_identity(trash/dest);rec['method']='trash';rec['status']='done'
+                finally:os.close(tfd)
+            return True
+        except Exception as e:
+            if staged and fd is not None and not removal_started:
+                try:os.rename(staged,Path(rec['path']).name,src_dir_fd=fd,dst_dir_fd=fd)
+                except OSError:pass
+            rec['status']='prepared' if moved else 'failed';rec['error']=str(e)
+            if removal_started:rec['partialDeletionPossible']=True
+            return False
+        finally:
+            if fd is not None:os.close(fd)
     def tool_action(self,action):
         if action['kind']=='git-worktree':
             from .gitstate import GitInspector
@@ -243,6 +330,20 @@ class Cleaner:
                 results.append({'id':e['id'],'partialDeletionPossible':True,'stagedPath':e.get('stagedPath'),'status':'Permanent removal interrupted; remaining staged data is not an intact undo copy'})
                 continue
             if e.get('status')!='prepared':continue
+            if e.get('members'):
+                result={'id':e['id'],'compound':True,'applied':apply,'members':[]}
+                for m in e['members']:
+                    if m['status']!='prepared':result['members'].append({'path':m['path'],'status':m['status']});continue
+                    candidate=m.get('trashedTo')
+                    if candidate and os.path.lexists(candidate) and not os.path.lexists(m['path']):
+                        current=file_identity(candidate)
+                        if not all(current.get(k)==m['identity'].get(k) for k in ('device','inode','type')):
+                            result['members'].append({'path':m['path'],'refused':'Recovery identity mismatch'});continue
+                        result['members'].append({'path':m['path'],'recoverableTrashMove':True})
+                        if apply:m.update(status='done',recovered=True,trashedIdentity=current,method='trash')
+                    else:result['members'].append({'path':m['path'],'status':'Operation outcome uncertain; inspect recorded path/stagedName before taking action'})
+                if apply:compound_status(e);self.append(e)
+                result['status']=e['status'];results.append(result);continue
             candidate=e.get('trashedTo')
             if candidate and os.path.lexists(candidate) and not os.path.lexists(e['path']):
                 current=file_identity(candidate);expected=e.get('identity',{})
@@ -256,7 +357,22 @@ class Cleaner:
         return results
     def undo(self,entry_id):
         e=next((e for e in self.entries() if e['id']==entry_id),None)
+        if e and e.get('members') and e.get('status') in ('done','partial'):
+            todo=[m for m in e['members'] if m['status']=='done' and m.get('method')=='trash']
+            if not todo:raise ValueError('Only completed Trash moves can be restored')
+            # Transcript (index 0) first, then sidecars: reverse of cleanup order.
+            for m in todo:
+                try:self.restore(m)
+                except Exception as exc:
+                    m['restoreError']=str(exc);e['restoreError']=f'Restore incomplete at {m["path"]}: {exc}';self.append(e)
+                    raise ValueError(e['restoreError']) from exc
+                m.update(status='restored',restoredAt=time.time());self.append(e)
+            if all(m['status'] in ('restored','failed','skipped') for m in e['members']):e['status']='restored'
+            e['restoredAt']=time.time();self.append(e);return e
         if not e or e.get('status')!='done' or e.get('method')!='trash':raise ValueError('Only completed Trash moves can be restored')
+        self.restore(e)
+        e.update(status='restored',restoredAt=time.time());self.append(e);return e
+    def restore(self,e):
         source=e['trashedTo'];dest=e['path']
         if os.path.lexists(dest):raise ValueError('Original destination exists; refusing overwrite')
         if file_identity(source)!=e.get('trashedIdentity'):raise ValueError('Trashed item changed')
@@ -274,4 +390,3 @@ class Cleaner:
                 if libc.renameatx_np(sfd,os.fsencode(Path(source).name),dfd,os.fsencode(Path(dest).name),4)!=0:raise OSError(ctypes.get_errno(),'Exclusive restore failed')
             else:raise ValueError('Exclusive directory restore requires macOS renameatx_np')
         finally:os.close(sfd);os.close(dfd)
-        e.update(status='restored',restoredAt=time.time());self.append(e);return e
