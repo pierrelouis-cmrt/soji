@@ -72,6 +72,11 @@ class IndexStore:
         for device,inode in identities:
             result[(device,inode)]=[r[0] for r in self.db.execute('SELECT path FROM links WHERE device=? AND inode=?',(device,inode))]
         return result
+    def external_links(self):
+        """Identities with fewer cached names than their stored link count:
+        some links live outside the indexed roots and fire no in-root event."""
+        rows=self.db.execute('SELECT device,inode,MAX(nlink),GROUP_CONCAT(path,char(0)) FROM links GROUP BY device,inode HAVING COUNT(*)<MAX(nlink)')
+        return {(d,i):(n,paths.split('\0')) for d,i,n,paths in rows}
     def save(self,scanner,event_id,signature,*,full_scan=True,volumes=None):
         with self.db:
             self.db.execute('DELETE FROM nodes')
@@ -180,6 +185,19 @@ class IndexedScanner(Scanner):
         removed_ids={identity(n) for n in old.values() if multi(n)}
         added_ids={identity(n) for n in fresh.values() if multi(n)}
         affected=removed_ids|added_ids
+        # Links outside the roots: re-stat one cached name per such identity
+        # and treat it as affected if its link count moved.
+        external_checked=0
+        for ident,(nlink,paths) in store.external_links().items():
+            if ident in affected:continue
+            probe=next((q for q in sorted(paths) if q in self.nodes and not inside(q)),None)
+            if probe is None:continue
+            external_checked+=1
+            try:
+                current=os.lstat(probe)
+                moved=(current.st_dev,current.st_ino)!=ident or current.st_nlink!=nlink
+            except OSError:moved=True
+            if moved:affected.add(ident)
         cached=store.links_for(affected)
         # A brand-new link to a file cached with nlink == 1 is not in the
         # links table; fall back to an in-memory (stat-free) identity lookup.
@@ -230,7 +248,7 @@ class IndexedScanner(Scanner):
         self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
         self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
         self.skipped=sum(bool(n.reason) for n in self.nodes.values())
-        return {'affectedIdentities':len(affected),'restatted':restatted,'recomputedDirectories':len(dirs)}
+        return {'affectedIdentities':len(affected),'restatted':restatted,'externalChecked':external_checked,'recomputedDirectories':len(dirs)}
     def run(self):
         self.started=time.monotonic();store=None
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()

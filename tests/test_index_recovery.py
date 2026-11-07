@@ -160,6 +160,18 @@ class IndexRecovery(unittest.TestCase):
         self.assertEqual((s.nodes[str(original)].size,s.nodes[str(b/'link')].size),(share,share))
         self.assertEqual(s.nodes[str(self.root)].apparent-s.nodes[str(self.root)].own_apparent-s.nodes[str(a)].own_apparent-s.nodes[str(b)].own_apparent,16384)
         self.assert_matches_full(s)
+    def test_link_removed_outside_roots_refreshes_share(self):
+        outside=self.base/'outside';outside.mkdir()
+        inner=self.root/'a';inner.mkdir()
+        f=inner/'file';f.write_bytes(b'x'*16384);os.link(f,outside/'link')
+        first=self.run_scan()
+        self.assertEqual(first.nodes[str(f)].size,f.stat().st_blocks*512//2)
+        (outside/'link').unlink()  # no event inside the indexed roots
+        s=self.run_scan(101,[{'checkpoint':101}])
+        self.assertEqual(s.index_info['strategy'],'incremental')
+        self.assertEqual(s.index_info.get('externalChecked'),1)
+        self.assertEqual(s.nodes[str(f)].size,f.stat().st_blocks*512)
+        self.assertEqual(s.nodes[str(self.root)].size,first.nodes[str(self.root)].size+f.stat().st_blocks*512//2)
     def test_legacy_index_backfills_link_identities(self):
         import sqlite3
         a=self.root/'a';b=self.root/'b';a.mkdir();b.mkdir()

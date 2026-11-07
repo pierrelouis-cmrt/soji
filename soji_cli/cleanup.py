@@ -183,9 +183,9 @@ class Cleaner:
             if mn is None:raise ValueError('Fresh target could not be measured')
             if mn.errors or mn.skipped or mn.secret:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
             if mn.size!=m['size'] or mn.newest!=m['newest'] or mn.files!=m['files']:raise ValueError('Contents changed since analysis'+(': '+m['path'] if members else ''))
-        if item.get('hint')=='claude-sessions' and measure_root!=path:
-            # Rebuild the session catalog from its project row so the compound
-            # unit (and its FindingPart policy) is re-derived, not a bare file.
+        if item.get('hint') in ('claude-sessions','codex-sessions','trash-item') and measure_root!=path:
+            # Re-derive the catalog row (FindingPart policy, compound members)
+            # from its catalog root, not from a bare file.
             scan.roots=[measure_root]
         scan._build_findings()
         f=next((f for f in scan.findings if f.path==path),None)
