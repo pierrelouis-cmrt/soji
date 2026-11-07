@@ -78,6 +78,108 @@ def device_build_prepared(path):
     except OSError:return False
     return any(n.startswith('.processed_dyld_shared_cache') for n in names) and any(not n.startswith('.') for n in names)
 
+def device_support_name(name):
+    """DeviceSupportFolder.init(name:), 0x1004c31f4 -> (device, version, build) or None.
+
+    `[DEVICE ]VERSION (BUILD)`: ends with ')', BUILD (after the last '(') is
+    non-empty letters/digits; the rest splits on spaces into 1 or 2 words, the
+    last (VERSION) starting with a digit; with 2 words the first (DEVICE) must
+    contain ','.
+    """
+    if not isinstance(name,str) or not name.endswith(')') or '(' not in name:return None
+    i=name.rindex('(')
+    build=name[i+1:-1]
+    if not build or not all(c.isalpha() or c.isnumeric() for c in build):return None
+    words=[w for w in name[:i].split(' ') if w]
+    if not words or len(words)>2 or not words[-1][0].isnumeric():return None
+    if len(words)==2 and ',' not in words[0]:return None
+    return (words[0] if len(words)==2 else None),words[-1],build
+
+def build_number(build):
+    """DeviceSupportFolder.BuildNumber.init, 0x1004c4728 -> (train, number) or None.
+
+    Digits, one letter, then 1-3 digits: '21A329' -> ('21A', 329). Anything
+    else (e.g. beta '22A5316k') is None and newerBuild falls back to dates.
+    """
+    letter=next((i for i,c in enumerate(build) if c.isalpha()),None)
+    if not letter or not all(c.isnumeric() for c in build[:letter]):return None
+    rest=build[letter+1:]
+    if not rest or len(rest)>3 or not rest.isascii() or not rest.isdigit():return None
+    return build[:letter+1],int(rest)
+
+def is_device_support(path):
+    """DeviceSupportFolder.isDeviceSupport, 0x1004c35f8: .../Xcode/<* DeviceSupport>/<name>."""
+    p=Path(path)
+    return p.parent.name.endswith(' DeviceSupport') and p.parent.parent.name=='Xcode'
+
+def _birth_seconds(path):
+    # lstat st_birthtimespec.tv_sec (struct stat +0x50), whole seconds.
+    try:return int(os.lstat(path).st_birthtime)
+    except (OSError,AttributeError):return None
+
+def newer_build(path):
+    """DeviceSupportFolder.newerBuild(than:), 0x1004c0c5c.
+
+    Returns the build of a prepared sibling with the same device and version and
+    a newer build, else None. Newer means: same BuildNumber train and a higher
+    number; when either build does not parse or the trains differ, a strictly
+    later creation time (whole seconds). Unreadable dates never count as newer.
+    """
+    if not is_device_support(path):return None
+    me=device_support_name(Path(path).name)
+    if me is None:return None
+    parent=Path(path).parent
+    try:names=os.listdir(parent)
+    except OSError:return None
+    mine=build_number(me[2]);my_birth=None
+    for name in names:
+        other=device_support_name(name)
+        if other is None or other[:2]!=me[:2] or other[2]==me[2]:continue
+        candidate=parent/name
+        if not device_build_prepared(candidate):continue
+        theirs=build_number(other[2])
+        if mine and theirs and mine[0]==theirs[0]:
+            if theirs[1]>mine[1]:return other[2]
+            continue
+        their_birth=_birth_seconds(candidate)
+        if my_birth is None:my_birth=_birth_seconds(path)
+        if their_birth is not None and my_birth is not None and their_birth>my_birth:return other[2]
+    return None
+
+def simulator_device(path):
+    """SimulatorDevice.init(path:), 0x1006a8394: device.plist name/runtime (String)
+    and state (Int) are required; returns None otherwise."""
+    info=read_plist(Path(path)/'device.plist')
+    if not isinstance(info,dict):return None
+    name,runtime,state=info.get('name'),info.get('runtime'),info.get('state')
+    if not isinstance(name,str) or not isinstance(runtime,str) or not isinstance(state,int) or isinstance(state,bool):return None
+    return {'name':name,'runtime':runtime,'state':state}
+
+def _uuid(text):
+    import uuid
+    try:return uuid.UUID(text) if re.fullmatch(r'[0-9A-Fa-f-]{36}',text or '') else None
+    except ValueError:return None
+
+def simulator_has_twin(path,device=None):
+    """SimulatorDevice.hasTwin(path:), 0x1006a8b64 and closure 0x1006a8db8.
+
+    True when another device folder in the same Devices directory (a different
+    UUID; entries are skipped when neither name parses as a UUID) has the same
+    device.plist name and runtime.
+    """
+    me=device or simulator_device(path)
+    if me is None:return False
+    parent=Path(path).parent;own=Path(path).name;mine=_uuid(own)
+    try:names=os.listdir(parent)
+    except OSError:return False
+    for name in names:
+        if name==own:continue
+        theirs=_uuid(name)
+        if theirs==mine:continue  # both unparsable, or the same device
+        other=simulator_device(parent/name)
+        if other and other['name']==me['name'] and other['runtime']==me['runtime']:return True
+    return False
+
 def archive_platform(path,props):
     application=props.get('ApplicationPath')
     if not isinstance(application,str) or '..' in application:return ''
@@ -301,23 +403,47 @@ class SpecializedRules:
             build=build_match.group(1) if build_match else None
             if not self.connected_known:f.holds.append('Connected-device build state unavailable')
             elif build and build in self.devices.device_builds:f.holds.append('A connected device uses this build')
-            # newerBuild requires a prepared sibling and a parsed build train;
-            # a natural-sort name comparison cannot prove this early outcome.
-            f.evidence.append({'check':'deviceBuild','status':'supersession early outcome requires prepared sibling; not implemented'})
+            # SmartRules early Outcome (0x1006ac2b8-0x1006ac34c), gated on the
+            # rule's deviceBuild flag and Context.direct: a prepared newer build
+            # of the same device and version gives level Careful exactly like
+            # workspaceMissing; earlier holds stay, retention and rule clocks go,
+            # then CleanupLevels.apply uses normal recency.
+            newer=None
+            if f.matched_pattern and f.rule_early_reason is None:
+                try:direct=stat.S_ISDIR(os.lstat(f.path).st_mode)
+                except OSError:direct=False
+                if direct:newer=newer_build(f.path)
+            if newer:
+                f.rule_early_reason='newerBuild';f.rule_level='careful'
+                f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
+            f.evidence.append({'check':'deviceBuild','newerBuild':newer,'basis':'DeviceSupportFolder.newerBuild: same device and version, prepared sibling, BuildNumber train or creation time'})
         if r.get('simulatorDevice'):
             device=self.devices.devices.get(Path(f.path).name)
             if not self.devices.available:f.holds.append('Simulator state unavailable')
             elif device and device.get('state')!='Shutdown':f.holds.append('Simulator is not shut down')
             elif device:
                 runtime=next((x for x in self.devices.runtime_images if x.get('identifier')==device['runtime']),None)
-                if device.get('isAvailable') is False or runtime and not runtime.get('isAvailable',True):
-                    f.special_min_hours=0;f.levels={'careful':0,'balanced':0,'aggressive':0,'reason':'Simulator runtime is unavailable'}
+                missing=(device.get('isAvailable') is False or (runtime is not None and not runtime.get('isAvailable',True))
+                         or (runtime is None and bool(self.devices.runtime_images)))
+                if missing:
+                    # Early Outcome 0x1006ac6c0 (runtime absent from the available
+                    # runtime set): level Careful, then CleanupLevels.apply's
+                    # normal recency (>=7 d Careful, 1-7 d Balanced, 1 h-1 d
+                    # Aggressive). Expressed as levels so the unresolved costly
+                    # adjustment cannot make it looser or stricter than traced.
+                    f.special_min_hours=0;f.rule_early_reason='runtimeMissing'
+                    f.levels={'careful':168,'balanced':24,'aggressive':1,'reason':'Simulator runtime is not installed'}
                 else:
-                    peers=[d for d in self.devices.devices.values() if d.get('runtime')==device['runtime']]
                     bundles=Path(f.path)/'data/Containers/Bundle/Application'
                     try:has_apps=bundles.exists() and any(not p.name.startswith('.') for p in bundles.iterdir())
                     except OSError:has_apps=True
-                    if len(peers)>1 and not has_apps:f.levels={'balanced':168,'aggressive':168,'reason':'Spare shut-down simulator without installed app bundles'}
+                    # 0x1006acbd0-0x1006ace1c: no app bundles and a twin (same
+                    # device.plist name and runtime, other UUID) raise the rule
+                    # level to Balanced. Port keeps the stricter 7-day judgement
+                    # until the costly-tier adjustment is resolved.
+                    twin=not has_apps and simulator_has_twin(f.path)
+                    f.evidence.append({'check':'simulatorTwin','apps':has_apps,'twin':twin,'basis':'SimulatorDevice.hasTwin: same name and runtime, different UUID'})
+                    if twin:f.levels={'balanced':168,'aggressive':168,'reason':'Spare shut-down simulator: a twin with the same name and runtime exists, and this one has no apps'}
                 f.action={'kind':'simulator-device','udid':device['udid']}
             else:
                 # Orphan folders have no valid simctl identity: do not fabricate one.

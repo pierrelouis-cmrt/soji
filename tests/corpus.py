@@ -36,8 +36,9 @@ RUNTIME = 'com.apple.CoreSimulator.SimRuntime.iOS-18-0'
 SIMCTL = {
     'devices': {RUNTIME: [
         {'udid': BOOTED, 'state': 'Booted', 'isAvailable': True, 'name': 'Booted phone'},
-        {'udid': SPARE, 'state': 'Shutdown', 'isAvailable': True, 'name': 'Spare phone'},
-        {'udid': PEER, 'state': 'Shutdown', 'isAvailable': True, 'name': 'Peer phone'},
+        # SPARE and PEER are twins (same name and runtime); only PEER has an app.
+        {'udid': SPARE, 'state': 'Shutdown', 'isAvailable': True, 'name': 'iPhone 16'},
+        {'udid': PEER, 'state': 'Shutdown', 'isAvailable': True, 'name': 'iPhone 16'},
     ]},
     'runtimes': [{'identifier': RUNTIME, 'isAvailable': True}],
 }
@@ -145,6 +146,10 @@ def build_corpus(home: Path, now: float | None = None) -> float:
     session = home / '.claude/projects/-code-py-agent/session.jsonl'
     line = json.dumps({'type': 'user', 'cwd': str(home / 'code/py-agent')}) + '\n'
     session.write_bytes(line.encode().ljust(PAYLOAD, b' '))
+    # device.plist as CoreSimulator writes it (state 1 = Shutdown, 3 = Booted).
+    for d in SIMCTL['devices'][RUNTIME]:
+        info = {'UDID': d['udid'], 'name': d['name'], 'runtime': RUNTIME, 'state': 3 if d['state'] == 'Booted' else 1}
+        (home / 'Library/Developer/CoreSimulator/Devices' / d['udid'] / 'device.plist').write_bytes(plistlib.dumps(info))
     plist = {'CFBundleIdentifier': 'com.example.Known', 'CFBundleName': 'Known'}
     (home / 'Applications/Known.app/Contents/Info.plist').write_bytes(plistlib.dumps(plist))
     dd = home / 'Library/Developer/Xcode/DerivedData'

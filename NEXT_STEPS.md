@@ -17,9 +17,7 @@
 | Item | Where | Note |
 |---|---|---|
 | Original-app corpus run | owner | No safe fake-home entry point found in the original (research/consumer-observation.md) |
-| Costly-tier verifier adjustment | `levels.combine_rule_level` | Flag source unresolved; omitted |
-| Device-build supersession, simulator twins | `specialized.py` | Unported early branches |
-| Codex raw level byte → Careful/Balanced/Aggressive mapping | `catalogs.py` | Unconfirmed cross-check (research/activity-recovery.md) |
+| Costly-tier verifier adjustment | `levels.combine_rule_level` | Flag source unresolved; omitted. Simulators are the costly rows it matters for: the hint text says spare twins go "from Balanced", which needs the flag, so the port keeps its stricter 7-day judgement for twins |
 | Worktree activity in the parent project clock | `engine.project_age` | `<project>/.claude/worktrees` counts as project use; unverified |
 | Outside link to a small single-link file | `index.reconcile` | Files ≥ 1 MiB (largest 20,000) are re-checked on every incremental run; smaller ones wait for the weekly full check. Estimates only |
 | Native busy filter, settle measurement | `SojiNative.swift`, `nativeplans.py` | Conservative holds |

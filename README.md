@@ -68,6 +68,8 @@ Before each action, soji re-measures the target and refuses it if any of these a
 - Example routine: `{"id":"nightly","enabled":true,"paths":["/Users/YOU/Library/Caches"],"groups":["App caches"],"mode":"careful","unusedForHours":168,"everyHours":24}`.
 - Templates: `soji_cli/data/routine-templates.json`.
 
+**Cleaning from the TUI:** mark rows with Space (or mark nothing to take every READY row in the current category, search and mode), press X, check the list, press Y. Items go to the Trash through the same plan and re-checks as `soji clean --apply` (plan saved under `tui-plans/` in the state folder, entries in `soji journal`); U restores the batch. Permanent deletion and tool actions (simulators, document versions, worktrees) stay terminal commands.
+
 **TUI keys:**
 
 | Key | Action |
@@ -78,6 +80,9 @@ Before each action, soji re-measures the target and refuses it if any of these a
 | Enter | Details |
 | / | Search |
 | A | Eligible rows only |
+| Space | Mark / unmark a READY row |
+| X | Clean the marked rows (or, with none marked, every READY row in view) → confirm → Trash |
+| U | Put the last cleaned batch back |
 | S | Sort |
 | E | Export |
 | C | Cancel scan |

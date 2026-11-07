@@ -144,7 +144,7 @@ def main():
     interactive=action=='scan' and not args.json and not args.plain and sys.stdin.isatty() and sys.stdout.isatty()
     if interactive:
         from .tui import run_tui
-        run_tui(scanner,args.mode,args.output);return 0
+        run_tui(scanner,args.mode,args.output,args.state);return 0
     scanner.run()
     if scanner.error:raise ValueError(scanner.error)
     if action=='auto':

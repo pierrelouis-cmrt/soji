@@ -519,7 +519,7 @@
    "decision": "Simulator is not shut down",
    "selected": false
   },
-  "bytes": 131072,
+  "bytes": 135168,
   "careful": {
    "decision": "Simulator is not shut down",
    "selected": false
@@ -544,7 +544,7 @@
    "decision": "Idle 30.0 d; eligible from balanced",
    "selected": true
   },
-  "bytes": 131072,
+  "bytes": 135168,
   "careful": {
    "decision": "Eligible from balanced",
    "selected": false
@@ -567,7 +567,7 @@
    "decision": "Eligible from aggressive",
    "selected": false
   },
-  "bytes": 135168,
+  "bytes": 139264,
   "careful": {
    "decision": "Eligible from aggressive",
    "selected": false
