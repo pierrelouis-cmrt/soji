@@ -30,7 +30,18 @@ The shipped catalogs/presets remain the original recovered resources. Source rec
 - **Uninstall:** signing/team/app-group and shared receipt attribution are incomplete. Keep the existing narrow ownership scope until those are implemented.
 - **Tests/tooling:** two opt-in native tests are separate from the default suite. A Python 3.15 unclosed-SQLite `ResourceWarning` appeared in fixtures; it did not fail tests and remains minor cleanup work. Full provider compatibility is untested. No differential run of both apps over an identical comprehensive corpus was performed.
 
+## Product decisions (7 November 2026)
+
+Sōji stays a command you run, in the style of mole. It does not try to be a background app.
+
+- **No background automation.** No daemon, login item, scheduled AI runs or notifications. Routines and `auto` stay explicit CLI invocations. The cadence and backoff policy code stays but will not be wired.
+- **AI inverts the original design.** Instead of Sōji launching an agent, an agent (Claude Code, Codex, anything) runs `soji --ai`. Sōji prints a built-in instruction block (a "skill": usage, safety rules, delete only through soji), then a paged briefing with stable candidate IDs. `soji ai inspect ID` drills down. `soji ai propose` validates verdicts into an ordinary expiring plan, and `soji clean` re-checks everything before acting. Verdicts can never lift holds, reference unknown IDs, or select personal data. `analyse` (agent launching) is legacy: kept working, no further parity work. Matching Sōji's prompt packing, run budgets and cadence is dropped.
+- **Original-app comparison** (corpus run against the consumer build, early-rule tracing) is done by the project owner, not by agents.
+- Engineering items still in scope: compound Claude session cleanup, uninstall ownership, incremental index performance.
+
 ## Next work, in order
+
+Items 2 and 4 below are superseded by the decisions above where they conflict: AI scheduling and packing parity are dropped, and comparison against the original is owner-run.
 
 ### 1. Establish a stable baseline and cheap regression corpus
 
@@ -51,6 +62,15 @@ What the corpus found on our side:
 - **Open:** worktrees under `<project>/.claude/worktrees` count toward the parent project's idle clock (`~/code/clean-web/node_modules` reads 10 days, not 60). This is probably right, but it is unverified.
 
 ### 2. Close the specialized-rule gaps that affect selection
+
+**Investigation update (7 Nov 2026):** see `research/consumer-observation.md`.
+Installed original 2026.11.14 was inspected; GUI access timed out and no safe
+fake-home scan entry point was verified. The CLI status query works outside
+the sandbox, but `analyse` has no folder argument. Original corpus rows and
+the differential run remain outstanding. The fallback now proves that
+workspaceMissing returns Outcome.level=Careful and identifies its immediate
+FindingVerifier continuation, which combines levels and retains separate hold
+handling. Full final-selection dataflow remains open; no rule change was made.
 
 Files: `specialized.py`, `levels.py`, `engine.py`; evidence: `research/rules-recovery.md`, `mode-recovery.md`.
 
