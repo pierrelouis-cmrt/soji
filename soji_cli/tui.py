@@ -8,6 +8,9 @@ re-verification and journal as `soji clean PLAN --apply`.
 import collections
 import curses
 import json
+import os
+import shutil
+import sys
 import textwrap
 import threading
 import time
@@ -190,6 +193,45 @@ def sidebar_line(name, size, width, active):
     if len(name) > room:
         name = name[: room - 1] + "…"
     return ("› " if active else "  ") + f"{name:<{room}} {amount}"
+
+
+# Size the window opens at; the layout needs at least 82x18.
+PREFERRED_SIZE = (124, 36)
+
+
+def fit_terminal(cols=PREFERRED_SIZE[0], rows=PREFERRED_SIZE[1]):
+    """Grow the terminal window to cols x rows if it is smaller.
+
+    Uses the xterm window-ops sequence (CSI 8 ; rows ; cols t), honoured by
+    Terminal.app, iTerm2 and most xterm-compatible emulators; others ignore it.
+    Never shrinks, skips multiplexers, and returns the original size so the
+    caller can put the window back. SOJI_NO_RESIZE=1 turns it off.
+    """
+    if os.environ.get("SOJI_NO_RESIZE") == "1" or not sys.stdout.isatty():
+        return None
+    if os.environ.get("TMUX") or os.environ.get("STY"):
+        return None
+    before = shutil.get_terminal_size((0, 0))
+    if before.columns >= cols and before.lines >= rows:
+        return None
+    want = (max(cols, before.columns), max(rows, before.lines))
+    sys.stdout.write(f"\033[8;{want[1]};{want[0]}t")
+    sys.stdout.flush()
+    # The emulator resizes asynchronously; wait briefly so curses starts with
+    # the new size instead of the old one.
+    deadline = time.monotonic() + 0.5
+    while time.monotonic() < deadline:
+        now = shutil.get_terminal_size((0, 0))
+        if (now.columns, now.lines) != (before.columns, before.lines):
+            break
+        time.sleep(0.02)
+    return before
+
+
+def restore_terminal(before):
+    if before and before.columns and before.lines:
+        sys.stdout.write(f"\033[8;{before.lines};{before.columns}t")
+        sys.stdout.flush()
 
 
 def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
@@ -823,4 +865,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     state["message"] = "Export failed: " + str(e)
         thread.join(timeout=1)
 
-    curses.wrapper(main)
+    before = fit_terminal()
+    try:
+        curses.wrapper(main)
+    finally:
+        restore_terminal(before)

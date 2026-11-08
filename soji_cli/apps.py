@@ -159,7 +159,7 @@ class InstalledTools:
         for rel in configs:
             data=self.config_json(self.home/rel)
             if data:self.extract(data,rel)
-        # TOML support on Python 3.11+, bounded parser fallback on 3.10.
+        # TOML support on Python 3.11+, bounded parser fallback before that.
         p=self.home/'.codex/config.toml'
         try:
             if p.is_file() and p.stat().st_size<4_000_000:

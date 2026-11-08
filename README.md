@@ -1,33 +1,62 @@
 # Sōji 0.4
 
-A macOS disk-cleanup command line: 375 cleanup rules, three modes (careful, balanced, aggressive) and layered safety checks. Python 3.10+, no pip dependencies. It includes a universal Swift helper (macOS 13+) for the disk walk, FSEvents, metadata, running apps and document versions. Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
+A macOS disk-cleanup command line: 375 cleanup rules, three modes (careful, balanced, aggressive) and layered safety checks. Scanning never deletes anything; cleaning goes to the Trash after a confirmation and can be undone. macOS 13+, Python 3.9+ (the version included with Apple's Command Line Tools is enough), no pip dependencies. It includes a universal Swift helper for the disk walk, FSEvents, metadata, running apps and document versions. Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
+
+## Install
+
+**With Homebrew** (recommended: Homebrew provides Python and handles updates):
+
+```sh
+brew install pierrelouis-cmrt/tap/soji
+soji
+```
+
+Update with `brew upgrade soji`, remove with `brew uninstall soji`.
+
+**Without Homebrew** (one command, no admin password, nothing outside your home folder):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/pierrelouis-cmrt/soji/main/install.sh | sh
+```
+
+Then open a new Terminal window and run `soji`.
+
+- The script installs `soji.pyz` into `~/.local/share/soji` and a `soji` command into `~/.local/bin`, verifies the SHA-256 checksum published with the release, and adds `~/.local/bin` to your `PATH` in `~/.zshrc` if needed (`SOJI_NO_MODIFY_PATH=1` to skip that).
+- It uses any Python 3.9+ already installed. If there is none, it asks you to run `xcode-select --install` (Apple's Command Line Tools, which include Python) and then run it again.
+- Update by running the same command again. A specific version: `… | sh -s -- --version 0.4.0`. Uninstall: `… | sh -s -- --uninstall`.
+
+Both methods install the same file from the same GitHub release. Neither one leaves a quarantined download behind, so macOS shows no "unidentified developer" warning.
+
+Your index, plans and journal live in `~/Library/Application Support/Soji`. Uninstalling keeps them; delete that folder to remove them.
+
+**From source:** `git clone https://github.com/pierrelouis-cmrt/soji && cd soji && ./soji`. You can also double-click `Launch Sōji.command`. The examples below write `soji`; from a checkout, use `./soji`.
 
 ## Scan
 
 ```sh
-./soji ~/Library/Caches                         # TUI (when interactive)
-./soji scan ~/code --mode careful --plain       # careful | balanced | aggressive
-./soji scan ~/Library/Caches --json --output report.json
-./soji --demo                                   # synthetic data
+soji ~/Library/Caches                         # TUI (when interactive)
+soji scan ~/code --mode careful --plain       # careful | balanced | aggressive
+soji scan ~/Library/Caches --json --output report.json
+soji --demo                                   # synthetic data
 ```
 
 - State lives in `~/Library/Application Support/Soji` (`--state PATH` to change). Scans keep an incremental index (`--no-index` to skip it, `--refresh` to force a full walk). Scans never delete anything or call a model.
 - Options: `--protect PATH`; `--max-files`, `--max-seconds` and `--min-mb` bound the scan; `--recent-activity-hours` sets the recent-use window; `--no-context` turns off process/activity checks, and rows are then held as unverified.
 - The disk walk runs in the helper (parallel `getattrlistbulk`, results identical to the Python walk); without the helper, or with `SOJI_NATIVE_WALK=0`, the Python walk is used. Cleanup always re-measures targets with the Python walk. `SOJI_NATIVE_WALK_THREADS` sets the worker count (default: up to 8).
-- The single-file `dist/soji.pyz` runs anywhere with Python 3.10+. For the TUI, double-click `Launch Sōji.command`.
+- The TUI grows the Terminal window to 124×36 at launch if it is smaller, then restores it on exit (`SOJI_NO_RESIZE=1` turns this off).
 
 ## AI mode
 
 Run it from Claude Code, Codex or any agent with a shell:
 
 ```sh
-./soji --ai ~/Library/Caches ~/code      # agent instructions + rows with stable ids
-./soji ai inspect ROW_ID                 # largest children, evidence, same-rule rows
-./soji --ai ~/code --rule node-modules    # one rule at a time (large briefings print a per-rule summary)
-./soji ai propose verdicts.json          # {"verdicts":[{"id":"…","action":"remove|keep|review","reason":"…","unusedDays":30}]}
-./soji clean PLAN                        # review
-./soji clean PLAN --apply                # Trash; undo with `soji undo ID --apply`
-./soji ai skill > ~/.claude/skills/soji/SKILL.md
+soji --ai ~/Library/Caches ~/code      # agent instructions + rows with stable ids
+soji ai inspect ROW_ID                 # largest children, evidence, same-rule rows
+soji --ai ~/code --rule node-modules    # one rule at a time (large briefings print a per-rule summary)
+soji ai propose verdicts.json          # {"verdicts":[{"id":"…","action":"remove|keep|review","reason":"…","unusedDays":30}]}
+soji clean PLAN                        # review
+soji clean PLAN --apply                # Trash; undo with `soji undo ID --apply`
+soji ai skill > ~/.claude/skills/soji/SKILL.md
 ```
 
 Sōji enforces:
@@ -44,12 +73,12 @@ Legacy `analyse` (soji launches an agent; `agents` lists presets, and `--dry-run
 ## Plan, clean, undo
 
 ```sh
-./soji plan ~/Library/Caches --mode balanced --output plan.json
-./soji clean plan.json                    # review only
-./soji clean plan.json --apply            # verified Trash moves
-./soji journal; ./soji undo ID --apply; ./soji recover [--apply]
-./soji plan … --method permanent --output p.json
-./soji clean p.json --apply --permanent [--execute-tools]
+soji plan ~/Library/Caches --mode balanced --output plan.json
+soji clean plan.json                    # review only
+soji clean plan.json --apply            # verified Trash moves
+soji journal; soji undo ID --apply; soji recover [--apply]
+soji plan … --method permanent --output p.json
+soji clean p.json --apply --permanent [--execute-tools]
 ```
 
 Before each action, soji re-measures the target and refuses it if any of these apply: changed identity or contents, active use, Git work, a protected path, an expired plan, an ambiguous tool scope or an incomplete measurement. Cross-volume moves are refused. `--execute-tools` is required for official cleanup commands, simulators, document versions and worktrees.
@@ -59,17 +88,17 @@ Batch cleanup re-measures each selected session (including its freshly discovere
 ## Other commands
 
 ```sh
-./soji versions FILE [--plan]            # document versions: keeps current, newest older, conflicts
-./soji runtimes [--plan]                 # simulator runtimes: keeps active and newest
-./soji apps; ./soji uninstall BUNDLE_ID  # Trash plan; shared leftovers listed, never removed
-./soji routines save|list|run ID [--apply]
-./soji auto PATH --auto-settings auto.json [--apply --permanent]
-./soji watch PATH; ./soji activity PATH; ./soji rules ID; ./soji processes [cpu|memory]
+soji versions FILE [--plan]            # document versions: keeps current, newest older, conflicts
+soji runtimes [--plan]                 # simulator runtimes: keeps active and newest
+soji apps; soji uninstall BUNDLE_ID  # Trash plan; shared leftovers listed, never removed
+soji routines save|list|run ID [--apply]
+soji auto PATH --auto-settings auto.json [--apply --permanent]
+soji watch PATH; soji activity PATH; soji rules ID; soji processes [cpu|memory]
 ```
 
 - Routines (daily, weekly, monthly or `everyHours`) and `auto` (low free space) cover regenerable data only and remove permanently. They run only when invoked.
 - Example routine: `{"id":"nightly","enabled":true,"paths":["/Users/YOU/Library/Caches"],"groups":["App caches"],"mode":"careful","unusedForHours":168,"everyHours":24}`.
-- Templates: `soji_terminal/data/routine-templates.json`.
+- Templates: `soji_cli/data/routine-templates.json`.
 
 **Cleaning from the TUI:** mark rows with Space (or mark nothing to take every READY row in the current category, search and mode), press X, check the list, press Y. Items go to the Trash through the same plan and re-checks as `soji clean --apply` (plan saved under `tui-plans/` in the state folder, entries in `soji journal`); U restores the batch. Permanent deletion and tool actions (simulators, document versions, worktrees) stay terminal commands.
 
@@ -108,4 +137,12 @@ A quiet status bar shows disk scanning, category sorting, and cleanup progress. 
 | `agent.py` | `soji --ai`; `ai.py` and `mcp.py` are the legacy `analyse` path |
 | `tests/` | Fixture tests, plus the regression corpus (`corpus.py`, `corpus_expected.json`) |
 
-Validation and release commands: [NEXT_STEPS.md](NEXT_STEPS.md#validation).
+Validation commands: [NEXT_STEPS.md](NEXT_STEPS.md#validation).
+
+## Publishing a release
+
+1. Set the version in `soji_cli/__init__.py`, then run `python3 build_release.py` (needs the Xcode Command Line Tools for the universal helper). `dist/` then contains `soji.pyz`, `soji.pyz.sha256`, `Soji-VERSION.zip`, `install.sh` and `soji.rb`.
+2. Create the GitHub release with the tag `vVERSION` and those files: `gh release create v0.4.0 dist/soji.pyz dist/soji.pyz.sha256 dist/Soji-0.4.0.zip dist/install.sh`. `install.sh` downloads `releases/latest`, so it picks up the new version automatically.
+3. Homebrew: copy `dist/soji.rb` to `Formula/soji.rb` in the `pierrelouis-cmrt/homebrew-tap` repository and push it (the template is `packaging/homebrew/soji.rb`). `brew upgrade soji` then installs the new version.
+
+The repository (`pierrelouis-cmrt/soji`) is set in `build_release.py` (`REPO`) and `install.sh` (`SOJI_REPO`).

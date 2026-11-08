@@ -9,6 +9,7 @@ import hashlib
 import json
 from importlib.resources import files as resource_files
 import os
+import sys
 from pathlib import Path
 import re
 import stat
@@ -67,7 +68,8 @@ def glob_regex(pattern: str) -> re.Pattern:
 NO_MATCH = -1
 
 
-@dataclasses.dataclass(slots=True)
+# slots (3.10+) keep large scans small; 3.9 (the macOS system Python) runs without.
+@dataclasses.dataclass(**({'slots': True} if sys.version_info >= (3, 10) else {}))
 class Node:
     path: str
     size: int = 0

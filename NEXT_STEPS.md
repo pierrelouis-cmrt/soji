@@ -41,7 +41,7 @@ python3 -m unittest discover -s tests -q
 SOJI_TEST_NATIVE="$PWD/soji_cli/native-bin/soji-native" python3 -m unittest discover -s tests -p 'test_index_store.py' -q
 python3 scripts/native_integration.py     # real FSEvents, fake agent; no model call
 python3 scripts/walk_parity.py ~/Library ~/code   # native walk == Python walk, node for node (read-only)
-python3 build_release.py                  # needs Xcode CLT; universal helper
+python3 build_release.py                  # needs Xcode CLT; see README "Publishing a release"
 python3 dist/soji.pyz --version
 ```
 

@@ -2,6 +2,7 @@
 
 This module never schedules or launches an agent by itself.
 """
+from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
