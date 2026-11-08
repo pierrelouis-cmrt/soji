@@ -271,7 +271,7 @@ class AIAnalyzer:
         atomic_json(run/'context.json',{'roots':scanner.roots,'hiddenPaths':hidden,'kind':'disk','runID':run.name})
         env={'SOJI_REPORT':str(run/'report.json'),'SOJI_RUN_DIR':str(run),'SOJI_HIDDEN_PATHS':json.dumps(hidden)}
         base=entry_command()
-        config={'mcpServers':{'soji':{'command':base[0],'args':base[1:],'env':env,**self.preset.get('mcpServerExtra',{})}}}
+        config={'mcpServers':{'soji':{'command':base[0],'args':base[1:],'env':env,**self.preset.get('mcpServerFields',{})}}}
         atomic_json(run/'soji-mcp.json',config)
         executable=self.detect()
         flags=list(self.preset.get('readOnlyArguments',[]))
@@ -286,17 +286,17 @@ class AIAnalyzer:
                 for key,value in substitutions.items():token=token.replace(key,value)
                 out.append(token)
             return out
-        argv=[executable,*expand(self.preset.get('arguments',[]))]
+        argv=[executable,*expand(self.preset.get('runArguments',[]))]
         format=self.preset.get('mcpFormat','mcpServers')
         if self.preset['id']=='codex':
             # Codex's -c accepts TOML, not JSON object syntax.
-            inline='mcp_servers.soji={command='+json.dumps(base[0])+',args='+json.dumps(base[1:])+',env={'+','.join(json.dumps(k)+'='+json.dumps(v) for k,v in env.items())+'}'+''.join(','+k+'='+json.dumps(v) for k,v in self.preset.get('mcpServerExtra',{}).items())+'}'
-            argv=[executable,*expand([t for t in self.preset.get('arguments',[]) if t!='{mcp_inline}'])]
+            inline='mcp_servers.soji={command='+json.dumps(base[0])+',args='+json.dumps(base[1:])+',env={'+','.join(json.dumps(k)+'='+json.dumps(v) for k,v in env.items())+'}'+''.join(','+k+'='+json.dumps(v) for k,v in self.preset.get('mcpServerFields',{}).items())+'}'
+            argv=[executable,*expand([t for t in self.preset.get('runArguments',[]) if t!='{mcp_inline}'])]
             argv[1:1]=['-c',inline]
         elif self.preset['id']=='custom':
             argv=[executable,*expand(self.custom_command[1:])]
         if self.preset.get('mcpAttach')=='configFile':
-            target=run/'work'/self.preset['mcpFile'];target.parent.mkdir(parents=True,exist_ok=True)
+            target=run/'work'/self.preset['mcpConfigFile'];target.parent.mkdir(parents=True,exist_ok=True)
             if format=='toml':
                 target.write_text('[mcp_servers.soji]\ncommand = '+json.dumps(base[0])+'\nargs = '+json.dumps(base[1:])+'\n[mcp_servers.soji.env]\n'+'\n'.join(k+' = '+json.dumps(v) for k,v in env.items())+'\n')
             elif format=='opencode':atomic_json(target,{'mcp':{'soji':{'type':'local','command':base,'environment':env,'enabled':True}}})
@@ -406,7 +406,7 @@ class AIAnalyzer:
             f.source='both' if f.hint_id else 'agent';f.recommendation=data.get('recommendation','review');f.confidence=data.get('confidence')
             f.evidence.append({'check':'agent','judgment':data})
             # AI may nominate unknown folders but cannot override any local hold,
-            # personal-data tier, listOnly policy, or specialized integrity rule.
+            # personal-data tier, reviewOnly policy, or specialized integrity rule.
             # cleanCommand is evidence only; the plan uses bound native actions.
         # Prevent double-counting/cleaning a newly split child and its old parent.
         nominated={os.path.realpath(d['path']) for d in findings}

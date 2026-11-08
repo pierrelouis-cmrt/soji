@@ -32,7 +32,7 @@ PRIVATE_SUFFIXES = ('.photoslibrary', '.photolibrary', '.aplibrary', '.keychain-
 SECRET_SUFFIXES = ('.pem', '.key', '-keypair.json', '.p12', '.pfx')
 PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Library/CloudStorage', 'Library/Mobile Documents', 'Library/Application Support/com.apple.TCC', 'Library/Application Support/Soji')
 CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
-SPECIAL_RULES = {'deviceBuild', 'simulatorDevice', 'keepActive', 'keepPinned', 'knownApp', 'notApple', 'appNotInstalled', 'workspaceMissing'}
+SPECIAL_RULES = {'checkDeviceBuilds', 'checkSimulatorDevice', 'keepVersionPointedToBy', 'keepProjectPinnedVersions', 'onlyIfOwnerInstalled', 'notIfAppleOwned', 'onlyIfOwnerNotInstalled', 'checkWorkspaceExists'}
 
 
 def within(path: str, root: str) -> bool:
@@ -130,7 +130,7 @@ class Finding:
     rule_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_project_min_hours: dict = dataclasses.field(default_factory=dict)
     rule_early_reason: str | None = None
-    # SmartRules early Outcome level (e.g. workspaceMissing -> careful). When
+    # Early outcome of a rule check (e.g. workspace missing -> careful). When
     # set, the rule's own age/rank gates were skipped; the level is combined
     # with the judged risk level.
     rule_level: str | None = None
@@ -182,7 +182,7 @@ class Finding:
 
 # Rules that make a matched folder one cleanup unit (retention family, device,
 # worktree, workspace); such rows are never split around nested hints.
-UNIT_RULES = ('keepNewest', 'simulatorDevice', 'deviceBuild', 'early', 'workspaceMissing')
+UNIT_RULES = ('keepNewest', 'checkSimulatorDevice', 'checkDeviceBuilds', 'sameIdleAtEveryLevel', 'checkWorkspaceExists')
 
 
 def generic_container(match) -> bool:
@@ -195,7 +195,7 @@ def generic_container(match) -> bool:
     """
     if not match:return False
     hint,pattern=match
-    return (pattern.rstrip('/').rsplit('/',1)[-1]=='*' and not hint.get('listOnly')
+    return (pattern.rstrip('/').rsplit('/',1)[-1]=='*' and not hint.get('reviewOnly')
             and hint['tier']!='userData' and not any(k in (hint.get('rule') or {}) for k in UNIT_RULES))
 
 
@@ -203,7 +203,7 @@ class Catalog:
     def __init__(self, home: str):
         self.home = home
         self.hints = json.loads((DATA/'hints.json').read_text())
-        self.groups = {g['group']:g for g in json.loads((DATA/'groups.json').read_text())}
+        self.groups = {g['name']:g for g in json.loads((DATA/'groups.json').read_text())}
         self.by_last = collections.defaultdict(list)
         self.wild = []
         from .locations import cache_locations
@@ -306,11 +306,11 @@ class Catalog:
         p=Path(path);pure=True
         for regex,hint,pattern in candidates:
             if not regex.fullmatch(path): continue
-            if hint.get('inside') or hint.get('notInside') or hint.get('near'):pure=False
-            if hint.get('inside') and not self.exists(p,hint['inside']):continue
-            if hint.get('notInside') and self.exists(p,hint['notInside']):continue
-            # `near` markers may sit in up to four ancestors.
-            if hint.get('near') and not any(self.exists(a,hint['near']) for a in list(p.parents)[:4]):continue
+            if hint.get('onlyIfContains') or hint.get('unlessContains') or hint.get('onlyIfAncestorContains'):pure=False
+            if hint.get('onlyIfContains') and not self.exists(p,hint['onlyIfContains']):continue
+            if hint.get('unlessContains') and self.exists(p,hint['unlessContains']):continue
+            # Ancestor markers may sit in up to four ancestors.
+            if hint.get('onlyIfAncestorContains') and not any(self.exists(a,hint['onlyIfAncestorContains']) for a in list(p.parents)[:4]):continue
             if pure:self.pure[path]=self.record_index[(hint['id'],pattern)]
             return hint,pattern
         if pure:self.pure[path]=NO_MATCH
@@ -505,7 +505,7 @@ class Scanner:
         match=match or self.catalog.match(node.path)
         if match:
             hint,pattern=match
-            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,hint['group'],hint['label'],hint['id'],hint['tier'],hint.get('comesBack','gone'),hint.get('rule',{}),hint.get('smartRule',''),hint.get('listOnly',False),matched_pattern=pattern)
+            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,hint['group'],hint['label'],hint['id'],hint['tier'],hint['comesBack'],hint.get('rule',{}),hint.get('ruleSummary',''),hint.get('reviewOnly',False),matched_pattern=pattern)
         else:
             name=Path(node.path).name.lower()
             if not node.directory:
@@ -519,10 +519,10 @@ class Scanner:
         if self.now-node.newest<300:f.holds.append('Changed or created within the last 5 minutes')
         if self.is_open(node.path):f.holds.append('File open or process working in this folder')
         running=[]
-        for proc in f.rule.get('processes',[]):
+        for proc in f.rule.get('notWhileRunning',[]):
             if any(Path(p).name==proc.casefold() or p.endswith('/'+proc.casefold()) for p in self.processes):running.append(proc)
         if running:f.holds.append('Running: '+', '.join(running))
-        project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('projectUntouchedDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
+        project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('minProjectIdleDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
         if project:
             f.project_idle_hours=self.project_age(project)
             # Safety extension: agent or
@@ -546,7 +546,7 @@ class Scanner:
             if f.identity['type']==stat.S_IFLNK:f.holds.append('Symlink itself is never a cleanup target')
         except OSError:f.holds.append('File identity unavailable')
         # Show the rule thresholds, separate from mode choices.
-        f.thresholds={'untouchedDays':f.rule.get('untouchedDays'),'projectUntouchedDays':f.rule.get('projectUntouchedDays')}
+        f.thresholds={'minIdleDays':f.rule.get('minIdleDays'),'minProjectIdleDays':f.rule.get('minProjectIdleDays')}
         return f
 
     def run(self):
@@ -599,7 +599,7 @@ class Scanner:
             n=self.nodes[path]
             if n.size<self.min_bytes and not n.reason:return
             match=self.catalog.match(path) or inherited
-            descend_review=bool(match and (match[0].get('listOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash'))
+            descend_review=bool(match and (match[0].get('reviewOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash'))
             split=bool(not descend_review and generic_container(match) and below.get(path,set())-{match[0]['id']})
             if (match and not descend_review and not split) or not n.children or n.reason:
                 self.findings.append(self.classify(n,match));return

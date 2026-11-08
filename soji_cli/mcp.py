@@ -69,13 +69,13 @@ class MCPServer:
     def call(self,name,args):
         if name not in SCHEMAS:raise ValueError('Unknown tool')
         validate(args,SCHEMAS[name])
-        if name=='index_summary':
+        if name=='disk_summary':
             return {'indexedBytes':self.report.get('allocatedBytes',0),'unreadable':self.report.get('unreadable',0),'largest':self.indexed(limit=args.get('limit',30)) or sorted(self.findings,key=lambda f:f['size'],reverse=True)[:args.get('limit',30)],'growing':self.report.get('growth',[])}
-        if name in ('largest','list'):
+        if name in ('largest_items','list_folder'):
             path=self.path(args['path']);items=[f for f in self.findings if inside(f['path'],path) and f['path']!=path]
-            indexed=self.indexed(path,direct=name=='list',limit=args.get('limit',200))
+            indexed=self.indexed(path,direct=name=='list_folder',limit=args.get('limit',200))
             if indexed:return indexed
-            if name=='list':
+            if name=='list_folder':
                 children=[]
                 try:
                     for p in Path(path).iterdir():
@@ -85,14 +85,14 @@ class MCPServer:
                 except OSError:pass
                 return children[:1000]
             return sorted(items,key=lambda f:f['size'],reverse=True)[:args.get('limit',20)]
-        if name=='file_info':
+        if name=='path_info':
             path=self.path(args['path']);p=Path(path);s=p.stat()
             return {'path':path,'allocatedBytes':s.st_blocks*512,'modified':s.st_mtime,'created':getattr(s,'st_birthtime',None),'kind':'folder' if p.is_dir() else 'file','finding':next((f for f in self.findings if f['path']==path),None),'git':self.git.inspect(path)}
         if name=='git_status':return self.git.inspect(self.path(args['path']))
         if name=='open_files':
             path=self.path(args['path']);code,out,err=command(['/usr/sbin/lsof','-nP','-w','+D',path,'-F','pcn'],timeout=5)
             return {'records':out.splitlines()[:2000],'verified':code in (0,1),'error':err if code not in (0,1) else None}
-        if name in ('processes','process_info'):
+        if name in ('top_processes','process_info'):
             argv=['/bin/ps','-axo','pid=,ppid=,uid=,%cpu=,%mem=,rss=,etime=,command=']
             if name=='process_info':argv=['/bin/ps','-p',str(args['pid']),'-o','pid=,ppid=,uid=,%cpu=,%mem=,rss=,etime=,command=']
             code,out,err=command(argv)

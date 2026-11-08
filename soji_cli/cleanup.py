@@ -215,7 +215,7 @@ class Cleaner:
             # Marker listings are mutable filesystem facts, not catalog rules.
             scan.catalog.markers_cache.clear();scan.catalog.match_cache.clear()
         measure_root=path
-        if item.get('finding',{}).get('rule',{}).get('projectUntouchedDays'):
+        if item.get('finding',{}).get('rule',{}).get('minProjectIdleDays'):
             measure_root=scan.project_for(path) or path
         elif item.get('finding',{}).get('rule',{}).get('keepNewest'):
             # Retention ranks against siblings: measure the whole version family,

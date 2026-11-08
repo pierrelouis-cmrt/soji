@@ -90,7 +90,7 @@
    "Active version: ~/.nvm/alias/default"
   ],
   "modeHolds": {
-   "careful": "Retained newest version in all group"
+   "careful": "Retained newest version per folder"
   },
   "path": "~/.nvm/versions/node/v20.1.0",
   "rank": 1
@@ -98,16 +98,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Retained newest version in all group",
+   "decision": "Retained newest version per folder",
    "selected": false
   },
   "balanced": {
-   "decision": "Retained newest version in all group",
+   "decision": "Retained newest version per folder",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version in all group",
+   "decision": "Retained newest version per folder",
    "selected": false
   },
   "early": null,
@@ -115,9 +115,9 @@
   "hint": "nvm-versions",
   "holds": [],
   "modeHolds": {
-   "aggressive": "Retained newest version in all group",
-   "balanced": "Retained newest version in all group",
-   "careful": "Retained newest version in all group"
+   "aggressive": "Retained newest version per folder",
+   "balanced": "Retained newest version per folder",
+   "careful": "Retained newest version per folder"
   },
   "path": "~/.nvm/versions/node/v22.3.0",
   "rank": 0
@@ -419,7 +419,7 @@
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "early": null,
@@ -427,7 +427,7 @@
   "hint": "playwright-browsers",
   "holds": [],
   "modeHolds": {
-   "careful": "Retained newest version in product group"
+   "careful": "Retained newest version per product"
   },
   "path": "~/Library/Caches/ms-playwright/chromium-1100",
   "rank": 1
@@ -435,16 +435,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "balanced": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "early": null,
@@ -452,9 +452,9 @@
   "hint": "playwright-browsers",
   "holds": [],
   "modeHolds": {
-   "aggressive": "Retained newest version in product group",
-   "balanced": "Retained newest version in product group",
-   "careful": "Retained newest version in product group"
+   "aggressive": "Retained newest version per product",
+   "balanced": "Retained newest version per product",
+   "careful": "Retained newest version per product"
   },
   "path": "~/Library/Caches/ms-playwright/chromium-1200",
   "rank": 0
@@ -462,16 +462,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "balanced": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version in product group",
+   "decision": "Retained newest version per product",
    "selected": false
   },
   "early": null,
@@ -479,9 +479,9 @@
   "hint": "playwright-browsers",
   "holds": [],
   "modeHolds": {
-   "aggressive": "Retained newest version in product group",
-   "balanced": "Retained newest version in product group",
-   "careful": "Retained newest version in product group"
+   "aggressive": "Retained newest version per product",
+   "balanced": "Retained newest version per product",
+   "careful": "Retained newest version per product"
   },
   "path": "~/Library/Caches/ms-playwright/firefox-1400",
   "rank": 0
@@ -694,8 +694,8 @@
    "Connected-device build state unavailable"
   ],
   "modeHolds": {
-   "balanced": "Retained newest version in device group",
-   "careful": "Retained newest version in device group"
+   "balanced": "Retained newest version per device",
+   "careful": "Retained newest version per device"
   },
   "path": "~/Library/Developer/Xcode/iOS DeviceSupport/iPhone15,2 17.0 (21A329)",
   "rank": 1
@@ -722,9 +722,9 @@
    "Connected-device build state unavailable"
   ],
   "modeHolds": {
-   "aggressive": "Retained newest version in device group",
-   "balanced": "Retained newest version in device group",
-   "careful": "Retained newest version in device group"
+   "aggressive": "Retained newest version per device",
+   "balanced": "Retained newest version per device",
+   "careful": "Retained newest version per device"
   },
   "path": "~/Library/Developer/Xcode/iOS DeviceSupport/iPhone15,2 18.0 (22A3354)",
   "rank": 0

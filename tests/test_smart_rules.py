@@ -39,7 +39,7 @@ class SmartRuleCases(unittest.TestCase):
     def test_highest_version_kept_even_when_touched_earlier(self):
         # Seen in a real run: chromium-1248 older mtime than chromium-1234.
         high=self.node('chromium-1248',100);low=self.node('chromium-1234',200)
-        rule={'keepNewest':1,'keepBy':'product'}
+        rule={'keepNewest':1,'keepNewestPer':'product'}
         retained,rank,_,version_rank=self.rules.retained(self.finding(high,rule))
         self.assertEqual((retained,rank,version_rank),(True,1,0))
         for mode in ('careful','balanced','aggressive'):
@@ -47,7 +47,7 @@ class SmartRuleCases(unittest.TestCase):
             self.assertIn(mode,self.rules.evaluate(self.finding(low,rule)).mode_holds)
     def test_version_rank_never_releases_timestamp_newest(self):
         old=self.node('tool-2.0',100);self.node('tool-10.0',50);self.node('tool-1.0',300)
-        f=self.rules.evaluate(self.finding(old,{'keepNewest':1,'keepBy':'product'}))
+        f=self.rules.evaluate(self.finding(old,{'keepNewest':1,'keepNewestPer':'product'}))
         self.assertNotIn('balanced',f.mode_holds)
         self.assertEqual(next(e for e in f.evidence if e['check']=='retention')['versionRank'],1)
     def test_equal_timestamps_share_rank(self):
@@ -62,8 +62,8 @@ class SmartRuleCases(unittest.TestCase):
     def test_product_and_major_tokenization(self):
         g=self.rules.grouping
         self.assertEqual(g('/x/Android Studio_2026.1','product'),'android-studio')
-        self.assertEqual(g('/y/Android-Studio-v2026.2','major'),'android-studio@2026')
-        self.assertEqual(g('/x/35.0.0','major'),'@35')
+        self.assertEqual(g('/y/Android-Studio-v2026.2','majorVersion'),'android-studio@2026')
+        self.assertEqual(g('/x/35.0.0','majorVersion'),'@35')
         self.assertEqual(g('/x/Chrome120','product'),'chrome120')
     def test_retention_counts_change_per_mode(self):
         self.assertEqual([retention_count(2,m) for m in ('careful','balanced','aggressive')],[3,2,1])
@@ -75,10 +75,10 @@ class SmartRuleCases(unittest.TestCase):
         self.assertNotIn('balanced',f.mode_holds)
         self.assertNotIn('aggressive',f.mode_holds)
     def test_rule_age_clocks_have_different_scaling_and_day_floor(self):
-        r={'untouchedDays':14,'projectUntouchedDays':8}
-        self.assertEqual(rule_threshold_days(r,'careful'),{'untouchedDays':28,'projectUntouchedDays':32})
-        self.assertEqual(rule_threshold_days(r,'aggressive'),{'untouchedDays':7,'projectUntouchedDays':2})
-        self.assertEqual(rule_threshold_days({'untouchedDays':.1},'aggressive'),{'untouchedDays':1})
+        r={'minIdleDays':14,'minProjectIdleDays':8}
+        self.assertEqual(rule_threshold_days(r,'careful'),{'minIdleDays':28,'minProjectIdleDays':32})
+        self.assertEqual(rule_threshold_days(r,'aggressive'),{'minIdleDays':7,'minProjectIdleDays':2})
+        self.assertEqual(rule_threshold_days({'minIdleDays':.1},'aggressive'),{'minIdleDays':1})
         self.assertEqual(rule_threshold_days({},'balanced'),{})
     def test_pin_matching_is_literal_not_semver_range(self):
         self.assertTrue(version_match('NODE-v22.1.0','22'))
@@ -124,7 +124,7 @@ class SmartRuleCases(unittest.TestCase):
         self.plist('app.xcarchive/Info.plist',{'ApplicationProperties':{
             'CFBundleIdentifier':'Example.App','ApplicationPath':'Applications/App.app'}})
         self.plist('app.xcarchive/Products/Applications/App.app/Info.plist',{'DTPlatformName':'iPhoneOS'})
-        self.assertEqual(self.rules.grouping(str(archive),'bundle'),'id:example.app|iphoneos')
+        self.assertEqual(self.rules.grouping(str(archive),'app'),'id:example.app|iphoneos')
     def test_upload_success_task_and_destination_identity(self):
         rows=[{'task':'Upload','uploadEvent':{'state':'SUCCESS'},'uploadDestination':'Apple'},
               {'task':'validate','uploadEvent':{'state':'success'},'destination':'Apple'},
@@ -139,8 +139,8 @@ class SmartRuleCases(unittest.TestCase):
                 'ApplicationProperties':{'CFBundleIdentifier':'EXAMPLE.App'},
                 'Distributions':[{'task':'upload','uploadEvent':{'state':'success'},'destination':destination}]})
         self.assertTrue(self.rules.newest_uploaded(old,[old,new]))
-        self.assertEqual(self.rules.retained(self.finding(old,{'keepNewest':1,'keepBy':'bundle'}))[1],1)
-        self.assertEqual(self.rules.grouping(old,'bundle'),'id:example.app|')
+        self.assertEqual(self.rules.retained(self.finding(old,{'keepNewest':1,'keepNewestPer':'app'}))[1],1)
+        self.assertEqual(self.rules.grouping(old,'app'),'id:example.app|')
         self.rules.archive_cache[new]=(self.rules.archive(new)[0],{'apple|upload'},self.rules.archive(new)[2])
         self.assertFalse(self.rules.newest_uploaded(old,[old,new]))
 

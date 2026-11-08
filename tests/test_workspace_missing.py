@@ -24,10 +24,10 @@ DAY = 86400
 
 class NeverCostly(unittest.TestCase):
     def test_workspace_missing_hints_are_never_costly(self):
-        """Every workspaceMissing hint is regenerable, never costly."""
+        """Every checkWorkspaceExists hint is regenerable, never costly."""
         import json
         from soji_cli.engine import DATA
-        hints = [h for h in json.loads((DATA / 'hints.json').read_text()) if (h.get('rule') or {}).get('workspaceMissing')]
+        hints = [h for h in json.loads((DATA / 'hints.json').read_text()) if (h.get('rule') or {}).get('checkWorkspaceExists')]
         self.assertTrue(hints)
         self.assertEqual({h['tier'] for h in hints}, {'regenerable'})
 

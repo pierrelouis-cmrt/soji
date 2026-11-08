@@ -39,7 +39,7 @@ for protected in ['index.sqlite','index.sqlite-wal','report.json','sandbox.sb']:
  except PermissionError:pass
 cfg=json.loads((run/'soji-mcp.json').read_text())['mcpServers']['soji']
 p=subprocess.Popen([cfg['command'],*cfg['args']],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=dict(os.environ,**cfg['env']))
-for i,(method,params) in enumerate([('initialize',{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'fixture','version':'1'}}),('tools/call',{'name':'index_summary','arguments':{}}),('tools/call',{'name':'submit_findings','arguments':{'findings':[]}})],1):
+for i,(method,params) in enumerate([('initialize',{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'fixture','version':'1'}}),('tools/call',{'name':'disk_summary','arguments':{}}),('tools/call',{'name':'submit_findings','arguments':{'findings':[]}})],1):
  p.stdin.write(json.dumps({'jsonrpc':'2.0','id':i,'method':method,'params':params})+'\\n');p.stdin.flush()
  response=json.loads(p.stdout.readline())
  assert 'error' not in response,response

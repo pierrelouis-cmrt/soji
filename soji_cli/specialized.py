@@ -1,5 +1,6 @@
-"""Executable interpretations of every SmartRule field in the hint catalog.
-Evidence entries make each interpretation inspectable.
+"""Executable interpretations of every `rule` field in the hint catalog.
+Evidence entries make each interpretation inspectable. data/README.md
+documents the fields.
 """
 from __future__ import annotations
 import collections
@@ -12,7 +13,9 @@ import re
 import tempfile
 from .util import read_plist,read_json,json_command,command,inside
 
-FIELDS={'untouchedDays','keepNewest','keepBy','keepActive','appNotRunning','appNotInstalled','processes','projectUntouchedDays','minBytes','notApple','keepPinned','newestAfterDays','simulatorDevice','early','workspaceMissing','deviceBuild','knownApp'}
+FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel'}
+# How `keepNewestPer` reads in a hold.
+KEEP_PER_TEXT={'app':'app','device':'device','product':'product','majorVersion':'major version','folder':'folder'}
 
 def version_key(name):
     return tuple((0,int(t)) if t.isdigit() else (1,t.casefold()) for t in re.findall(r'\d+|[^\d]+',str(name)))
@@ -46,7 +49,7 @@ def retention_count(count,mode):
     return count+1 if mode=='careful' else max(1,count-1) if mode=='aggressive' else count
 
 def rule_threshold_days(rule,mode):
-    """SmartRules age gates, not CleanupLevel.forIdle.
+    """Rule age gates (minIdleDays, minProjectIdleDays), not CleanupLevel.forIdle.
 
     Consumers must evaluate both clocks. None means the rule has no such gate.
     Early outcomes (workspace missing, superseded device build, simulator) need
@@ -54,7 +57,7 @@ def rule_threshold_days(rule,mode):
     """
     scale={'careful':(2,4),'balanced':(1,1),'aggressive':(.5,.25)}[mode]
     result={}
-    for key,factor in zip(('untouchedDays','projectUntouchedDays'),scale):
+    for key,factor in zip(('minIdleDays','minProjectIdleDays'),scale):
         value=rule.get(key)
         if value is not None:
             days=value*factor
@@ -285,7 +288,7 @@ class SpecializedRules:
     @devices.setter
     def devices(self,value):self._devices=value
     def active(self,path,markers):
-        # Literal marker paths: the executable does not glob keepActive.
+        # Literal marker paths: keepVersionPointedToBy is never globbed.
         name=Path(path).name
         for marker in markers:
             expanded=marker.replace('~',str(self.home),1) if marker.startswith('~') else marker
@@ -319,22 +322,22 @@ class SpecializedRules:
     def grouping(self,path,by):
         # groupKey receives the leaf name, not a plist or its parent path.
         name=Path(path).name
-        if by=='bundle':return self.archive(path)[0]
+        if by=='app':return self.archive(path)[0]
         if by=='device':
             first=name.split(' ')[0]
             return first if ',' in first else ''
-        if by in ('product','major'):
+        if by in ('product','majorVersion'):
             prefix,version=split_version(name)
             product='-'.join(prefix).lower()
-            return product+'@'+version.lstrip('v').split('.')[0] if by=='major' and version else product
+            return product+'@'+version.lstrip('v').split('.')[0] if by=='majorVersion' and version else product
         return ''
     def retained(self,f):
-        by=f.rule.get('keepBy','all');group=self.grouping(f.path,by)
+        by=f.rule.get('keepNewestPer','folder');group=self.grouping(f.path,by)
         siblings=[p for p in self.siblings[f.hint_id] if self.grouping(p,by)==group and
-                  (by=='bundle' or Path(p).parent==Path(f.path).parent) and
+                  (by=='app' or Path(p).parent==Path(f.path).parent) and
                   self.scanner.nodes[p].reason!='Symlink; not followed']
         def stamp(p):
-            if by=='bundle':return self.archive(p)[2]
+            if by=='app':return self.archive(p)[2]
             # Newest change in the subtree.
             return self.scanner.nodes[p].newest
         target=stamp(f.path)
@@ -345,7 +348,7 @@ class SpecializedRules:
         # never removed because an older one was touched later. Bundle groups
         # (archives) have no version label. None = no comparable version.
         version_rank=None
-        mine=version_number(f.path) if by!='bundle' else None
+        mine=version_number(f.path) if by!='app' else None
         if mine is not None:
             version_rank=sum(v is not None and v>mine for v in (version_number(p) for p in siblings if p!=f.path))
         return min(rank,version_rank if version_rank is not None else rank)<int(f.rule.get('keepNewest',0)),rank,siblings,version_rank
@@ -362,39 +365,39 @@ class SpecializedRules:
         if hint and hint.get('cleanCommand'):f.action={'kind':'official-command','hint':f.hint_id,'argv':hint['cleanCommand']}
         r=f.rule;f.mode_holds={};f.special_min_hours=0
         thresholds={mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')}
-        f.rule_min_hours={mode:v['untouchedDays']*24 for mode,v in thresholds.items() if 'untouchedDays' in v}
-        f.rule_project_min_hours={mode:v['projectUntouchedDays']*24 for mode,v in thresholds.items() if 'projectUntouchedDays' in v}
+        f.rule_min_hours={mode:v['minIdleDays']*24 for mode,v in thresholds.items() if 'minIdleDays' in v}
+        f.rule_project_min_hours={mode:v['minProjectIdleDays']*24 for mode,v in thresholds.items() if 'minProjectIdleDays' in v}
         f.rule_early_reason=None;f.rule_level=None
         unknown=set(r)-FIELDS
         if unknown:f.holds.append('Unknown rule fields: '+', '.join(sorted(unknown)))
         owners=self.apps.owner(f.path)
         f.evidence.append({'check':'owner','apps':owners,'basis':'installed bundle metadata / path attribution'})
-        if r.get('knownApp') and not owners:f.holds.append('Owning application is unknown')
-        if r.get('notApple'):
+        if r.get('onlyIfOwnerInstalled') and not owners:f.holds.append('Owning application is unknown')
+        if r.get('notIfAppleOwned'):
             apple=any(a['bundle'].startswith('com.apple.') for a in owners) or any(p.startswith('com.apple.') or p.startswith('group.com.apple.') for p in Path(f.path).parts)
             if apple:f.holds.append('Apple-owned container excluded by rule')
-        if r.get('appNotInstalled') and owners:f.holds.append('Owning application is installed')
-        if r.get('appNotRunning'):
+        if r.get('onlyIfOwnerNotInstalled') and owners:f.holds.append('Owning application is installed')
+        if r.get('notWhileOwnerRuns'):
             if any(self.apps.is_running(a) for a in owners):f.holds.append('Owning application is running')
-            elif not owners and not r.get('processes'):f.holds.append('Cannot confirm application ownership or running state')
-        if r.get('minBytes',0)>f.size:f.holds.append('Below hint minimum size')
-        active=self.active(f.path,r.get('keepActive',[]))
+            elif not owners and not r.get('notWhileRunning'):f.holds.append('Cannot confirm application ownership or running state')
+        if r.get('minSizeBytes',0)>f.size:f.holds.append('Below hint minimum size')
+        active=self.active(f.path,r.get('keepVersionPointedToBy',[]))
         if active:f.holds.append('Active version: '+active)
-        if r.get('keepPinned') and self.pins.keeps(f.path,r['keepPinned']):f.holds.append('Version pinned by a project')
+        if r.get('keepProjectPinnedVersions') and self.pins.keeps(f.path,r['keepProjectPinnedVersions']):f.holds.append('Version pinned by a project')
         if r.get('keepNewest'):
             retained,rank,siblings,version_rank=self.retained(f)
             counts={mode:retention_count(r['keepNewest'],mode) for mode in ('careful','balanced','aggressive')}
-            f.evidence.append({'check':'retention','keepBy':r.get('keepBy'),'rank':rank,'versionRank':version_rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'kept if among the newest by timestamp or by version label'})
+            f.evidence.append({'check':'retention','keepNewestPer':r.get('keepNewestPer'),'rank':rank,'versionRank':version_rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'kept if among the newest by timestamp or by version label'})
             held=min(rank,version_rank) if version_rank is not None else rank
             for mode,count in counts.items():
                 if held<count:
-                    if mode=='aggressive' and r.get('newestAfterDays') is not None:
-                        if (self.scanner.now-f.newest)/86400>=r['newestAfterDays']:continue
-                    f.mode_holds[mode]='Retained newest version in '+r.get('keepBy','all')+' group'
-            if r.get('keepBy')=='bundle' and self.newest_uploaded(f.path,siblings):
+                    if mode=='aggressive' and r.get('newestGoesAtAggressiveAfterDays') is not None:
+                        if (self.scanner.now-f.newest)/86400>=r['newestGoesAtAggressiveAfterDays']:continue
+                    f.mode_holds[mode]='Retained newest version per '+KEEP_PER_TEXT[r.get('keepNewestPer','folder')]
+            if r.get('keepNewestPer')=='app' and self.newest_uploaded(f.path,siblings):
                 f.holds.append('Newest uploaded archive retained')
-        f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'SmartRules age thresholds per mode'})
-        if r.get('workspaceMissing'):
+        f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'rule age thresholds per mode'})
+        if r.get('checkWorkspaceExists'):
             missing=workspace_missing(f.path)
             if missing:
                 # Early outcome: level Careful, earlier holds kept, rank/age
@@ -402,7 +405,7 @@ class SpecializedRules:
                 f.rule_early_reason='workspaceMissing';f.rule_level='careful'
                 f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
             f.evidence.append({'check':'workspaceMissing','missing':missing,'basis':'literal WorkspacePath existence; absent/unreadable metadata is missing'})
-        if r.get('deviceBuild'):
+        if r.get('checkDeviceBuilds'):
             if not self.connected_checked:self.connected_known=self.devices.connected();self.connected_checked=True
             build_match=re.search(r'\(([A-Za-z0-9]+)\)',Path(f.path).name)
             build=build_match.group(1) if build_match else None
@@ -421,7 +424,7 @@ class SpecializedRules:
                 f.rule_early_reason='newerBuild';f.rule_level='careful'
                 f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
             f.evidence.append({'check':'deviceBuild','newerBuild':newer,'basis':'DeviceSupportFolder.newerBuild: same device and version, prepared sibling, BuildNumber train or creation time'})
-        if r.get('simulatorDevice'):
+        if r.get('checkSimulatorDevice'):
             device=self.devices.devices.get(Path(f.path).name)
             if not self.devices.available:f.holds.append('Simulator state unavailable')
             elif device and device.get('state')!='Shutdown':f.holds.append('Simulator is not shut down')
@@ -449,7 +452,7 @@ class SpecializedRules:
             else:
                 # Orphan folders have no valid simctl identity: do not fabricate one.
                 f.evidence.append({'check':'simulatorDevice','status':'absent from simctl; filesystem orphan'})
-        if self.activity.errors and (r.get('projectUntouchedDays') or f.group in ('Agent worktrees','Agent and editor history')):f.holds.append('Activity source verification incomplete')
+        if self.activity.errors and (r.get('minProjectIdleDays') or f.group in ('Agent worktrees','Agent and editor history')):f.holds.append('Activity source verification incomplete')
         activity=self.activity.last(f.path)
         if activity:
             f.last_activity=activity.at
@@ -460,6 +463,6 @@ class SpecializedRules:
         if f.group=='Agent worktrees':
             state=next((e['state'] for e in f.evidence if e.get('check')=='git'),{})
             if state.get('verified') and state.get('mainWorktree') and not state.get('reason'):f.action={'kind':'git-worktree','repository':state['mainWorktree'],'path':f.path}
-        if r.get('early') and f.group=='Agent worktrees' and not f.holds:
-            f.special_min_hours=max(1,r.get('untouchedDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; idle rule'}
+        if r.get('sameIdleAtEveryLevel') and f.group=='Agent worktrees' and not f.holds:
+            f.special_min_hours=max(1,r.get('minIdleDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; idle rule'}
         return f

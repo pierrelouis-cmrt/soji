@@ -85,10 +85,10 @@ class SpecializedTests(Fixture):
     def test_app_ownership_running_and_apple(self):
         p=self.file('Library/Caches/co.example.Test/item');s=self.scan()
         apps=AppCatalog(str(self.home));apps.apps=[{'path':'/Applications/Test.app','bundle':'co.example.Test','name':'Test','version':'1'}];apps.running=[{'bundleID':'co.example.Test'}]
-        f=self.finding(s,p.parent);f.rule={'appNotRunning':True,'knownApp':True};sp=self.special(s,apps=apps);sp.evaluate(f)
+        f=self.finding(s,p.parent);f.rule={'notWhileOwnerRuns':True,'onlyIfOwnerInstalled':True};sp=self.special(s,apps=apps);sp.evaluate(f)
         self.assertTrue(any('application is running' in h for h in f.holds))
-        f=self.finding(s,p.parent);f.rule={'appNotInstalled':True};sp.evaluate(f);self.assertIn('Owning application is installed',f.holds)
-        f=self.finding(s,p.parent);f.path=str(self.home/'Library/Containers/com.apple.Example/Data/Library/Caches');f.rule={'notApple':True};sp.evaluate(f);self.assertTrue(any('Apple-owned' in h for h in f.holds))
+        f=self.finding(s,p.parent);f.rule={'onlyIfOwnerNotInstalled':True};sp.evaluate(f);self.assertIn('Owning application is installed',f.holds)
+        f=self.finding(s,p.parent);f.path=str(self.home/'Library/Containers/com.apple.Example/Data/Library/Caches');f.rule={'notIfAppleOwned':True};sp.evaluate(f);self.assertTrue(any('Apple-owned' in h for h in f.holds))
     def test_missing_workspace_early(self):
         import plistlib
         p=self.file('Library/Developer/Xcode/DerivedData/Old/info.plist',binary=plistlib.dumps({'WorkspacePath':str(self.home/'gone.xcodeproj')}))
@@ -98,7 +98,7 @@ class SpecializedTests(Fixture):
         devices=DeviceCatalog(str(self.home),{'devices':{'runtime':[{'udid':'ABC','state':'Booted'}]},'runtimes':[]}).build()
         f=self.finding(s,p.parents[1]);self.special(s,devices).evaluate(f);self.assertIn('Simulator is not shut down',f.holds)
     def test_retention_age_and_minimum(self):
-        self.file('.cache/sample/a');s=self.scan();f=s.findings[0];f.rule={'untouchedDays':14,'minBytes':10**12}
+        self.file('.cache/sample/a');s=self.scan();f=s.findings[0];f.rule={'minIdleDays':14,'minSizeBytes':10**12}
         self.special(s).evaluate(f);self.assertEqual(f.rule_min_hours['balanced'],336);self.assertIn('Below hint minimum size',f.holds)
 
 class IndexTests(Fixture):
@@ -136,16 +136,16 @@ class MCPTests(Fixture):
         self.file('hidden/private');(self.home/'alias').symlink_to(self.home/'hidden',target_is_directory=True)
         s=self.server()
         for path in [str(self.home/'hidden'),str(self.home/'alias'),str(self.base)]:
-            with self.assertRaises(ValueError):s.call('file_info',{'path':path})
+            with self.assertRaises(ValueError):s.call('path_info',{'path':path})
     def test_invalid_output_rejected(self):
         with self.assertRaises(ValueError):validate({'findings':[{'path':'/a','confidence':2}]},SCHEMAS['submit_findings'])
-        with self.assertRaises(ValueError):self.server().call('index_summary',{'unexpected':True})
+        with self.assertRaises(ValueError):self.server().call('disk_summary',{'unexpected':True})
     def test_submission_once(self):
         s=self.server();s.call('submit_findings',{'findings':[]});self.assertTrue((self.state/'submission.json').exists())
         with self.assertRaises(ValueError):s.call('submit_findings',{'findings':[]})
     def test_snapshot_query_uses_aggregates(self):
         scan=self.scan();store=IndexStore(self.state/'index.sqlite');store.save(scan,1,'x');store.close()
-        s=self.server();s.database=str(self.state/'index.sqlite');self.assertTrue(s.call('index_summary',{})['largest'])
+        s=self.server();s.database=str(self.state/'index.sqlite');self.assertTrue(s.call('disk_summary',{})['largest'])
 
 class CleanupTests(Fixture):
     def setup_plan(self):

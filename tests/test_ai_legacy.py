@@ -124,7 +124,7 @@ class LaunchTests(unittest.TestCase):
                 with patch.object(ai,'detect',return_value='/fixture/fake-agent'):
                     run, argv, env = ai.prepare(self.scanner(Path(d)))
                 config = json.loads((run/'soji-mcp.json').read_text())['mcpServers']['soji']
-                for key, value in preset.get('mcpServerExtra',{}).items():
+                for key, value in preset.get('mcpServerFields',{}).items():
                     self.assertEqual(config[key], value)
                 if preset['id']=='codex':
                     self.assertIn('default_tools_approval_mode="approve"', argv[argv.index('-c')+1])

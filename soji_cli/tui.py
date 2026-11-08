@@ -616,7 +616,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         "3 Aggressive — unused recoverable items.",
                         "",
                         "All modes respect holds, retained versions, activity, and identity.",
-                        "375 hints; SmartRules and an incremental index.",
+                        "375 hints with their rules, and an incremental index.",
                         "",
                         "CLEANING",
                         "Space: mark or unmark a READY row.",

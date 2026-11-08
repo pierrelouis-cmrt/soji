@@ -74,10 +74,10 @@ class DecisionTests(unittest.TestCase):
             f=self.f(days);result=[f.decide(m,1000000000)[0] for m in ['careful','balanced','aggressive']]
             self.assertEqual(result,sorted(result))
     def test_smart_rule(self):
-        f=self.f(10,rule={'untouchedDays':14})
+        f=self.f(10,rule={'minIdleDays':14})
         f.special_min_hours=14*24;self.assertFalse(f.decide('balanced',1000000000)[0]);f.newest-=7*86400;self.assertTrue(f.decide('balanced',1000000000)[0])
     def test_project_rule(self):
-        f=self.f(2,rule={'projectUntouchedDays':14},project_idle_hours=15*24)
+        f=self.f(2,rule={'minProjectIdleDays':14},project_idle_hours=15*24)
         self.assertTrue(f.decide('balanced',1000000000)[0]);f.holds.append('Project used within 14 days');self.assertFalse(f.decide('balanced',1000000000)[0])
     def test_holds_and_personal_data_never_auto_selected(self):
         for mode in ['careful','balanced','aggressive']:

@@ -1,162 +1,162 @@
 [
   {
-    "group": "Xcode build data",
+    "name": "Xcode build data",
     "whatItIs": "Compiled code, indexes and previews Xcode keeps for your projects.",
-    "whySafe": "Xcode makes it from your source code, which stays untouched.",
+    "isItSafe": "Xcode makes it from your source code, which stays untouched.",
     "howItComesBack": "Xcode rebuilds it on the next build; that build takes longer."
   },
   {
-    "group": "Device support files",
+    "name": "Device support files",
     "whatItIs": "Debug symbols Xcode copied from each iPhone, iPad, Apple Watch or Apple TV you connected.",
-    "whySafe": "They're copies of what's on the device.",
+    "isItSafe": "They're copies of what's on the device.",
     "howItComesBack": "Xcode copies them again the next time you connect that device."
   },
   {
-    "group": "Simulators and emulators",
+    "name": "Simulators and emulators",
     "whatItIs": "Simulated iPhones, iPads and Android phones, and the system images they run.",
-    "whySafe": "Xcode and Android Studio can create or download them again. Apps and data inside a device go with it.",
+    "isItSafe": "Xcode and Android Studio can create or download them again. Apps and data inside a device go with it.",
     "howItComesBack": "Create the device again, or download the runtime in Xcode or Android Studio."
   },
   {
-    "group": "Project dependencies",
+    "name": "Project dependencies",
     "whatItIs": "Libraries your projects downloaded: node_modules, Pods, Python environments and the like.",
-    "whySafe": "Each project lists what it needs, so nothing of yours is lost.",
+    "isItSafe": "Each project lists what it needs, so nothing of yours is lost.",
     "howItComesBack": "Your package manager installs them again (npm install, pod install, pip install…)."
   },
   {
-    "group": "Build output",
+    "name": "Build output",
     "whatItIs": "Compiled files and build caches inside your projects.",
-    "whySafe": "They're made from your source code, which stays untouched.",
+    "isItSafe": "They're made from your source code, which stays untouched.",
     "howItComesBack": "Made again on your next build."
   },
   {
-    "group": "Package caches",
+    "name": "Package caches",
     "whatItIs": "Packages and downloads that package managers and build tools keep so they don't fetch them twice.",
-    "whySafe": "They're copies of what's online; your projects say what they need.",
+    "isItSafe": "They're copies of what's online; your projects say what they need.",
     "howItComesBack": "Downloaded again the next time a build or install needs them."
   },
   {
-    "group": "Toolchains and SDKs",
+    "name": "Toolchains and SDKs",
     "whatItIs": "Installed versions of languages, SDKs and developer tools, and the browsers test tools download.",
-    "whySafe": "Each can be installed again with the tool that put it there. A project may still need one, so Sōji never ticks them.",
+    "isItSafe": "Each can be installed again with the tool that put it there. A project may still need one, so Sōji never ticks them.",
     "howItComesBack": "Reinstall it with its version manager or SDK manager when a project needs it."
   },
   {
-    "group": "Developer tool caches",
+    "name": "Developer tool caches",
     "whatItIs": "Caches and indexes that editors, IDEs and coding tools keep to start faster.",
-    "whySafe": "The tools rebuild them; your projects and settings stay.",
+    "isItSafe": "The tools rebuild them; your projects and settings stay.",
     "howItComesBack": "Rebuilt the next time the tool opens a project."
   },
   {
-    "group": "Editor extensions",
+    "name": "Editor extensions",
     "whatItIs": "Extension folders of VS Code, Cursor and Windsurf, including versions an update left behind.",
-    "whySafe": "An extension you still use goes with its folder, so Sōji never ticks them. Old versions are safe to remove.",
+    "isItSafe": "An extension you still use goes with its folder, so Sōji never ticks them. Old versions are safe to remove.",
     "howItComesBack": "Install the extension again from the editor."
   },
   {
-    "group": "Virtual machines and containers",
+    "name": "Virtual machines and containers",
     "whatItIs": "Disks of virtual machines and container engines: Docker, OrbStack, UTM, Parallels and others.",
-    "whySafe": "A machine's files and settings go with it, so Sōji never ticks them. Remove machines you no longer use.",
+    "isItSafe": "A machine's files and settings go with it, so Sōji never ticks them. Remove machines you no longer use.",
     "howItComesBack": "Images download again; a removed machine has to be set up again."
   },
   {
-    "group": "AI models",
+    "name": "AI models",
     "whatItIs": "Machine learning models and datasets that AI tools and apps downloaded.",
-    "whySafe": "They're downloads; the tool fetches a model again when you use it.",
+    "isItSafe": "They're downloads; the tool fetches a model again when you use it.",
     "howItComesBack": "Downloaded again the next time you run that model."
   },
   {
-    "group": "App caches",
+    "name": "App caches",
     "whatItIs": "Files apps keep to load faster: web pages, thumbnails, artwork and updates waiting to install.",
-    "whySafe": "Apps rebuild their caches as needed; your documents and settings stay.",
+    "isItSafe": "Apps rebuild their caches as needed; your documents and settings stay.",
     "howItComesBack": "Rebuilt as you use the app, which may be a little slower at first."
   },
   {
-    "group": "Temporary files",
+    "name": "Temporary files",
     "whatItIs": "Files apps, builds and agents left in the temporary folders.",
-    "whySafe": "They're meant to be thrown away, and macOS clears them on its own.",
+    "isItSafe": "They're meant to be thrown away, and macOS clears them on its own.",
     "howItComesBack": "The app that made one makes it again if it needs it."
   },
   {
-    "group": "Logs and crash reports",
+    "name": "Logs and crash reports",
     "whatItIs": "Records apps write while they run, and reports from past crashes.",
-    "whySafe": "Nothing needs them to work; they're only for troubleshooting.",
+    "isItSafe": "Nothing needs them to work; they're only for troubleshooting.",
     "howItComesBack": "Apps write new ones as they run."
   },
   {
-    "group": "Render and preview files",
+    "name": "Render and preview files",
     "whatItIs": "Render, proxy and preview files that video, photo and audio apps make from your media.",
-    "whySafe": "They're made from your original media, which stays.",
+    "isItSafe": "They're made from your original media, which stays.",
     "howItComesBack": "The app makes them again when you open the project."
   },
   {
-    "group": "Sound libraries",
+    "name": "Sound libraries",
     "whatItIs": "Instruments, loops, samples and sound packs that music apps downloaded.",
-    "whySafe": "The app can download them again, so Sōji never ticks them.",
+    "isItSafe": "The app can download them again, so Sōji never ticks them.",
     "howItComesBack": "Download them again from the app's sound library."
   },
   {
-    "group": "Games",
+    "name": "Games",
     "whatItIs": "Games and mods that game launchers installed.",
-    "whySafe": "Their launcher can install them again, so Sōji never ticks them. Check your saves are backed up first.",
+    "isItSafe": "Their launcher can install them again, so Sōji never ticks them. Check your saves are backed up first.",
     "howItComesBack": "Install it again from your launcher's library."
   },
   {
-    "group": "Podcast and media downloads",
+    "name": "Podcast and media downloads",
     "whatItIs": "Episodes and media apps downloaded to play offline.",
-    "whySafe": "The app streams them, or downloads them again while they're still published.",
+    "isItSafe": "The app streams them, or downloads them again while they're still published.",
     "howItComesBack": "Download it again in the app. Episodes a show took down don't come back."
   },
   {
-    "group": "Downloads and installers",
+    "name": "Downloads and installers",
     "whatItIs": "Installers, disk images and archives you downloaded, and updates kept for later.",
-    "whySafe": "What they installed keeps working, and most can be downloaded again.",
+    "isItSafe": "What they installed keeps working, and most can be downloaded again.",
     "howItComesBack": "Download it again from where it came from."
   },
   {
-    "group": "Backups and archives",
+    "name": "Backups and archives",
     "whatItIs": "Backups of iPhones and iPads, and the archives Xcode makes for each app release.",
-    "whySafe": "A backup may be the only copy, so Sōji never ticks them. Remove ones you no longer need."
+    "isItSafe": "A backup may be the only copy, so Sōji never ticks them. Remove ones you no longer need."
   },
   {
-    "group": "Chat attachments",
+    "name": "Chat attachments",
     "whatItIs": "Photos, videos and files received in WhatsApp and Signal.",
-    "whySafe": "This may be the only copy, so Sōji never ticks them. Remove only what you've saved elsewhere."
+    "isItSafe": "This may be the only copy, so Sōji never ticks them. Remove only what you've saved elsewhere."
   },
   {
-    "group": "Large media files",
+    "name": "Large media files",
     "whatItIs": "Large videos, recordings and video projects in your folders.",
-    "whySafe": "They're your own files, so Sōji never ticks them. Remove only what you don't need."
+    "isItSafe": "They're your own files, so Sōji never ticks them. Remove only what you don't need."
   },
   {
-    "group": "Document versions",
+    "name": "Document versions",
     "whatItIs": "Older saved versions of your documents, kept by apps that save as you work.",
-    "whySafe": "Sōji keeps each document, its newest older version and any conflict. A removed version can't be restored."
+    "isItSafe": "Sōji keeps each document, its newest older version and any conflict. A removed version can't be restored."
   },
   {
-    "group": "Trash",
+    "name": "Trash",
     "whatItIs": "Files you moved to the Trash.",
-    "whySafe": "Sōji ticks them only with Tick old items in the Trash on. Emptying the Trash removes them for good."
+    "isItSafe": "Sōji ticks them only with Tick old items in the Trash on. Emptying the Trash removes them for good."
   },
   {
-    "group": "Agent worktrees",
+    "name": "Agent worktrees",
     "whatItIs": "Copies of your repositories that coding agents made to work on a task.",
-    "whySafe": "Sōji keeps any with uncommitted or unmerged work; the rest is already in your repository.",
+    "isItSafe": "Sōji keeps any with uncommitted or unmerged work; the rest is already in your repository.",
     "howItComesBack": "The agent makes a new one for its next task."
   },
   {
-    "group": "Agent and editor history",
+    "name": "Agent and editor history",
     "whatItIs": "Transcripts of past coding agent sessions, and the state editors keep per project.",
-    "whySafe": "Sōji takes only sessions left idle a while, never a running one. A removed session can't be resumed."
+    "isItSafe": "Sōji takes only sessions left idle a while, never a running one. A removed session can't be resumed."
   },
   {
-    "group": "App leftovers",
+    "name": "App leftovers",
     "whatItIs": "Data and settings left by apps you removed, and by older versions of apps you updated.",
-    "whySafe": "Reinstalling the app would use them, so Sōji never ticks them. Remove leftovers of apps you won't reinstall."
+    "isItSafe": "Reinstalling the app would use them, so Sōji never ticks them. Remove leftovers of apps you won't reinstall."
   },
   {
-    "group": "Never touched",
+    "name": "Never touched",
     "whatItIs": "Your libraries, mail, messages, keychains and macOS's own files.",
-    "whySafe": "Sōji never removes these."
+    "isItSafe": "Sōji never removes these."
   }
 ]

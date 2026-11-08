@@ -36,8 +36,8 @@ class AdvancedRules(Fixture):
         self.assertIn('A connected device uses this build',f.holds)
     def test_grouping_major_and_product(self):
         self.file('tmp/data');s=self.scan();sp=self.special(s)
-        self.assertEqual(sp.grouping('/sdk/build-tools/35.0.0','major'),sp.grouping('/sdk/build-tools/35.0.1','major'))
-        self.assertNotEqual(sp.grouping('/sdk/build-tools/34.0.0','major'),sp.grouping('/sdk/build-tools/35.0.1','major'))
+        self.assertEqual(sp.grouping('/sdk/build-tools/35.0.0','majorVersion'),sp.grouping('/sdk/build-tools/35.0.1','majorVersion'))
+        self.assertNotEqual(sp.grouping('/sdk/build-tools/34.0.0','majorVersion'),sp.grouping('/sdk/build-tools/35.0.1','majorVersion'))
         self.assertEqual(sp.grouping('/tools/chrome-120','product'),sp.grouping('/tools/chrome-121','product'))
     def test_session_parts_and_memory_exclusion(self):
         self.file('.claude/projects/proj/one.jsonl',json.dumps({'cwd':str(self.home/'project'),'timestamp':'2020-01-01T00:00:00Z'})+'\n')

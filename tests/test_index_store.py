@@ -283,8 +283,8 @@ class IndexRecovery(unittest.TestCase):
         self.assertIn(NO_MATCH,first.pure.values())
         third=Catalog(home);third.seed('other-catalog',dict(first.pure))
         self.assertEqual(third.seeded,{})
-        # Conditional hints (inside/notInside/near) are never cached.
-        conditional={i for i,r in enumerate(first.records) if r[1].get('inside') or r[1].get('notInside') or r[1].get('near')}
+        # Conditional hints (onlyIfContains/unlessContains/onlyIfAncestorContains) are never cached.
+        conditional={i for i,r in enumerate(first.records) if r[1].get('onlyIfContains') or r[1].get('unlessContains') or r[1].get('onlyIfAncestorContains')}
         self.assertFalse(conditional & set(first.pure.values()))
     def test_unreadable_sample_is_spread_and_bounded(self):
         from soji_cli.index import unreadable_sample
