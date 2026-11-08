@@ -65,6 +65,8 @@ class SmartRuleCases(unittest.TestCase):
         self.assertEqual(g('/y/Android-Studio-v2026.2','majorVersion'),'android-studio@2026')
         self.assertEqual(g('/x/35.0.0','majorVersion'),'@35')
         self.assertEqual(g('/x/Chrome120','product'),'chrome120')
+        self.assertEqual(g('/x/3.12.1','minorVersion'),'@3.12')
+        self.assertEqual(g('/u/cpython-3.12.1-macos-aarch64-none','minorVersion'),'cpython@3.12')
     def test_retention_counts_change_per_mode(self):
         self.assertEqual([retention_count(2,m) for m in ('careful','balanced','aggressive')],[3,2,1])
         self.assertEqual(retention_count(1,'aggressive'),1)

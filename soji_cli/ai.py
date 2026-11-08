@@ -278,7 +278,9 @@ class AIAnalyzer:
         if self.max_turns:flags+=self.preset.get('maxTurnsArguments',[])
         if self.model:flags+=self.preset.get('modelArguments',[])
         if self.effort:flags+=self.preset.get('effortArguments',[])
-        substitutions={'{prompt}':(run/'prompt.md').read_text(),'{mcp_inline}':'', '{mcp_config}':str(run/'soji-mcp.json'),'{max_turns}':str(self.max_turns),'{model}':self.model or 'default','{effort}':self.effort or 'default','{prompt_file}':str(run/'prompt.md')}
+        # A configFile preset gets its own format-specific file; {mcp_config} names it.
+        attached=run/'work'/self.preset['mcpConfigFile'] if self.preset.get('mcpAttach')=='configFile' else run/'soji-mcp.json'
+        substitutions={'{prompt}':(run/'prompt.md').read_text(),'{mcp_inline}':'', '{mcp_config}':str(attached),'{max_turns}':str(self.max_turns),'{model}':self.model or 'default','{effort}':self.effort or 'default','{prompt_file}':str(run/'prompt.md')}
         def expand(items):
             out=[]
             for token in items:
@@ -296,11 +298,13 @@ class AIAnalyzer:
         elif self.preset['id']=='custom':
             argv=[executable,*expand(self.custom_command[1:])]
         if self.preset.get('mcpAttach')=='configFile':
-            target=run/'work'/self.preset['mcpConfigFile'];target.parent.mkdir(parents=True,exist_ok=True)
+            target=attached;target.parent.mkdir(parents=True,exist_ok=True)
+            # Preset restrictions (tool excludes, permission denials) sit beside the MCP section.
+            extra=self.preset.get('mcpConfigFields',{})
             if format=='toml':
                 target.write_text('[mcp_servers.soji]\ncommand = '+json.dumps(base[0])+'\nargs = '+json.dumps(base[1:])+'\n[mcp_servers.soji.env]\n'+'\n'.join(k+' = '+json.dumps(v) for k,v in env.items())+'\n')
-            elif format=='opencode':atomic_json(target,{'mcp':{'soji':{'type':'local','command':base,'environment':env,'enabled':True}}})
-            else:atomic_json(target,config)
+            elif format=='opencode':atomic_json(target,{**extra,'mcp':{'soji':{'type':'local','command':base,'environment':env,'enabled':True}}})
+            else:atomic_json(target,{**extra,**config})
         profile='(version 1)\n(allow default)\n(deny file-write*)\n'
         def q(p):return json.dumps(str(p))
         work=run/'work';work.mkdir(exist_ok=True)
@@ -321,6 +325,8 @@ class AIAnalyzer:
         (run/'sandbox.sb').write_text(profile)
         launch=['/usr/bin/sandbox-exec','-f',str(run/'sandbox.sb'),*argv]
         atomic_json(run/'launch.json',{'argv':launch,'cwd':str(work),'environment':env,'preset':self.preset['id']})
+        # The agent's own variables may name run files ({mcp_config}).
+        env={**env,**{k:expand([v])[0] for k,v in self.preset.get('environment',{}).items()}}
         return run,launch,env
     def run(self,scanner,dry_run=False,trigger='ordinary'):
         store=IndexStore(scanner.database) if getattr(scanner,'database',None) else None
@@ -343,7 +349,7 @@ class AIAnalyzer:
             day=time.strftime('%Y-%m-%d');tally=self.state/('agent-runs-'+day+'.json');counts=read_json(tally) or {'count':0}
             if counts['count']>=self.max_runs_per_day:raise ValueError('Daily agent-run limit reached')
             counts['count']+=1;atomic_json(tally,counts)
-            start=time.time();run_env=dict(os.environ,**env,**self.preset.get('environment',{}))
+            start=time.time();run_env=dict(os.environ,**env)
             for key in list(run_env):
                 if key.startswith('CLAUDE_CODE_') and key not in self.preset.get('environment',{}):run_env.pop(key)
             with (run/'stdout.log').open('w') as stdout,(run/'stderr.log').open('w') as stderr:

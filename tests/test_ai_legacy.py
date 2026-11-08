@@ -129,6 +129,23 @@ class LaunchTests(unittest.TestCase):
                 if preset['id']=='codex':
                     self.assertIn('default_tools_approval_mode="approve"', argv[argv.index('-c')+1])
 
+    def test_config_file_presets_carry_their_restrictions(self):
+        with tempfile.TemporaryDirectory() as d:
+            for preset in PRESETS:
+                if preset.get('mcpAttach')!='configFile' or not preset.get('mcpConfigFields'): continue
+                ai = AIAnalyzer(Path(d)/'state', preset=preset['id'])
+                with patch.object(ai,'detect',return_value='/fixture/fake-agent'):
+                    run, argv, env = ai.prepare(self.scanner(Path(d)))
+                target = run/'work'/preset['mcpConfigFile']
+                config = json.loads(target.read_text())
+                for key, value in preset['mcpConfigFields'].items():
+                    self.assertEqual(config[key], value, preset['id'])
+                self.assertTrue(config.get('mcpServers') or config.get('mcp'), preset['id'])
+                for key in preset.get('environment',{}):
+                    self.assertNotIn('{', env[key], preset['id'])
+                if preset['id']=='opencode':
+                    self.assertEqual(env['OPENCODE_CONFIG'], str(target))
+
     def test_fake_agent_run_salvages_output_without_provider(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); run=root/'run'; (run/'work').mkdir(parents=True)

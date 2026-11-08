@@ -64,7 +64,7 @@ never makes Sōji more aggressive. `specialized.py` implements them.
 | Key | Meaning |
 | --- | --- |
 | `keepNewest` | Keep this many of the newest. An item counts as newest by its latest change *or* by the highest version in its name. Careful keeps one more and Aggressive one fewer (at least 1) |
-| `keepNewestPer` | How siblings are grouped before `keepNewest` applies: `folder` (all siblings, the default), `product` (the name before the version), `majorVersion` (product plus major version), `device` (device model, for device support), `app` (bundle id, for Xcode archives) |
+| `keepNewestPer` | How siblings are grouped before `keepNewest` applies: `folder` (all siblings, the default), `product` (the name before the version), `majorVersion` (product plus major version), `minorVersion` (product plus major.minor), `device` (device model, for device support), `app` (bundle id, for Xcode archives) |
 | `newestGoesAtAggressiveAfterDays` | At Aggressive, a newest copy loses `keepNewest` protection once idle this many days |
 | `keepVersionPointedToBy` | Paths (symlinks or version files) that name the active version. That version is held |
 | `keepProjectPinnedVersions` | `node`, `ruby` or `android`: hold any version a project on this Mac pins |
@@ -123,12 +123,12 @@ replaced when Sōji launches the agent: `{prompt}`, `{prompt_file}`,
 | `readOnlyArguments` | Restrict the agent to reading and Sōji's tools |
 | `modelArguments`, `effortArguments`, `maxTurnsArguments` | Added through `{flags}` when that option is set |
 | `chatArguments`, `resumeArguments` | Start or resume an interactive session |
-| `environment` | Extra environment variables for the run |
+| `environment` | Extra environment variables for the run. Placeholders are expanded; `{mcp_config}` names the `configFile` config when there is one |
 | `mcpAttach` | How Sōji's MCP server is attached: `flag` (a config path on the command line), `configFile` (a file written into the run's work folder) or `inlineConfig` (inline on the command line) |
 | `mcpFormat` | Format of that config: `mcpServers`, `toml`, `opencode` or `codexInline` |
 | `mcpConfigFile` | Where the config goes, relative to the work folder for `configFile` |
 | `mcpServerFields` | Extra fields merged into Sōji's server entry |
-| `mcpConfigFields` | Extra top-level config for that agent. Not applied by the launcher yet |
+| `mcpConfigFields` | Extra top-level fields (tool excludes, permission denials) merged into the `configFile` config |
 | `writablePaths` | Paths the sandbox lets the agent write, besides the run folder. `*` matches within one segment, and paths with unset `$VARS` are skipped |
 
 ## `mcp-tools.json`

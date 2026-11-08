@@ -466,8 +466,8 @@
     "tier": "userData",
     "comesBack": "gone",
     "reviewOnly": true,
-    "ruleSummary": "keep newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product"}
+    "ruleSummary": "keep the newest",
+    "rule": {"keepNewest": 1, "keepNewestPer": "folder"}
   },
   {
     "id": "android-project-build",
@@ -590,8 +590,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product"}
+    "ruleSummary": "keep the newest per major version",
+    "rule": {"keepNewest": 1, "keepNewestPer": "majorVersion"}
   },
   {
     "id": "sdkman-archives",
@@ -852,8 +852,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product"}
+    "ruleSummary": "keep the newest per major version",
+    "rule": {"keepNewest": 1, "keepNewestPer": "majorVersion"}
   },
   {
     "id": "volta-versions",
@@ -863,8 +863,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product"}
+    "ruleSummary": "keep the newest per major version",
+    "rule": {"keepNewest": 1, "keepNewestPer": "majorVersion"}
   },
   {
     "id": "nvm-cache",
@@ -902,8 +902,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest per implementation (CPython, PyPy…)",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product", "notWhileRunning": ["uv"]}
+    "ruleSummary": "keep the newest per implementation and minor version (CPython 3.12, PyPy…)",
+    "rule": {"keepNewest": 1, "keepNewestPer": "minorVersion", "notWhileRunning": ["uv"]}
   },
   {
     "id": "poetry-cache",
@@ -988,8 +988,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product"}
+    "ruleSummary": "keep the newest per minor version",
+    "rule": {"keepNewest": 1, "keepNewestPer": "minorVersion"}
   },
   {
     "id": "python-venv",
@@ -1748,8 +1748,8 @@
     "tier": "costly",
     "comesBack": "downloads",
     "reviewOnly": true,
-    "ruleSummary": "keep the newest",
-    "rule": {"keepNewest": 1, "keepNewestPer": "product", "notWhileRunning": ["Unity", "Unity Hub"]}
+    "ruleSummary": "keep the newest per major version (year)",
+    "rule": {"keepNewest": 1, "keepNewestPer": "majorVersion", "notWhileRunning": ["Unity", "Unity Hub"]}
   },
   {
     "id": "unity-logs",

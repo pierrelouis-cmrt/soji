@@ -15,7 +15,7 @@ from .util import read_plist,read_json,json_command,command,inside
 
 FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel'}
 # How `keepNewestPer` reads in a hold.
-KEEP_PER_TEXT={'app':'app','device':'device','product':'product','majorVersion':'major version','folder':'folder'}
+KEEP_PER_TEXT={'app':'app','device':'device','product':'product','majorVersion':'major version','minorVersion':'minor version','folder':'folder'}
 
 def version_key(name):
     return tuple((0,int(t)) if t.isdigit() else (1,t.casefold()) for t in re.findall(r'\d+|[^\d]+',str(name)))
@@ -326,10 +326,11 @@ class SpecializedRules:
         if by=='device':
             first=name.split(' ')[0]
             return first if ',' in first else ''
-        if by in ('product','majorVersion'):
+        if by in ('product','majorVersion','minorVersion'):
             prefix,version=split_version(name)
             product='-'.join(prefix).lower()
-            return product+'@'+version.lstrip('v').split('.')[0] if by=='majorVersion' and version else product
+            if by=='product' or not version:return product
+            return product+'@'+'.'.join(version.lstrip('v').split('.')[:1 if by=='majorVersion' else 2])
         return ''
     def retained(self,f):
         by=f.rule.get('keepNewestPer','folder');group=self.grouping(f.path,by)
