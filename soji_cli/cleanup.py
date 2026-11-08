@@ -175,7 +175,12 @@ class Cleaner:
                 if match and (match[0]['id']==item.get('hint') or item.get('hint')=='trash-item' and match[0]['id']=='trash'):
                     measure_root=str(parent);break
             scan.tick_trash=item.get('hint')=='trash-item'
-        scan.started=time.monotonic();scan.collect_context();scan.visit(measure_root);n=scan.nodes.get(path)
+        scan.started=time.monotonic()
+        # Fresh process/open-file snapshot, taken while the target is re-measured.
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(1) as pool:
+            context=pool.submit(scan.collect_context);scan.visit(measure_root);context.result()
+        n=scan.nodes.get(path)
         if n is None:raise ValueError('Fresh target could not be measured')
         if scan.limited:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
         for m in members or [{'path':path,'size':item['size'],'newest':item['newest'],'files':item['files']}]:

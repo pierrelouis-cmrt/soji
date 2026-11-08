@@ -8,7 +8,7 @@ import re
 import shlex
 import shutil
 import plistlib
-from .util import read_plist,read_json,inside,command
+from .util import read_plist,read_json,inside,command,SubtreeIndex
 from .platform import native
 
 CODESIGN='/usr/bin/codesign'
@@ -100,13 +100,18 @@ class AppCatalog:
                 if i+1<len(parts):tokens.append(parts[i+1].removesuffix('.plist'))
         tokens += [Path(path).name.removesuffix('.plist')]
         result=[]
-        for app in self.apps:
-            for token in tokens:
-                normalized=re.sub(r'[^a-z0-9]','',token.casefold().removeprefix('group.'))
-                name=re.sub(r'[^a-z0-9]','',app['name'].casefold())
-                bundle=app['bundle'].casefold()
-                if token.casefold()==bundle or (bundle and token.casefold().startswith(bundle+'.')) or (normalized and normalized==name):result.append(app);break
+        keys=[(token.casefold(),re.sub(r'[^a-z0-9]','',token.casefold().removeprefix('group.'))) for token in tokens]
+        for app,name,bundle in self._app_keys():
+            for folded,normalized in keys:
+                if folded==bundle or (bundle and folded.startswith(bundle+'.')) or (normalized and normalized==name):result.append(app);break
         return result
+    def _app_keys(self):
+        # Normalized (name, bundle) per app, rebuilt if the app list changes.
+        stamp=(id(self.apps),len(self.apps))
+        if getattr(self,'_keys_stamp',None)!=stamp:
+            self._keys=[(app,re.sub(r'[^a-z0-9]','',app['name'].casefold()),app['bundle'].casefold()) for app in self.apps]
+            self._keys_stamp=stamp
+        return self._keys
     def is_running(self,app):
         return any(r.get('bundleID')==app['bundle'] or r.get('path')==app['path'] for r in self.running) or any(inside(p.casefold(),app['path'].casefold()) for p in self.processes if p.startswith('/'))
 
@@ -172,4 +177,17 @@ class InstalledTools:
                 for value in [info.get('Program'),*(info.get('ProgramArguments') or [])]:self.add(value,'Launch agent '+p.stem)
         return self
     def use(self,path):
-        return next(({'path':p,'source':source} for p,source in self.targets if inside(p,path)),None)
+        # First matching target in list order, via a prefix index.
+        key=(id(self.targets),len(self.targets))
+        if getattr(self,'_index_key',None)!=key:
+            entries=[]
+            for i,(p,source) in enumerate(self.targets):
+                a=os.path.abspath(p)
+                if a.startswith('//'):entries=None;break
+                entries.append((a,-i,(p,source)))
+            self._index=SubtreeIndex(entries) if entries is not None else None;self._index_key=key
+        root=os.path.abspath(path)
+        if self._index is None or root.startswith('//'):
+            return next(({'path':p,'source':source} for p,source in self.targets if inside(p,path)),None)
+        hit=self._index.subtree(root)
+        return {'path':hit[1][0],'source':hit[1][1]} if hit else None

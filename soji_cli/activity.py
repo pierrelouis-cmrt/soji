@@ -11,7 +11,7 @@ import datetime as dt
 from pathlib import Path
 import sqlite3
 import time
-from .util import read_json, ro_sqlite, timestamp, inside
+from .util import read_json, ro_sqlite, timestamp, inside, SubtreeIndex
 try:  # Python 3.14+ standard library; older Pythons rely on the Codex state DB.
     from compression import zstd as _zstd
 except ImportError:
@@ -171,10 +171,28 @@ class ActivityIndex:
             except (OSError,ValueError,sqlite3.Error) as e:self.errors.append(adapter.__name__+': '+str(e))
         return self
 
+    def _index(self):
+        # Rebuilt when records change; same answer as a linear max over
+        # records (newest time, first-added on ties).
+        key=(id(self.records),len(self.records))
+        if getattr(self,'_index_key',None)!=key:
+            entries=[]
+            for i,r in enumerate(self.records):
+                p=os.path.abspath(r.path)
+                if p.startswith('//'):entries=None;break
+                entries.append((p,(r.at,-i),r))
+            self._index_value=SubtreeIndex(entries) if entries is not None else None
+            self._index_key=key
+        return self._index_value
+
     def last(self,path,include_ancestors=False):
         path=os.path.realpath(path)
-        matches=[r for r in self.records if inside(r.path,path) or (include_ancestors and inside(path,r.path))]
-        return max(matches,key=lambda r:r.at) if matches else None
+        index=self._index()
+        if index is None or path.startswith('//'):
+            matches=[r for r in self.records if inside(r.path,path) or (include_ancestors and inside(path,r.path))]
+            return max(matches,key=lambda r:r.at) if matches else None
+        hits=[h for h in (index.subtree(path),index.ancestors(path) if include_ancestors else None) if h is not None]
+        return max(hits,key=lambda h:h[0])[1] if hits else None
 
     def report(self,path=None):
         records=self.records if path is None else [r for r in self.records if inside(r.path,path) or inside(path,r.path)]

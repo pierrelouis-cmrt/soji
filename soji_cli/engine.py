@@ -4,6 +4,7 @@ import bisect
 import collections
 import dataclasses
 import fnmatch
+import functools
 import json
 from importlib.resources import files as resource_files
 import os
@@ -12,6 +13,7 @@ import re
 import stat
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 
 DATA = resource_files('soji_cli').joinpath('data')
@@ -44,6 +46,7 @@ def human(n: int) -> str:
     return str(n)
 
 
+@functools.lru_cache(maxsize=None)
 def glob_regex(pattern: str) -> re.Pattern:
     """Segment-aware glob: * never crosses /; ** matches zero or more segments."""
     parts = pattern.split('/')
@@ -208,7 +211,29 @@ class Catalog:
                 last = expanded.rsplit('/', 1)[-1]
                 if any(c in last for c in '*?['): self.wild.append(record)
                 else: self.by_last[last.casefold()].append(record)
+        # Literal leading segments of each wildcard pattern: an ASCII path that
+        # does not start with them cannot match, so its regex is skipped.
+        self.wild_prefix = []
+        for regex, hint, pattern in self.wild:
+            expanded = pattern.replace('~', home, 1) if pattern.startswith('~') else pattern
+            literal = []
+            for part in expanded.split('/')[:-1]:
+                if any(c in part for c in '*?[') or part == '**': break
+                literal.append(part)
+            prefix = '/'.join(literal) + '/' if literal else ''
+            # Literal head/tail of the last segment (`*.mp4`, `blendcache_*`).
+            leaf = expanded.rsplit('/', 1)[-1]
+            head = re.split(r'[*?\[]', leaf, maxsplit=1)[0]; tail = re.split(r'[*?\]]', leaf)[-1]
+            ok = lambda t: t if t.isascii() else ''
+            self.wild_prefix.append((ok(prefix).lower(), ok(head).lower(), ok(tail).lower()))
+        # Bucketed by literal directory prefix; a path looks up only its own
+        # ancestor prefixes, then candidates are restored to catalog order.
+        self.wild_buckets = collections.defaultdict(list)
+        for i, (record, (prefix, head, tail)) in enumerate(zip(self.wild, self.wild_prefix)):
+            self.wild_buckets[prefix].append((i, record, head, tail))
         self.markers_cache = {}
+        self.match_cache = {}
+        self.parent_cache = {}
 
     def exists(self, folder: Path, markers: list[str]) -> bool:
         key=(str(folder),tuple(markers))
@@ -222,8 +247,42 @@ class Catalog:
         return self.markers_cache[key]
 
     def match(self, path: str):
+        # Results depend on the path and on cached marker listings only.
+        try: return self.match_cache[path]
+        except KeyError: pass
+        result = self.match_cache[path] = self._match(path)
+        return result
+
+    def _parent_candidates(self, parent: str):
+        """Wildcard records whose literal prefix is `parent` or one of its
+        ancestors, in catalog order; shared by every entry of a folder."""
+        found = self.parent_cache.get(parent)
+        if found is None:
+            buckets = self.wild_buckets; found = list(buckets.get('', ()))
+            k = parent.find('/')
+            while k >= 0:
+                hits = buckets.get(parent[:k+1])
+                if hits: found += hits
+                k = parent.find('/', k+1)
+            found.sort(key=lambda x: x[0])
+            self.parent_cache[parent] = found
+        return found
+
+    def _candidates(self, path: str, name: str):
+        exact = self.by_last.get(name.casefold())
+        if not path.isascii():
+            return [*(exact or ()), *self.wild]
+        low = path.lower(); cut = low.rfind('/'); leaf = low[cut+1:]
+        wild = [record for _, record, head, tail in self._parent_candidates(low[:cut+1])
+                if leaf.startswith(head) and leaf.endswith(tail)]
+        return [*exact, *wild] if exact else wild
+
+    def _match(self, path: str):
+        name = os.path.basename(path) if not path.endswith('/') else Path(path).name
+        candidates = self._candidates(path, name)
+        if not candidates: return None
         p=Path(path)
-        for regex,hint,pattern in self.by_last[p.name.casefold()] + self.wild:
+        for regex,hint,pattern in candidates:
             if not regex.fullmatch(path): continue
             if hint.get('inside') and not self.exists(p,hint['inside']):continue
             if hint.get('notInside') and self.exists(p,hint['notInside']):continue
@@ -250,17 +309,20 @@ class Scanner:
         self.recent_activity_hours=max(0,float(recent_activity_hours))
         self.context=context;self.processes=[];self.open_paths=[];self.context_warnings=[]
         self._inodes=set();self._git_cache={}
+        self._private_home=(None,())
         self.activity=None;self.apps=None;self.tools=None;self.specialized=None;self.git=None
 
     def private(self,path: str) -> str:
-        p=Path(path)
+        p=Path(path) if path.endswith('/') else None
+        name=p.name if p is not None else os.path.basename(path)
         if any(within(path,r) for r in self.protected): return 'User protected path'
-        if p.name in PRIVATE_NAMES: return 'Credentials or repository metadata; contents not scanned'
-        if p.name.lower().endswith(PRIVATE_SUFFIXES):return 'Personal library; contents not scanned'
-        if any(within(path,os.path.join(self.home,r)) for r in PRIVATE_HOME):return 'Private or cloud data; contents not scanned'
-        if any(p.name == name or p.name.startswith(name+' ') or p.name.startswith(name+'-') for name in CLOUD_NAMES):return 'Cloud-synced folder; contents not scanned'
-        if p.name.lower() in ('memory','memories') and any(x in path for x in ['/.claude/', '/.codex/', '/.cursor/']):return 'Agent memory; contents not scanned'
-        if p.name.endswith('.app'):return 'Installed application bundle; contents not scanned'
+        if name in PRIVATE_NAMES: return 'Credentials or repository metadata; contents not scanned'
+        if name.lower().endswith(PRIVATE_SUFFIXES):return 'Personal library; contents not scanned'
+        if self._private_home[0]!=self.home:self._private_home=(self.home,[os.path.join(self.home,r) for r in PRIVATE_HOME])
+        if any(within(path,r) for r in self._private_home[1]):return 'Private or cloud data; contents not scanned'
+        if any(name == cloud or name.startswith(cloud+' ') or name.startswith(cloud+'-') for cloud in CLOUD_NAMES):return 'Cloud-synced folder; contents not scanned'
+        if name.lower() in ('memory','memories') and any(x in path for x in ['/.claude/', '/.codex/', '/.cursor/']):return 'Agent memory; contents not scanned'
+        if name.endswith('.app'):return 'Installed application bundle; contents not scanned'
         return ''
 
     def collect_context(self):
@@ -283,11 +345,12 @@ class Scanner:
             self.limited=True;return False
         return True
 
-    def visit(self,path: str, depth=0, device=None) -> Node:
+    def visit(self,path: str, depth=0, device=None, _stat=None) -> Node:
         node=Node(path);self.nodes[path]=node;self.current=path
         if not self.budget():node.errors=1;node.own_errors=1;node.reason='Scan stopped before measuring';return node
-        try:s=os.lstat(path)
-        except OSError:
+        try:s=os.lstat(path) if _stat is None else _stat
+        except OSError:s=None
+        if s is None or isinstance(s,OSError):
             node.errors=1;node.own_errors=1;node.reason='Unreadable entry';self.unreadable+=1;return node
         self.visited+=1
         node.device=s.st_dev;node.inode=s.st_ino
@@ -306,7 +369,8 @@ class Scanner:
                 node.size=node.own_size;self.bytes+=node.size
                 if key not in self._inodes:
                     self._inodes.add(key);node.apparent=s.st_size
-                node.secret=Path(path).name.startswith('.env') or Path(path).name.endswith(SECRET_SUFFIXES) or Path(path).name in ('credentials.json','id_rsa','id_ed25519')
+                name=os.path.basename(path)
+                node.secret=name.startswith('.env') or name.endswith(SECRET_SUFFIXES) or name in ('credentials.json','id_rsa','id_ed25519')
             return node
         reason=self.private(path)
         if reason or depth>=128 or (device is not None and s.st_dev!=device):
@@ -314,18 +378,32 @@ class Scanner:
         # Directory blocks count too; hardlinks are counted once per scan.
         node.size=getattr(s,'st_blocks',0)*512;node.apparent=s.st_size;self.bytes+=node.size
         node.own_size=node.size;node.own_apparent=node.apparent
+        # Children are stat'ed relative to an open directory descriptor
+        # (fstatat), which avoids re-resolving every ancestor per entry.
+        entries=[];failed=False
         try:
-            with os.scandir(path) as it:
-                for entry in it:
+            fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|getattr(os,'O_NOFOLLOW',0))
+            try:
+                with os.scandir(fd) as it:
+                    for entry in it:
+                        name=entry.name
+                        try:entries.append((name,os.stat(name,dir_fd=fd,follow_symlinks=False)))
+                        except OSError as e:entries.append((name,e))
+            finally:os.close(fd)
+        except OSError:failed=True
+        try:
+            for name,child_stat in entries:
                     if not self.budget():node.errors+=1;node.own_errors+=1;break
-                    child=self.visit(entry.path,depth+1,s.st_dev)
-                    node.children.append(entry.path)
+                    child_path=os.path.join(path,name)
+                    child=self.visit(child_path,depth+1,s.st_dev,child_stat)
+                    node.children.append(child_path)
                     node.size+=child.size;node.apparent+=child.apparent;node.files+=child.files
                     node.newest=max(node.newest,child.newest)
                     node.errors+=child.errors;node.secret |= child.secret
                     # Skipped descendants make candidate size/safety incomplete.
                     if child.skipped:node.skipped=True
-        except OSError:node.errors+=1;node.own_errors+=1;self.unreadable+=1
+        except OSError:failed=True
+        if failed:node.errors+=1;node.own_errors+=1;self.unreadable+=1
         return node
 
     def project_for(self,path: str) -> str | None:
@@ -427,10 +505,13 @@ class Scanner:
     def run(self):
         self.started=time.monotonic()
         try:
-            self.collect_context()
-            for root in self.roots:
-                if not self.budget():break
-                self.visit(root)
+            # Process/open-file snapshots (subprocesses) overlap the walk.
+            with ThreadPoolExecutor(1) as pool:
+                context=pool.submit(self.collect_context)
+                for root in self.roots:
+                    if not self.budget():break
+                    self.visit(root)
+                context.result()
             self._build_findings()
         except Exception as exc:self.error=f'{type(exc).__name__}: {exc}'
         finally:self.done=True;self.finished=time.monotonic()
@@ -442,9 +523,15 @@ class Scanner:
         from .gitstate import GitInspector
         self.now=time.time();self.findings=[]
         self.git=GitInspector()
-        self.activity=ActivityIndex(self.home).build() if self.context else ActivityIndex(self.home)
-        self.apps=AppCatalog(self.home,self.processes).build() if self.context else AppCatalog(self.home)
-        self.tools=InstalledTools(self.home).build() if self.context else InstalledTools(self.home)
+        if self.context:
+            # Independent local inventories; their file and subprocess I/O overlaps.
+            with ThreadPoolExecutor(3) as pool:
+                activity=pool.submit(lambda:ActivityIndex(self.home).build())
+                apps=pool.submit(lambda:AppCatalog(self.home,self.processes).build())
+                tools=pool.submit(lambda:InstalledTools(self.home).build())
+                self.activity=activity.result();self.apps=apps.result();self.tools=tools.result()
+        else:
+            self.activity=ActivityIndex(self.home);self.apps=AppCatalog(self.home);self.tools=InstalledTools(self.home)
         self.specialized=SpecializedRules(self,self.apps,self.activity,self.tools) if self.context else None
         # Every row is measured once. Select a non-overlapping frontier: known
         # hint roots first; otherwise recurse to expose meaningful children.

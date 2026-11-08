@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS links(path TEXT PRIMARY KEY,device INTEGER NOT NULL,i
 CREATE INDEX IF NOT EXISTS links_identity ON links(device,inode);
 '''
 
+NODE_FIELDS=tuple(f.name for f in dataclasses.fields(Node))
+
+
 def _link_rows(items):
     # Regular files with nlink > 1: the only cached names whose allocated
     # share can change when a different name of the same inode is touched.
@@ -54,6 +57,9 @@ class IndexStore:
         self.db=sqlite3.connect(self.path,timeout=10)
         had_links=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='links'").fetchone() is not None
         self.db.executescript(SCHEMA)
+        # The index is a rebuildable cache; WAL + NORMAL stays consistent on a
+        # crash and skips an fsync per commit.
+        self.db.execute('PRAGMA synchronous=NORMAL')
         # Existing indexes predate the hardlink identity table; backfill it
         # from persisted node rows so incremental reconciliation stays exact.
         if not had_links:
@@ -84,7 +90,10 @@ class IndexStore:
     def save(self,scanner,event_id,signature,*,full_scan=True,volumes=None):
         with self.db:
             self.db.execute('DELETE FROM nodes')
-            self.db.executemany('INSERT INTO nodes VALUES(?,?,?)',((p,str(Path(p).parent),json.dumps(dataclasses.asdict(n))) for p,n in scanner.nodes.items()))
+            # Node holds only scalars and a list of str: a shallow field dict
+            # serializes exactly like dataclasses.asdict without its deep copy.
+            dumps=json.dumps;fields=NODE_FIELDS
+            self.db.executemany('INSERT INTO nodes VALUES(?,?,?)',((p,str(Path(p).parent) if p=='/' or p.endswith('/') else os.path.dirname(p),dumps({f:getattr(n,f) for f in fields})) for p,n in scanner.nodes.items()))
             self.db.execute('DELETE FROM links')
             self.db.executemany('INSERT INTO links VALUES(?,?,?,?)',list(_link_rows(scanner.nodes.items())))
             self.set_meta('signature',signature);self.set_meta('eventID',event_id)
@@ -268,12 +277,14 @@ class IndexedScanner(Scanner):
         self.skipped=sum(bool(n.reason) for n in self.nodes.values())
         return {'affectedIdentities':len(affected),'restatted':restatted,'externalChecked':external_checked,'linkProbed':link_probed,'recomputedDirectories':len(dirs)}
     def run(self):
-        self.started=time.monotonic();store=None
+        self.started=time.monotonic();store=None;pool=None
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()
         self.catalog.markers_cache.clear()
         try:
             store=IndexStore(self.database);signature=self.signature()
-            self.collect_context()
+            # Process/open-file snapshot runs alongside the index work below.
+            from concurrent.futures import ThreadPoolExecutor
+            pool=ThreadPoolExecutor(1);context=pool.submit(self.collect_context)
             can_reuse=not self.refresh and store.meta('signature')==signature and store.meta('complete',False) and time.time()-store.meta('fullCheckedAt',0)<RECOVERED_DEFAULTS['fullCheckInterval']
             saved=store.meta('eventID',0);current=native('event-id',*self.roots);event_id=current.get('eventID',0) if isinstance(current,dict) else 0
             if saved and (not event_id or event_id<saved):can_reuse=False
@@ -302,6 +313,7 @@ class IndexedScanner(Scanner):
                 self.index_info={'strategy':'incremental','dirtySubtrees':dirty,'reusedEntries':len(self.nodes)-self.visited,**stats}
                 if not dirty:self.current='Persistent index reused; FSEvents history checked'
             if any(r not in self.nodes for r in self.roots):self.limited=True
+            context.result();pool.shutdown();pool=None
             self._build_findings()
             from .ai import AIAnalyzer,fingerprint
             from . import ai
@@ -317,6 +329,7 @@ class IndexedScanner(Scanner):
             store.save(self,checkpoint,signature,full_scan=not can_reuse or lost,volumes=volumes);self.growth=store.growth()
         except Exception as e:self.error=type(e).__name__+': '+str(e)
         finally:
+            if pool is not None:pool.shutdown()
             if store:store.close()
             self.done=True;self.finished=time.monotonic()
     def report(self,mode):

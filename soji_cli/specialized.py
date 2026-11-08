@@ -268,13 +268,21 @@ class SpecializedRules:
     def __init__(self,scanner,apps,activity,tools,devices=None):
         self.scanner=scanner;self.apps=apps;self.activity=activity;self.tools=tools;self.home=Path(scanner.home)
         self.pins=ProjectPins().scan(scanner.nodes)
-        self.devices=devices or DeviceCatalog(scanner.home).build()
+        self._devices=devices or None
         self.connected_checked=False;self.connected_known=False
         self.siblings=collections.defaultdict(list)
         for path in scanner.nodes:
             match=scanner.catalog.match(path)
             if match:self.siblings[match[0]['id']].append(path)
         self.archive_cache={}
+    @property
+    def devices(self):
+        # Built on first use: only simulator and device-support rules need
+        # simctl, so other scans and clean checks skip that subprocess.
+        if self._devices is None:self._devices=DeviceCatalog(str(self.home)).build()
+        return self._devices
+    @devices.setter
+    def devices(self,value):self._devices=value
     def active(self,path,markers):
         # Literal marker paths: the executable does not glob keepActive.
         name=Path(path).name
