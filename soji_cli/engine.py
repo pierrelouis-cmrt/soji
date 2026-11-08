@@ -293,13 +293,13 @@ class Catalog:
 
 
 class Scanner:
-    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0, inherit_hint=None):
+    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0, inherit_hint=None, catalog=None):
         self.inherit_hint=inherit_hint
         self.home=os.path.realpath(home or str(Path.home()))
         cleaned=sorted(set(os.path.realpath(os.path.expanduser(p)) for p in roots))
         self.roots=[p for p in cleaned if not any(p != q and within(p,q) for q in cleaned)]
         self.protected=[os.path.realpath(os.path.expanduser(p)) for p in protected]
-        self.catalog=Catalog(self.home)
+        self.catalog=catalog if catalog is not None else Catalog(self.home)
         self.nodes: dict[str,Node]={}
         self.findings: list[Finding]=[]
         self.cancel=threading.Event()
@@ -311,6 +311,10 @@ class Scanner:
         self._inodes=set();self._git_cache={}
         self._private_home=(None,())
         self.activity=None;self.apps=None;self.tools=None;self.specialized=None;self.git=None
+        self.progress={'phase':'scan','completed':0,'total':None,'path':''}
+
+    def set_progress(self,phase,completed=0,total=None,path=''):
+        self.progress={'phase':phase,'completed':completed,'total':total,'path':path}
 
     def private(self,path: str) -> str:
         p=Path(path) if path.endswith('/') else None
@@ -353,6 +357,7 @@ class Scanner:
         if s is None or isinstance(s,OSError):
             node.errors=1;node.own_errors=1;node.reason='Unreadable entry';self.unreadable+=1;return node
         self.visited+=1
+        if self.visited%128==1:self.set_progress('scan',self.visited,path=path)
         node.device=s.st_dev;node.inode=s.st_ino
         # Birth time approximates date added; ctime is not creation time on Unix.
         stamp=max(s.st_mtime,getattr(s,'st_birthtime',0))
@@ -514,7 +519,8 @@ class Scanner:
                 context.result()
             self._build_findings()
         except Exception as exc:self.error=f'{type(exc).__name__}: {exc}'
-        finally:self.done=True;self.finished=time.monotonic()
+        finally:
+            self.set_progress('done',1,1);self.done=True;self.finished=time.monotonic()
 
     def _build_findings(self):
         from .activity import ActivityIndex
@@ -522,8 +528,12 @@ class Scanner:
         from .specialized import SpecializedRules
         from .gitstate import GitInspector
         self.now=time.time();self.findings=[]
+        self.set_progress('categorize',0,4,'Checking activity and apps')
         self.git=GitInspector()
-        if self.context:
+        shared=getattr(self,'_shared_inventories',None)
+        if shared is not None:
+            self.activity,self.apps,self.tools=shared
+        elif self.context:
             # Independent local inventories; their file and subprocess I/O overlaps.
             with ThreadPoolExecutor(3) as pool:
                 activity=pool.submit(lambda:ActivityIndex(self.home).build())
@@ -533,6 +543,7 @@ class Scanner:
         else:
             self.activity=ActivityIndex(self.home);self.apps=AppCatalog(self.home);self.tools=InstalledTools(self.home)
         self.specialized=SpecializedRules(self,self.apps,self.activity,self.tools) if self.context else None
+        self.set_progress('categorize',1,4,'Matching categories')
         # Every row is measured once. Select a non-overlapping frontier: known
         # hint roots first; otherwise recurse to expose meaningful children.
         below=collections.defaultdict(set)  # ancestor -> hint ids matched beneath it
@@ -563,8 +574,10 @@ class Scanner:
         for root in self.roots:
             if root in self.nodes:frontier(root,0,self.inherited_match(root))
         self.findings.sort(key=lambda f:f.size,reverse=True)
+        self.set_progress('categorize',2,4,'Sorting session and Trash catalogs')
         from .catalogs import expand_catalogs
         self.findings=expand_catalogs(self)
+        self.set_progress('categorize',3,4,'Checking file metadata')
         if self.context:
             from .platform import native
             for start in range(0,len(self.findings),64):
@@ -578,6 +591,7 @@ class Scanner:
                         if meta.get('cloud'):f.holds.append('Cloud-managed or online-only item')
                         if meta:f.evidence.append({'check':'nativeMetadata',**meta})
         self.findings.sort(key=lambda f:f.size,reverse=True)
+        self.set_progress('categorize',4,4,'Categories ready')
 
     def decisions(self,mode):
         for f in self.findings:

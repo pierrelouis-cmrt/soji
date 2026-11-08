@@ -278,6 +278,7 @@ class IndexedScanner(Scanner):
         return {'affectedIdentities':len(affected),'restatted':restatted,'externalChecked':external_checked,'linkProbed':link_probed,'recomputedDirectories':len(dirs)}
     def run(self):
         self.started=time.monotonic();store=None;pool=None
+        self.set_progress('scan',path='Checking disk index')
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()
         self.catalog.markers_cache.clear()
         try:
@@ -331,7 +332,7 @@ class IndexedScanner(Scanner):
         finally:
             if pool is not None:pool.shutdown()
             if store:store.close()
-            self.done=True;self.finished=time.monotonic()
+            self.set_progress('done',1,1);self.done=True;self.finished=time.monotonic()
     def report(self,mode):
         result=super().report(mode);result.update(index=self.index_info,growth=self.growth,database=self.database);return result
     def watch(self,interval=5,on_update=None):

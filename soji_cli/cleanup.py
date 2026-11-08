@@ -45,15 +45,22 @@ def validate_plan(plan):
     for path,items in by_path.items():
         if len(items)>1 and not all(i.get('action',{}).get('kind')=='document-version' and i['action'].get('document')==path for i in items):
             raise ValueError('Duplicate plan paths')
-    paths=list(by_path)
+    paths=set(by_path)
     for item in plan['items']:
         if 'members' not in item:continue
         session_members(item)
         for m in item['members']:
             if m['path']!=item['path']:
                 if m['path'] in paths:raise ValueError('Duplicate plan paths')
-                paths.append(m['path'])
-    if any(a!=b and inside(a,b) for a in paths for b in paths):raise ValueError('Overlapping cleanup targets')
+                paths.add(m['path'])
+    # Check ancestors rather than every pair (millions of pairs for session batches).
+    normalized={os.path.abspath(p).replace('//','/') for p in paths}
+    if len(normalized)!=len(paths):raise ValueError('Overlapping cleanup targets')
+    for path in normalized:
+        parent=os.path.dirname(path)
+        while parent!=path:
+            if parent in normalized:raise ValueError('Overlapping cleanup targets')
+            path,parent=parent,os.path.dirname(parent)
     return plan
 
 
@@ -124,6 +131,53 @@ class Cleaner:
     def __init__(self,state,*,context=True,trash_directory=None):
         self.state=Path(state).expanduser().resolve();self.state.mkdir(parents=True,exist_ok=True)
         self.journal=self.state/'journal.jsonl';self.context=context;self.trash_directory=trash_directory
+        self._batch=None
+
+    def collect_context(self,scan):
+        """Share live snapshots for at most one second, only within one apply call.
+
+        Target contents and identities are never cached. Inventory snapshots have
+        a separate five-second lifetime; new batches always start from scratch.
+        """
+        batch=self._batch
+        now=time.monotonic()
+        if batch is None or now-batch.get('context_at',float('-inf'))>=1:
+            scan.collect_context()
+            from .catalogs import codex_writer_ids
+            locks=codex_writer_ids(scan.home)
+            if batch is not None:
+                batch.update(context_at=now,processes=scan.processes,open_paths=scan.open_paths,
+                             warnings=scan.context_warnings,locks=locks)
+        else:
+            scan.processes=batch['processes'];scan.open_paths=batch['open_paths']
+            scan.context_warnings=list(batch['warnings']);locks=batch['locks']
+        scan._codex_writer_ids=locks
+
+    def measure_catalog_target(self,scan,path,root,hint):
+        """Reconstruct the catalog from just this target's current filesystem unit.
+
+        A synthetic container feeds the same catalog policy as a full scan. For
+        Claude, discover both sidecars anew, including a newly created transcript
+        that would subsume a formerly standalone subagent row.
+        """
+        from .engine import Node
+        for parent in Path(path).parents:
+            if str(parent)==root:break
+            if scan.private(str(parent)):raise ValueError('Protected session ancestor')
+        targets=[path]
+        if hint=='claude-sessions':
+            relative=Path(path).relative_to(root)
+            base=str(Path(root)/relative.parts[0])
+            transcript=base if base.endswith('.jsonl') else base+'.jsonl'
+            stem=transcript[:-len('.jsonl')]
+            targets=([p for p in [transcript,stem+'/subagents',stem+'/tool-results'] if os.path.lexists(p)]
+                     if os.path.lexists(transcript) else [path])
+            if not any(inside(path,p) for p in targets):targets.append(path)
+        for target in targets:scan.visit(target)
+        scan.nodes[root]=Node(root,directory=True,children=targets,
+                              size=sum(scan.nodes[p].size for p in targets),
+                              newest=max((scan.nodes[p].newest for p in targets),default=0))
+        scan.roots=[root]
     def append(self,entry):
         fd=os.open(self.journal,os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600)
         try:
@@ -154,7 +208,12 @@ class Cleaner:
             from .nativeplans import verify_native
             verify_native(item)
             return identity
-        scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None)
+        batch=self._batch
+        scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None,catalog=batch.get('catalog') if batch else None)
+        if batch is not None:
+            batch['catalog']=scan.catalog
+            # Marker listings are mutable filesystem facts, not catalog rules.
+            scan.catalog.markers_cache.clear();scan.catalog.match_cache.clear()
         measure_root=path
         if item.get('finding',{}).get('rule',{}).get('projectUntouchedDays'):
             measure_root=scan.project_for(path) or path
@@ -179,7 +238,11 @@ class Cleaner:
         # Fresh process/open-file snapshot, taken while the target is re-measured.
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(1) as pool:
-            context=pool.submit(scan.collect_context);scan.visit(measure_root);context.result()
+            context=pool.submit(self.collect_context,scan)
+            if item.get('hint') in ('claude-sessions','codex-sessions','trash-item') and measure_root!=path:
+                self.measure_catalog_target(scan,path,measure_root,item['hint'])
+            else:scan.visit(measure_root)
+            context.result()
         n=scan.nodes.get(path)
         if n is None:raise ValueError('Fresh target could not be measured')
         if scan.limited:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
@@ -192,13 +255,20 @@ class Cleaner:
             # Re-derive the catalog row (FindingPart policy, compound members)
             # from its catalog root, not from a bare file.
             scan.roots=[measure_root]
+        if batch is not None and time.monotonic()-batch.get('inventory_at',float('-inf'))<5:
+            scan._shared_inventories=batch['inventories']
+        inventory_started=time.monotonic()
         scan._build_findings()
+        if batch is not None and not hasattr(scan,'_shared_inventories'):
+            batch.update(inventory_at=inventory_started,inventories=(scan.activity,scan.apps,scan.tools))
         f=next((f for f in scan.findings if f.path==path),None)
         if members is not None:
             now_members=[(m['path'],m['identity']) for m in (f.members if f else [])]
             if now_members!=[(m['path'],m['identity']) for m in members]:raise ValueError('Session members changed since analysis')
         elif f is not None and f.members:raise ValueError('Target became a compound session; generate a new plan')
-        if f is None:f=scan.classify(n)
+        if f is None:
+            if item.get('hint') in ('claude-sessions','codex-sessions','trash-item'):raise ValueError('Session or Trash catalog membership changed since analysis')
+            f=scan.classify(n)
         permit=plan.get('routinePermit')
         if permit:
             if f.tier!='regenerable' or f.comes_back not in ('rebuilds','downloads'):raise ValueError('Routine cannot remove non-regenerable data')
@@ -221,13 +291,27 @@ class Cleaner:
         expected_action={} if item.get('method')=='trash' and f.action.get('kind')=='official-command' else f.action
         if (item.get('action') or {}) != expected_action:raise ValueError('Cleanup action changed or is not derived from current facts')
         return identity
-    def apply(self,plan,*,permanent=False,execute_tools=False):
+    def apply(self,plan,*,permanent=False,execute_tools=False,progress=None):
+        # Caches never survive a batch, including on an interrupted/failed apply.
+        self._batch={}
+        try:return self._apply(plan,permanent=permanent,execute_tools=execute_tools,progress=progress)
+        finally:self._batch=None
+
+    def _apply(self,plan,*,permanent=False,execute_tools=False,progress=None):
+        def report(phase,completed,path=''):
+            if progress:
+                # Display failures must not alter a filesystem operation's outcome.
+                try:progress({'phase':phase,'completed':completed,'total':len(plan['items']),'path':path})
+                except Exception:pass
+        report('verify',0)
         validate_plan(plan)
         entries=[]
         for item in plan['items']:
+            report('verify',len(entries),item['path'])
             entry={'id':uuid.uuid4().hex,'plan':plan['id'],'path':item['path'],'group':item['group'],'sizeBytes':item['size'],'at':time.time(),'identity':item['identity'],'method':item.get('method','trash'),'status':'prepared'}
             try:
                 self.fresh(item,plan)
+                report('clean',len(entries),item['path'])
                 action=item.get('action') or {}
                 if action.get('kind') in ('simulator-device','simulator-runtime','document-version','official-command','git-worktree'):
                     if not execute_tools or not permanent:raise ValueError('Native tool cleanup requires --execute-tools and --permanent')
@@ -259,6 +343,8 @@ class Cleaner:
                 entry['status']='failed';entry['error']=str(e)
                 self.append(entry)
             entries.append(entry)
+            report('clean',len(entries),item['path'])
+        report('done',len(entries))
         return {'entries':entries,'completed':sum(e['status']=='done' for e in entries),
                 'partial':sum(e['status']=='partial' for e in entries),
                 'failed':sum(e['status']!='done' for e in entries)}

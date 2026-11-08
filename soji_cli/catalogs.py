@@ -11,7 +11,8 @@ from .util import json_command,read_plist,command
 
 def expand_catalogs(scanner):
     result=[]
-    live_codex=codex_writer_ids(scanner.home)
+    live_codex=getattr(scanner,'_codex_writer_ids',None)
+    if live_codex is None:live_codex=codex_writer_ids(scanner.home)
     codex_running=any(Path(p).name.casefold()=='codex' for p in getattr(scanner,'processes',()) if isinstance(p,str))
     for finding in scanner.findings:
         if finding.hint_id in ('claude-sessions','codex-sessions'):

@@ -53,6 +53,8 @@ Legacy `analyse` (soji launches an agent; `agents` lists presets, and `--dry-run
 
 Before each action, soji re-measures the target and refuses it if any of these apply: changed identity or contents, active use, Git work, a protected path, an expired plan, an ambiguous tool scope or an incomplete measurement. Cross-volume moves are refused. `--execute-tools` is required for official cleanup commands, simulators, document versions and worktrees.
 
+Batch cleanup re-measures each selected session (including its freshly discovered Claude sidecars) or Trash item without repeatedly scanning the rest of its catalog. Process/open-file and Codex writer-lock snapshots are shared for at most one second within a batch; activity/app/tool inventories refresh after five seconds. No target measurements or identities are reused, and caches are discarded after the batch. Every move retains the durable journal checkpoints used for recovery and undo.
+
 ## Other commands
 
 ```sh
@@ -69,6 +71,8 @@ Before each action, soji re-measures the target and refuses it if any of these a
 - Templates: `soji_cli/data/routine-templates.json`.
 
 **Cleaning from the TUI:** mark rows with Space (or mark nothing to take every READY row in the current category, search and mode), press X, check the list, press Y. Items go to the Trash through the same plan and re-checks as `soji clean --apply` (plan saved under `tui-plans/` in the state folder, entries in `soji journal`); U restores the batch. Permanent deletion and tool actions (simulators, document versions, worktrees) stay terminal commands.
+
+A quiet status bar shows disk scanning, category sorting, and cleanup progress. Scanning uses an animated bar and entry count until a total is known; sorting and cleaning show completion counts. Cleanup runs in a worker so the screen continues updating and resizing. Other actions wait until the batch finishes.
 
 **TUI keys:**
 

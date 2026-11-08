@@ -42,7 +42,7 @@ def cleanup_targets(rows, marked):
     return targets, skipped
 
 
-def clean_targets(scanner, mode, targets, state_dir, cleaner=None):
+def clean_targets(scanner, mode, targets, state_dir, cleaner=None, progress=None):
     """Plan the targets (Trash only), save the plan for audit, apply it."""
     from .cleanup import Cleaner, create_plan
     from .util import atomic_json
@@ -51,12 +51,58 @@ def clean_targets(scanner, mode, targets, state_dir, cleaner=None):
     plans = Path(state_dir).expanduser() / "tui-plans"
     plans.mkdir(parents=True, exist_ok=True)
     atomic_json(plans / f"plan-{plan['id']}.json", plan)
-    result = (cleaner or Cleaner(state_dir)).apply(plan)
+    result = (cleaner or Cleaner(state_dir)).apply(plan, progress=progress)
     result["plan"] = str(plans / f"plan-{plan['id']}.json")
     result["freed"] = sum(
         e.get("sizeBytes", 0) for e in result["entries"] if e["status"] == "done"
     )
     return result
+
+
+class CleanupJob:
+    """Run a confirmed batch without blocking curses; publish whole snapshots."""
+
+    def __init__(self, scanner, mode, targets, state_dir):
+        self.progress = {"phase": "verify", "completed": 0,
+                         "total": len(targets), "path": ""}
+        self.result = None
+        self.error = None
+        self.done = threading.Event()
+        self.thread = threading.Thread(
+            target=self._run, args=(scanner, mode, targets, state_dir), daemon=False
+        )
+        self.thread.start()
+
+    def _run(self, scanner, mode, targets, state_dir):
+        try:
+            self.result = clean_targets(
+                scanner, mode, targets, state_dir,
+                progress=lambda value: setattr(self, "progress", dict(value)),
+            )
+        except Exception as exc:
+            self.error = str(exc)
+        finally:
+            self.done.set()
+
+
+def progress_line(progress, width=18, tick=None):
+    """A quiet determinate bar, or a moving segment when no total is known."""
+    phase = progress.get("phase", "scan")
+    label = {"scan": "Scanning disk", "categorize": "Sorting categories",
+             "verify": "Checking items", "clean": "Cleaning", "done": "Complete"}.get(phase, "Working")
+    completed = max(0, progress.get("completed", 0))
+    total = progress.get("total")
+    width = max(4, width)
+    if total is not None and total > 0:
+        fraction = min(1, completed / total)
+        filled = int(width * fraction)
+        bar = "━" * filled + "─" * (width - filled)
+        detail = f"{completed:,}/{total:,} · {fraction:.0%}"
+    else:
+        offset = int((time.monotonic() if tick is None else tick) * 5) % (width - 2)
+        bar = "─" * offset + "━━━" + "─" * (width - offset - 3)
+        detail = f"{completed:,} entries" if phase == "scan" else "Preparing…"
+    return f"{label}  {bar}  {detail}"
 
 
 def undo_entries(entries, state_dir, cleaner=None):
@@ -117,10 +163,15 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             "confirm": None,
             "result": None,
             "lastBatch": None,
+            "cleanup": None,
         }
         from .demo import DemoScanner
 
         demo = isinstance(scanner, DemoScanner)
+        analysis_key = None
+        analysis_view = None
+        rows_key = None
+        cached_rows = []
 
         def rescan(refresh):
             nonlocal thread
@@ -210,12 +261,30 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     pass
 
         while True:
+            job = state["cleanup"]
+            if job is not None and job.done.is_set():
+                job.thread.join()
+                state["cleanup"] = None
+                if job.error is not None:
+                    state["message"] = "Clean failed: " + job.error
+                else:
+                    result = job.result
+                    state["result"] = result
+                    state["lastBatch"] = result["entries"]
+                    state["marked"] -= {
+                        e["path"] for e in result["entries"] if e["status"] == "done"
+                    }
+                    state["message"] = (
+                        f"Moved {result['completed']} item(s) to the Trash ({human(result['freed'])}); {result['failed']} refused."
+                    )
+                    rescan(False)
             h, w = scr.getmaxyx()
             scr.erase()
             if h < 18 or w < 82:
-                put(0, 0, "Resize Terminal to at least 82 columns x 18 rows. Q exits.")
+                put(0, 0, "Resize Terminal to at least 82 columns x 18 rows."
+                    + (" Cleaning continues…" if state["cleanup"] else " Q exits."))
                 scr.refresh()
-                if scr.getch() in (ord("q"), ord("Q")):
+                if scr.getch() in (ord("q"), ord("Q")) and state["cleanup"] is None:
                     scanner.cancel.set()
                     break
                 continue
@@ -240,17 +309,27 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 put(3, x, label, attr)
                 x += len(label) + 2
             put(4, right, MODE_TEXT[state["mode"]], curses.A_DIM)
-            findings = scanner.decisions(state["mode"])
-            groups = collections.defaultdict(lambda: [0, 0])
-            for f in findings:
-                groups[f.group][0] += f.size
-                if f.selected:
-                    groups[f.group][1] += f.size
-            group_names = ["All categories"] + sorted(
-                groups, key=lambda k: groups[k][0], reverse=True
+            # The status bar animates at 10 Hz; decisions and large table sorts
+            # only need recomputing when the analysis or view actually changes.
+            current_analysis = (
+                id(scanner.findings), len(scanner.findings), scanner.now,
+                scanner.done, state["mode"],
             )
-            total = sum(f.size for f in findings)
-            eligible = sum(f.size for f in findings if f.selected)
+            if analysis_key != current_analysis:
+                findings = list(scanner.decisions(state["mode"]))
+                groups = collections.defaultdict(lambda: [0, 0])
+                for f in findings:
+                    groups[f.group][0] += f.size
+                    if f.selected:
+                        groups[f.group][1] += f.size
+                group_names = ["All categories"] + sorted(
+                    groups, key=lambda k: groups[k][0], reverse=True
+                )
+                total = sum(f.size for f in findings)
+                eligible = sum(f.size for f in findings if f.selected)
+                analysis_key = current_analysis
+                analysis_view = findings, groups, group_names, total, eligible
+            findings, groups, group_names, total, eligible = analysis_view
             put(3, 2, "CATEGORIES", curses.A_DIM)
             group_index = (
                 group_names.index(state["group"])
@@ -273,7 +352,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     pass
             put(h - 5, 2, human(scanner.bytes) + " measured", curses.A_BOLD)
             put(h - 4, 2, human(eligible) + " eligible", curses.color_pair(2))
-            marked_rows = [f for f in findings if f.path in state["marked"]]
+            marked_rows = [f for f in findings if f.path in state["marked"]] if state["marked"] else []
             if marked_rows:
                 put(
                     h - 3,
@@ -290,38 +369,45 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 if scanner.limited or scanner.cancel.is_set()
                 else "Scan complete"
             )
+            operation = None
+            if state["cleanup"] is not None:
+                operation = state["cleanup"].progress
+            elif not scanner.done:
+                operation = getattr(scanner, "progress", None) or {
+                    "phase": "scan", "completed": scanner.visited, "total": None,
+                    "path": scanner.current,
+                }
             put(
-                6,
-                right,
+                6, right,
+                progress_line(operation, width=min(18, max(4, w - right - 44)))
+                if operation else
                 f"{status}  ·  {scanner.visited:,} entries  ·  {scanner.unreadable} unreadable  ·  {scanner.skipped} excluded",
-                curses.color_pair(3) if not scanner.done else curses.A_DIM,
+                curses.A_DIM,
             )
             put(
-                7,
-                right,
-                scanner.error
-                or (
-                    scanner.current
-                    if not scanner.done
-                    else "Scope: " + ", ".join(scanner.roots)
+                7, right,
+                scanner.error or (
+                    operation.get("path", "").replace(scanner.home, "~", 1)
+                    if operation else "Scope: " + ", ".join(scanner.roots)
                 ),
                 curses.A_DIM,
             )
-            rows = [
-                f
-                for f in findings
-                if (state["group"] == "All categories" or f.group == state["group"])
-                and (not state["eligible"] or f.selected)
-                and (
-                    not state["query"]
-                    or state["query"].casefold()
-                    in (f.path + " " + f.group + " " + f.label).casefold()
-                )
-            ]
-            if state["sort"] == "name":
-                rows.sort(key=lambda f: f.path.casefold())
-            elif state["sort"] == "age":
-                rows.sort(key=lambda f: f.newest)
+            current_rows = (analysis_key, state["group"], state["eligible"],
+                            state["query"], state["sort"])
+            if rows_key != current_rows:
+                query = state["query"].casefold()
+                cached_rows = [
+                    f for f in findings
+                    if (state["group"] == "All categories" or f.group == state["group"])
+                    and (not state["eligible"] or f.selected)
+                    and (not query or query in (f.path + " " + f.group + " " + f.label).casefold())
+                ]
+                if state["sort"] == "name":
+                    cached_rows.sort(key=lambda f: f.path.casefold())
+                elif state["sort"] == "age":
+                    cached_rows.sort(key=lambda f: f.newest)
+                rows_key = current_rows
+            rows = cached_rows
             state["cursor"] = min(state["cursor"], max(0, len(rows) - 1))
             page = max(1, h - 16)
             state["offset"] = min(state["offset"], state["cursor"])
@@ -374,10 +460,12 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             put(
                 h - 2,
                 2,
+                "Cleaning in progress · items are re-checked before moving to Trash"
+                if state["cleanup"] is not None else
                 "↑↓ items  ←→ category  1–3 mode  Space mark  X clean  U undo  Enter details  / search  A eligible  S sort  ? help  Q quit",
                 curses.A_DIM,
             )
-            if state["message"]:
+            if state["message"] and state["cleanup"] is None:
                 put(h - 3, right, state["message"], curses.color_pair(1))
             if state["help"] or (state["details"] and selected):
                 boxw = min(w - 8, 108)
@@ -510,27 +598,12 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 if key not in (ord("y"), ord("Y")):
                     state["message"] = "Clean cancelled; nothing was moved."
                     continue
-                put(
-                    h - 3,
-                    right,
-                    f"Re-checking and moving {len(targets)} item(s) to the Trash…",
-                    curses.color_pair(3) | curses.A_BOLD,
-                )
-                scr.refresh()
-                try:
-                    result = clean_targets(scanner, state["mode"], targets, state_dir)
-                    state["result"] = result
-                    state["lastBatch"] = result["entries"]
-                    state["marked"] -= {
-                        e["path"] for e in result["entries"] if e["status"] == "done"
-                    }
-                    state["message"] = (
-                        f"Moved {result['completed']} item(s) to the Trash ({human(result['freed'])}); {result['failed']} refused."
-                    )
-                except Exception as e:
-                    state["message"] = "Clean failed: " + str(e)
-                if state["result"]:
-                    rescan(False)
+                state["message"] = ""
+                state["cleanup"] = CleanupJob(scanner, state["mode"], targets, state_dir)
+                continue
+            if state["cleanup"] is not None:
+                # Keep painting and resizing; never leave a live mutation worker
+                # behind or allow a rescan/undo to race with this batch.
                 continue
             if state["result"]:
                 state["result"] = None

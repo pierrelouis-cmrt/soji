@@ -93,6 +93,24 @@ class CompoundSessionTests(unittest.TestCase):
         self.write('sess/tool-results/new.txt','new');self.age(self.proj/'sess',OLD);self.age(self.proj,OLD)
         result=self.cleaner.apply(p);e=result['entries'][0]
         self.assertEqual(e['status'],'failed');self.assertTrue(self.transcript.exists())
+    def test_standalone_subagent_becoming_compound_is_refused(self):
+        self.transcript.unlink()
+        p=self.plan();self.assertEqual(p['items'][0]['path'],str(self.subagents/'agent.jsonl'))
+        self.transcript.write_text('{}\n')
+        result=self.cleaner.apply(p)
+        self.assertEqual(result['failed'],1)
+        self.assertIn('membership changed',result['entries'][0]['error'])
+        self.assertTrue((self.subagents/'agent.jsonl').exists())
+    def test_scoped_verification_preserves_catalog_policy(self):
+        p=self.plan();original=Scanner._build_findings;captured=[]
+        def build(scan):
+            original(scan)
+            captured.append([(f.path,f.levels,f.holds,f.members,f.action) for f in scan.findings if f.path==str(self.transcript)])
+        def whole(cleaner,scan,path,root,hint):scan.visit(root)
+        with patch.object(Scanner,'_build_findings',build):
+            self.cleaner.fresh(p['items'][0],p)
+            with patch.object(Cleaner,'measure_catalog_target',whole):self.cleaner.fresh(p['items'][0],p)
+        self.assertEqual(captured[0],captured[1])
     def test_tampered_members_rejected(self):
         p=self.plan();p['items'][0]['members'].append(dict(p['items'][0]['members'][1],path=str(self.memory)))
         p.pop('digest');p['digest']=digest(p)
