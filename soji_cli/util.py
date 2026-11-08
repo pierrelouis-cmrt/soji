@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 def inside(path,root):
     a=os.path.abspath(path);r=os.path.abspath(root)
-    if a.startswith('//') or r.startswith('//'):  # POSIX leading-// edge: exact original rule
+    if a.startswith('//') or r.startswith('//'):  # POSIX leading-// edge: exact commonpath rule
         return os.path.commonpath([a,r])==r
     return a==r or r=='/' or a.startswith(r+'/')
 
@@ -25,7 +25,7 @@ class SubtreeIndex:
     for the same path the highest score is kept. `subtree(root)` returns the
     payload whose path is `root` or inside it with the highest score, which is
     what a linear `max(... if inside(path, root))` returns when scores encode
-    the original tie-break order.
+    the linear scan's tie-break order.
     """
     def __init__(self,entries):
         best={}

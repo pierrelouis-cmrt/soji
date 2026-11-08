@@ -1,6 +1,5 @@
-"""Executable interpretations of every shipped SmartRule field.
-Field contracts/catalog values are recovered. Grouping and ambiguous thresholds
-are reconstructed; evidence entries make those interpretations inspectable.
+"""Executable interpretations of every SmartRule field in the hint catalog.
+Evidence entries make each interpretation inspectable.
 """
 from __future__ import annotations
 import collections
@@ -33,7 +32,7 @@ def version_number(name):
     return tuple(int(n) for n in parts) if parts else None
 
 def version_match(version,pin):
-    """ProjectPins.matches, 0x100694d48; literal major/minor prefixes only."""
+    """Project pin match: literal major/minor prefixes only."""
     def bare(value):
         value=value.lower()
         for prefix in ('ruby-','node-','v'):
@@ -43,15 +42,15 @@ def version_match(version,pin):
     return bool(pin) and (version==pin or version.startswith(pin+'.'))
 
 def retention_count(count,mode):
-    """CleanupLevel.keepNewest, 0x1004b14b0 (not a base age policy)."""
+    """Keep-newest count for a mode (not a base age policy)."""
     return count+1 if mode=='careful' else max(1,count-1) if mode=='aggressive' else count
 
 def rule_threshold_days(rule,mode):
-    """Independent SmartRules age gates, not CleanupLevel.forIdle.
+    """SmartRules age gates, not CleanupLevel.forIdle.
 
     Consumers must evaluate both clocks. None means the rule has no such gate.
     Early outcomes (workspace missing, superseded device build, simulator) need
-    to be resolved before applying these gates; see research/rules-recovery.md.
+    to be resolved before applying these gates.
     """
     scale={'careful':(2,4),'balanced':(1,1),'aggressive':(.5,.25)}[mode]
     result={}
@@ -63,23 +62,23 @@ def rule_threshold_days(rule,mode):
     return result
 
 def workspace_missing(path):
-    """DerivedDataProject.workspaceMissing, 0x1006b24d8.
+    """True when a DerivedData project's workspace no longer exists.
 
     Unreadable/malformed/missing metadata and empty WorkspacePath all return
-    true. The original passes the literal string to fileExistsAtPath.
+    true. WorkspacePath is checked as a literal path (not URL-decoded).
     """
     info=read_plist(Path(path)/'info.plist')
     workspace=info.get('WorkspacePath') if isinstance(info,dict) else None
     return not isinstance(workspace,str) or not workspace or not os.path.exists(workspace)
 
 def device_build_prepared(path):
-    """DeviceSupportFolder.isPrepared, 0x1004c4518: marker plus visible entry."""
+    """A prepared device-support folder: marker plus visible entry."""
     try:names=os.listdir(path)
     except OSError:return False
     return any(n.startswith('.processed_dyld_shared_cache') for n in names) and any(not n.startswith('.') for n in names)
 
 def device_support_name(name):
-    """DeviceSupportFolder.init(name:), 0x1004c31f4 -> (device, version, build) or None.
+    """Parse `[DEVICE ]VERSION (BUILD)` -> (device, version, build) or None.
 
     `[DEVICE ]VERSION (BUILD)`: ends with ')', BUILD (after the last '(') is
     non-empty letters/digits; the rest splits on spaces into 1 or 2 words, the
@@ -96,7 +95,7 @@ def device_support_name(name):
     return (words[0] if len(words)==2 else None),words[-1],build
 
 def build_number(build):
-    """DeviceSupportFolder.BuildNumber.init, 0x1004c4728 -> (train, number) or None.
+    """Parse a build number -> (train, number) or None.
 
     Digits, one letter, then 1-3 digits: '21A329' -> ('21A', 329). Anything
     else (e.g. beta '22A5316k') is None and newerBuild falls back to dates.
@@ -108,7 +107,7 @@ def build_number(build):
     return build[:letter+1],int(rest)
 
 def is_device_support(path):
-    """DeviceSupportFolder.isDeviceSupport, 0x1004c35f8: .../Xcode/<* DeviceSupport>/<name>."""
+    """Path is .../Xcode/<* DeviceSupport>/<name>."""
     p=Path(path)
     return p.parent.name.endswith(' DeviceSupport') and p.parent.parent.name=='Xcode'
 
@@ -118,7 +117,7 @@ def _birth_seconds(path):
     except (OSError,AttributeError):return None
 
 def newer_build(path):
-    """DeviceSupportFolder.newerBuild(than:), 0x1004c0c5c.
+    """Newer prepared build of the same device and version, if any.
 
     Returns the build of a prepared sibling with the same device and version and
     a newer build, else None. Newer means: same BuildNumber train and a higher
@@ -147,7 +146,7 @@ def newer_build(path):
     return None
 
 def simulator_device(path):
-    """SimulatorDevice.init(path:), 0x1006a8394: device.plist name/runtime (String)
+    """Read a simulator device.plist: name/runtime (String)
     and state (Int) are required; returns None otherwise."""
     info=read_plist(Path(path)/'device.plist')
     if not isinstance(info,dict):return None
@@ -161,7 +160,7 @@ def _uuid(text):
     except ValueError:return None
 
 def simulator_has_twin(path,device=None):
-    """SimulatorDevice.hasTwin(path:), 0x1006a8b64 and closure 0x1006a8db8.
+    """Another simulator with the same name and runtime (different UUID).
 
     True when another device folder in the same Devices directory (a different
     UUID; entries are skipped when neither name parses as a UUID) has the same
@@ -191,7 +190,7 @@ def archive_platform(path,props):
     return ''
 
 def archive_uploads(info):
-    """Successful non-validation distribution identities, 0x1004be4dc."""
+    """Successful non-validation distribution identities."""
     uploads=set()
     rows=info.get('Distributions',[])
     if not isinstance(rows,list):return uploads
@@ -336,12 +335,12 @@ class SpecializedRules:
                   self.scanner.nodes[p].reason!='Symlink; not followed']
         def stamp(p):
             if by=='bundle':return self.archive(p)[2]
-            # Original uses IndexEntry newestChange, falling back to lstat mtime.
+            # Newest change in the subtree.
             return self.scanner.nodes[p].newest
         target=stamp(f.path)
         rank=sum(stamp(p) is not None and target is not None and stamp(p)>target for p in siblings if p!=f.path)
         siblings.sort(key=lambda p:stamp(p) if stamp(p) is not None else float('-inf'),reverse=True)
-        # Port choice (stricter than the original's timestamp-only rank): a
+        # Stricter than a timestamp-only rank: a
         # higher version label also counts as newer, so the highest version is
         # never removed because an older one was touched later. Bundle groups
         # (archives) have no version label. None = no comparable version.
@@ -385,7 +384,7 @@ class SpecializedRules:
         if r.get('keepNewest'):
             retained,rank,siblings,version_rank=self.retained(f)
             counts={mode:retention_count(r['keepNewest'],mode) for mode in ('careful','balanced','aggressive')}
-            f.evidence.append({'check':'retention','keepBy':r.get('keepBy'),'rank':rank,'versionRank':version_rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'kept if among the newest by timestamp (original) or by version label (port)'})
+            f.evidence.append({'check':'retention','keepBy':r.get('keepBy'),'rank':rank,'versionRank':version_rank,'siblings':len(siblings),'keepNewest':r['keepNewest'],'counts':counts,'basis':'kept if among the newest by timestamp or by version label'})
             held=min(rank,version_rank) if version_rank is not None else rank
             for mode,count in counts.items():
                 if held<count:
@@ -394,16 +393,12 @@ class SpecializedRules:
                     f.mode_holds[mode]='Retained newest version in '+r.get('keepBy','all')+' group'
             if r.get('keepBy')=='bundle' and self.newest_uploaded(f.path,siblings):
                 f.holds.append('Newest uploaded archive retained')
-        f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'SmartRules.evaluate 0x1006ac904 onward; requires engine integration'})
+        f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'SmartRules age thresholds per mode'})
         if r.get('workspaceMissing'):
             missing=workspace_missing(f.path)
             if missing:
-                # SmartRules early Outcome (0x1006ac248-0x1006ac2b4): level=Careful,
-                # earlier-collected holds kept, rank/age loop skipped. The level
-                # becomes Finding.minLevel; CleanupLevels.apply (0x100660bf4) then
-                # applies the normal recency/age policy (levelByOwnRule is false:
-                # no document-version action, no simulator runtime). Static trace
-                # only; not observed in the original app.
+                # Early outcome: level Careful, earlier holds kept, rank/age
+                # gates skipped. The normal recency/age policy then applies.
                 f.rule_early_reason='workspaceMissing';f.rule_level='careful'
                 f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
             f.evidence.append({'check':'workspaceMissing','missing':missing,'basis':'literal WorkspacePath existence; absent/unreadable metadata is missing'})
@@ -413,11 +408,10 @@ class SpecializedRules:
             build=build_match.group(1) if build_match else None
             if not self.connected_known:f.holds.append('Connected-device build state unavailable')
             elif build and build in self.devices.device_builds:f.holds.append('A connected device uses this build')
-            # SmartRules early Outcome (0x1006ac2b8-0x1006ac34c), gated on the
-            # rule's deviceBuild flag and Context.direct: a prepared newer build
-            # of the same device and version gives level Careful exactly like
+            # Early outcome for a direct match: a prepared newer build of the
+            # same device and version gives level Careful exactly like
             # workspaceMissing; earlier holds stay, retention and rule clocks go,
-            # then CleanupLevels.apply uses normal recency.
+            # then normal recency applies.
             newer=None
             if f.matched_pattern and f.rule_early_reason is None:
                 try:direct=stat.S_ISDIR(os.lstat(f.path).st_mode)
@@ -436,21 +430,18 @@ class SpecializedRules:
                 missing=(device.get('isAvailable') is False or (runtime is not None and not runtime.get('isAvailable',True))
                          or (runtime is None and bool(self.devices.runtime_images)))
                 if missing:
-                    # Early Outcome 0x1006ac6c0 (runtime absent from the available
-                    # runtime set): level Careful, then CleanupLevels.apply's
-                    # normal recency (>=7 d Careful, 1-7 d Balanced, 1 h-1 d
-                    # Aggressive). Expressed as levels so the unresolved costly
-                    # adjustment cannot make it looser or stricter than traced.
+                    # Runtime not installed: level Careful plus normal recency
+                    # (>=7 d Careful, 1-7 d Balanced, 1 h-1 d Aggressive),
+                    # expressed as explicit levels.
                     f.special_min_hours=0;f.rule_early_reason='runtimeMissing'
                     f.levels={'careful':168,'balanced':24,'aggressive':1,'reason':'Simulator runtime is not installed'}
                 else:
                     bundles=Path(f.path)/'data/Containers/Bundle/Application'
                     try:has_apps=bundles.exists() and any(not p.name.startswith('.') for p in bundles.iterdir())
                     except OSError:has_apps=True
-                    # 0x1006acbd0-0x1006ace1c: no app bundles and a twin (same
-                    # device.plist name and runtime, other UUID) raise the rule
-                    # level to Balanced. Port keeps the stricter 7-day judgement
-                    # until the costly-tier adjustment is resolved.
+                    # No app bundles and a twin (same device.plist name and
+                    # runtime, other UUID): spare simulator, kept on a 7-day
+                    # Balanced judgement.
                     twin=not has_apps and simulator_has_twin(f.path)
                     f.evidence.append({'check':'simulatorTwin','apps':has_apps,'twin':twin,'basis':'SimulatorDevice.hasTwin: same name and runtime, different UUID'})
                     if twin:f.levels={'balanced':168,'aggressive':168,'reason':'Spare shut-down simulator: a twin with the same name and runtime exists, and this one has no apps'}
@@ -470,5 +461,5 @@ class SpecializedRules:
             state=next((e['state'] for e in f.evidence if e.get('check')=='git'),{})
             if state.get('verified') and state.get('mainWorktree') and not state.get('reason'):f.action={'kind':'git-worktree','repository':state['mainWorktree'],'path':f.path}
         if r.get('early') and f.group=='Agent worktrees' and not f.holds:
-            f.special_min_hours=max(1,r.get('untouchedDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; recovered idle rule'}
+            f.special_min_hours=max(1,r.get('untouchedDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; idle rule'}
         return f

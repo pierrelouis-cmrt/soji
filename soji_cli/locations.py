@@ -30,7 +30,7 @@ def cache_locations(home,environment=None):
         if path and os.path.isabs(path):
             if hint=='npm-cache':path=str(Path(path)/'_cacache')
             result.append((hint,os.path.normpath(path),variable))
-    # ToolCaches.locate: BUN_INSTALL_CACHE_DIR (0x10048a690) is direct;
+    # ToolCaches.locate: BUN_INSTALL_CACHE_DIR is direct;
     # BUN_INSTALL identifies the installation whose cache is install/cache.
     bun=values.get('BUN_INSTALL')
     if bun and os.path.isabs(bun):result.append(('bun-cache',str(Path(bun)/'install/cache'),'BUN_INSTALL'))

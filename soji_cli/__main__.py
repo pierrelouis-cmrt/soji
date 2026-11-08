@@ -20,8 +20,8 @@ def main():
     if '--ai' in argv and (not argv or argv[0] not in COMMANDS):
         argv=['ai','brief',*[a for a in argv if a!='--ai']]
     action=argv.pop(0) if argv and argv[0] in COMMANDS else 'scan'
-    p=argparse.ArgumentParser(prog='soji '+action,description='Sōji: reconstructed disk analysis, persistent index, AI and verified cleanup.')
-    p.add_argument('--state',default=str(Path.home()/'Library/Application Support/Soji'),help='Independent application state directory')
+    p=argparse.ArgumentParser(prog='soji '+action,description='Sōji: disk analysis, persistent index, AI and verified cleanup.')
+    p.add_argument('--state',default=str(Path.home()/'Library/Application Support/Soji'),help='Application state directory')
     if action=='mcp':
         p.add_argument('--report',default=os.environ.get('SOJI_REPORT'));args=p.parse_args(argv)
         from .mcp import MCPServer

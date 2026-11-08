@@ -14,9 +14,8 @@ import zlib
 from .engine import Scanner,Node,within
 from .platform import native,events
 
-# Consumer Options.init at 0x10050f334 and its literal pool at 0x100884000.
-# Keep independent scanner scheduling separate from the original worker timers.
-RECOVERED_DEFAULTS = {
+# Index scheduling defaults.
+INDEX_DEFAULTS = {
     'rollUpBytes': 50_000_000, 'forcedDepth': 1, 'latency': 30.0,
     'fullCheckInterval': 604800.0, 'snapshotDays': 60, 'cooldown': 60.0,
     'busyCooldown': 180.0, 'relaxedLatency': 300.0, 'relaxedCooldown': 300.0,
@@ -26,7 +25,7 @@ RECOVERED_DEFAULTS = {
 # In addition to lost history, mount/unmount changes invalidate device boundaries.
 RESCAN_FLAGS = 0x1 | 0x2 | 0x4 | 0x8 | 0x20 | 0x40 | 0x80
 HISTORY_DONE = 0x10
-# Port choice: per incremental run, re-stat at most this many cached single-link
+# Design choice: per incremental run, re-stat at most this many cached single-link
 # files of at least this size to catch new hardlinks made outside the roots.
 LINK_PROBE_MIN_BYTES = 1 << 20
 LINK_PROBE_LIMIT = 20_000
@@ -202,7 +201,7 @@ class IndexStore:
             finished=not scanner.limited and not scanner.cancel.is_set() and not scanner.error
             complete=finished and not any(n.own_errors for n in scanner.nodes.values())
             self.set_meta('updatedAt',now);self.set_meta('complete',complete)
-            # Port choice: a walk that finished but met unreadable entries (TCC
+            # Design choice: a walk that finished but met unreadable entries (TCC
             # denials such as ~/Library/Caches/com.apple.Safari) is reusable.
             # Incremental runs probe a sample of unreadable rows and re-walk
             # them all if any became readable; `complete` still gates snapshots.
@@ -212,14 +211,14 @@ class IndexStore:
             if full_scan and finished:self.set_meta('walkedAt',now)
             if volumes is not None:self.set_meta('volumes',volumes)
             day=time.strftime('%Y-%m-%d',time.localtime(now))
-            # snapshotIfDue (0x100515ff8) returns if ANY snapshot exists today.
+            # At most one snapshot per day.
             # A partial walk must never establish the daily growth baseline.
             if complete and not self.db.execute('SELECT 1 FROM snapshots WHERE day=? LIMIT 1',(day,)).fetchone():
                 self.db.executemany('INSERT INTO snapshots VALUES(?,?,?)',((day,p,n.size) for p,n in scanner.nodes.items() if n.directory))
-            cutoff=time.strftime('%Y-%m-%d',time.localtime(now-RECOVERED_DEFAULTS['snapshotDays']*86400))
+            cutoff=time.strftime('%Y-%m-%d',time.localtime(now-INDEX_DEFAULTS['snapshotDays']*86400))
             self.db.execute('DELETE FROM snapshots WHERE day<?',(cutoff,))
     def growth(self,limit=30,since=None,nodes=None):
-        # Original IndexStore.growth (0x100534dcc) compares LIVE rows with
+        # Growth compares live rows with
         # MAX(snapshot.day <= requested day), falling back to MIN(day).
         day=time.strftime('%Y-%m-%d',time.localtime(since)) if since is not None else ''
         baseline=self.db.execute('SELECT MAX(day) FROM snapshots WHERE day<=?',(day,)).fetchone()[0]
@@ -397,7 +396,7 @@ class IndexedScanner(Scanner):
             pool=ThreadPoolExecutor(1);context=pool.submit(self.collect_context)
             reusable=store.meta('reusable',store.meta('complete',False))
             walked=store.meta('walkedAt',store.meta('fullCheckedAt',0))
-            can_reuse=not self.refresh and store.meta('signature')==signature and reusable and time.time()-walked<RECOVERED_DEFAULTS['fullCheckInterval'] and store.loadable()
+            can_reuse=not self.refresh and store.meta('signature')==signature and reusable and time.time()-walked<INDEX_DEFAULTS['fullCheckInterval'] and store.loadable()
             saved=store.meta('eventID',0);current=native('event-id',*self.roots);event_id=current.get('eventID',0) if isinstance(current,dict) else 0
             if saved and (not event_id or event_id<saved):can_reuse=False
             volumes=current.get('volumes') if isinstance(current,dict) else None

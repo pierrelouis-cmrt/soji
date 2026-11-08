@@ -1,4 +1,4 @@
-"""Recovered agent presets, prompt contract, isolated MCP runs and verdict reuse."""
+"""Agent presets, prompt contract, isolated MCP runs and verdict reuse."""
 from __future__ import annotations
 import dataclasses
 from importlib.resources import files
@@ -62,8 +62,8 @@ IDENTITY_FIELDS = ('device', 'inode', 'type', 'parentDevice', 'parentInode')
 def content_fingerprint(f):
     """Measured content plus stable identity; mutable mtime/ctime are excluded.
 
-    Identity is a reconstruction safety boundary in addition to the recovered
-    three-field content policy. Return fresh dictionaries for snapshot storage.
+    Identity is a safety boundary in addition to the three-field content
+    policy. Return fresh dictionaries for snapshot storage.
     """
     identity = f.identity or {}
     return {'sizeBytes': f.size, 'newestChange': f.newest, 'fileCount': f.files,
@@ -73,9 +73,9 @@ def content_fingerprint(f):
 def reusable_verdict(store, f, now, trigger='ordinary'):
     """Return a reusable claim; absence/negative claims return None.
 
-    Raw records use the recovered selection policy only after stable identity
+    Raw records use the selection policy only after stable identity
     matches. Legacy stores/rows retain their strict hash and TTL behavior.
-    Backlog deliberately checks size alone (runDisk 0x100601438), ignoring age,
+    Backlog deliberately checks size alone, ignoring age,
     levels, count and timestamp; this never bypasses local cleanup checks.
     """
     reader = getattr(store, 'verdict_record', None)
@@ -132,10 +132,10 @@ def parse_usage(text):
     return usage
 
 
-# Cache policy recovered separately from the port's stricter identity digest.
-# A Fingerprint in the installed app is sizeBytes/newestChange/fileCount only.
+# Cache policy, separate from the stricter identity digest.
+# A content fingerprint is sizeBytes/newestChange/fileCount only.
 def same_content_fingerprint(old, current):
-    """VerdictCache.same (0x1006be098): timestamp tolerance is strictly <1s."""
+    """Same cached content: timestamp tolerance is strictly <1s."""
     a, b = old.get('newestChange'), current.get('newestChange')
     return (old['sizeBytes'] == current['sizeBytes'] and
             old['fileCount'] == current['fileCount'] and
@@ -174,10 +174,10 @@ def judgement_needed(old, current, judged_at, now, finding):
 
 
 def decode_submission(value):
-    """Salvage valid individual rows, as SubmissionReader.items does.
+    """Salvage valid individual rows.
 
-    The recovered fallback accepts an object containing either array and drops
-    undecodable rows. Retain the port's schema checks on each accepted row.
+    The fallback accepts an object containing either array and drops
+    undecodable rows. Retain the schema checks on each accepted row.
     """
     if not isinstance(value, dict) or not any(isinstance(value.get(k), list) for k in ('findings', 'processVerdicts')):
         return None

@@ -31,7 +31,7 @@ def expand_catalogs(scanner):
                 f.recommendation='trash';f.source='catalog'
                 if finding.hint_id=='claude-sessions':
                     sidecar=not f.members and ('/subagents/' in n.path or '/tool-results/' in n.path)
-                    f.levels={'careful':72 if sidecar else 168,'balanced':24 if sidecar else 48,'aggressive':3,'reason':'Recovered Claude session/sidecar idle policy'}
+                    f.levels={'careful':72 if sidecar else 168,'balanced':24 if sidecar else 48,'aggressive':3,'reason':'Claude session/sidecar idle policy'}
                 else:
                     f.levels={'careful':168,'balanced':48,'aggressive':3,'reason':'Codex executable idle branches: 7 days / 2 days / 3 hours'}
                 for member in (f.members or [{'path':n.path}]):
@@ -62,7 +62,7 @@ def expand_catalogs(scanner):
             for path in children:
                 f=scanner.classify(scanner.nodes[path]);f.group='Trash';f.label=Path(path).name;f.hint_id='trash-item';f.tier='userData'
                 f.managed=bool(getattr(scanner,'tick_trash',False));f.list_only=not f.managed
-                f.levels={'careful':720,'balanced':168,'aggressive':24,'reason':'Recovered old-Trash policy'}
+                f.levels={'careful':720,'balanced':168,'aggressive':24,'reason':'Old-Trash policy'}
                 f.action={'kind':'empty-trash'};f.recommendation='remove';result.append(f)
         else:result.append(finding)
     return result
@@ -75,7 +75,7 @@ def claude_session_units(scanner,project):
     """Map each main transcript `<project>/<id>.jsonl` to its member nodes.
 
     Members are the transcript plus the existing `<id>/subagents` and
-    `<id>/tool-results` folders (measureProject 0x1006a0774). Never the
+    `<id>/tool-results` folders. Never the
     common `<id>` parent, never memory/memories.
     """
     units={}
@@ -107,7 +107,7 @@ def compound_session(scanner,f,members):
 
 
 def codex_idle_ordinal(idle_seconds):
-    """Raw FindingPart level byte from codexRows (0x1006a3de4..3e10).
+    """Level ordinal for a Codex rollout from its idle time.
 
     0: Careful, 1: Balanced, 2: Aggressive, 3: below selectable age.
     Boundary comparisons are inclusive. Negative/future idle stays at 3.

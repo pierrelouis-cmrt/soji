@@ -1,4 +1,4 @@
-"""Activity sources visible in the consumer build; normalized to project/time pairs.
+"""Coding-agent and editor activity sources, normalized to project/time pairs.
 No transcript text, credentials, or model output is returned by these adapters.
 """
 from __future__ import annotations
@@ -111,8 +111,7 @@ class ActivityIndex:
             day=root/(today-dt.timedelta(days=offset)).strftime('%Y/%m/%d')
             for path in self.walk(day,('.jsonl',ZSTD_SUFFIX)) or []:
                 if not self.jsonl_metadata(path,'Codex',16384):unreadable.append(path)
-        # Compatibility extension for newer Codex installations (not observed
-        # in the recovered activity reader). Its rollout_path keeps the
+        # Newer Codex installations list rollouts in SQLite. Its rollout_path keeps the
         # pre-compression `.jsonl` name.
         listed=set()
         for db in base.glob('state_*.sqlite'):
@@ -139,7 +138,7 @@ class ActivityIndex:
                 query="SELECT json_extract(payload_json, '$.worktreePath'), updated_at, archived_at FROM orchestration_v2_projection_threads WHERE deleted_at IS NULL LIMIT ?"
                 for path,updated,archived in c.execute(query,(self.max_records,)):
                     # A NULL archive column means live now; archived threads use
-                    # the later of update/archive times (0x100557b8c..7c3c).
+                    # the later of update/archive times.
                     at=self.now if archived is None else max(timestamp(updated) or 0,timestamp(archived) or 0)
                     self.add(path,at,'T3 Code',active=archived is None)
         except sqlite3.Error:self.errors.append('T3 activity database unavailable or incompatible')

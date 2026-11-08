@@ -61,7 +61,7 @@ class ActivityTests(Fixture):
 
 class SpecializedTests(Fixture):
     def finding(self,s,path):return s.classify(s.nodes[str(path)])
-    def test_every_shipped_field_has_handler(self):
+    def test_every_rule_field_has_handler(self):
         fields={k for h in Catalog(str(self.home)).hints for k in h.get('rule',{})}
         self.assertEqual(fields,FIELDS)
     def test_retention_uses_newest_timestamps(self):

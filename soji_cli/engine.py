@@ -1,4 +1,4 @@
-"""Independent, read-only disk classifier using Sōji's shipped hint catalog."""
+"""Read-only disk classifier driven by the hint catalog."""
 from __future__ import annotations
 import bisect
 import collections
@@ -130,7 +130,7 @@ class Finding:
     rule_early_reason: str | None = None
     # SmartRules early Outcome level (e.g. workspaceMissing -> careful). When
     # set, the rule's own age/rank gates were skipped; the level is combined
-    # with the judged risk level (consumer build 2026.11.14, 0x1006782cc).
+    # with the judged risk level.
     rule_level: str | None = None
     # Compound unit (Claude session): explicit member paths, each measured once.
     # Empty for ordinary single-path rows.
@@ -186,7 +186,7 @@ UNIT_RULES = ('keepNewest', 'simulatorDevice', 'deviceBuild', 'early', 'workspac
 def generic_container(match) -> bool:
     """A selectable catch-all such as ~/Library/Caches/*.
 
-    Reconstruction choice: when a more specific hint matches inside one of
+    When a more specific hint matches inside one of
     these (Homebrew, Playwright, Cypress, browser caches...), the frontier
     descends so the specific rule applies, and the unmatched remainder keeps
     the catch-all classification. Review-only parents already descend.
@@ -307,7 +307,7 @@ class Catalog:
             if hint.get('inside') or hint.get('notInside') or hint.get('near'):pure=False
             if hint.get('inside') and not self.exists(p,hint['inside']):continue
             if hint.get('notInside') and self.exists(p,hint['notInside']):continue
-            # Recovered marker semantics say nearby. Ancestor depth here is reconstructed.
+            # `near` markers may sit in up to four ancestors.
             if hint.get('near') and not any(self.exists(a,hint['near']) for a in list(p.parents)[:4]):continue
             if pure:self.pure[path]=self.record_index[(hint['id'],pattern)]
             return hint,pattern
@@ -509,7 +509,7 @@ class Scanner:
             if not node.directory:
                 group='Large media files' if name.endswith(('.mov','.mp4','.mkv','.wav','.aiff','.mp3','.jpg','.heic','.png')) else 'Downloads and installers' if name.endswith(('.dmg','.pkg','.xip','.zip','.tar','.gz','.download','.part')) else 'Other files'
             else:group='Other folders'
-            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,group,Path(node.path).name or '/',smart_rule='No shipped hint matched; review only')
+            f=Finding(node.path,node.size,node.apparent,node.files,node.newest,group,Path(node.path).name or '/',smart_rule='No hint matched; review only')
         f.recent_activity_hours=self.recent_activity_hours
         if node.errors:f.holds.append(f'Incomplete measurement ({node.errors} errors or scan limit)')
         if node.skipped:f.holds.append(node.reason or 'Contains an excluded or unreadable subtree')
@@ -523,7 +523,7 @@ class Scanner:
         project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('projectUntouchedDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
         if project:
             f.project_idle_hours=self.project_age(project)
-            # Safety extension, not original ActivityTable semantics: agent or
+            # Safety extension: agent or
             # editor activity recorded at the owning project root also counts
             # as project use. Descendant-only last() is kept; the query is just
             # rooted at the project, and only the project clock is affected.
@@ -543,7 +543,7 @@ class Scanner:
             f.identity=file_identity(f.path)
             if f.identity['type']==stat.S_IFLNK:f.holds.append('Symlink itself is never a cleanup target')
         except OSError:f.holds.append('File identity unavailable')
-        # Explicitly show original thresholds as provenance, separate from mode choices.
+        # Show the rule thresholds, separate from mode choices.
         f.thresholds={'untouchedDays':f.rule.get('untouchedDays'),'projectUntouchedDays':f.rule.get('projectUntouchedDays')}
         return f
 
@@ -642,4 +642,4 @@ class Scanner:
 
     def report(self,mode):
         findings=self.decisions(mode)
-        return {'format':'soji/1','roots':self.roots,'home':self.home,'mode':mode,'modeDescription':MODE_TEXT[ALIASES.get(mode,mode)], 'source':'375 shipped hints; reconstructed native rules, activity, index, AI integration and guarded cleanup', 'scannedAt':self.now,'visited':self.visited,'indexedEntries':len(self.nodes),'allocatedBytes':self.bytes,'selectedBytes':sum(f.size for f in findings if f.selected),'unreadable':self.unreadable,'excludedSubtrees':self.skipped,'limited':self.limited or self.cancel.is_set(),'error':self.error,'contextWarnings':self.context_warnings,'findings':[dataclasses.asdict(f) for f in findings]}
+        return {'format':'soji/1','roots':self.roots,'home':self.home,'mode':mode,'modeDescription':MODE_TEXT[ALIASES.get(mode,mode)], 'source':'375 hints; native rules, activity, index, AI integration and guarded cleanup', 'scannedAt':self.now,'visited':self.visited,'indexedEntries':len(self.nodes),'allocatedBytes':self.bytes,'selectedBytes':sum(f.size for f in findings if f.selected),'unreadable':self.unreadable,'excludedSubtrees':self.skipped,'limited':self.limited or self.cancel.is_set(),'error':self.error,'contextWarnings':self.context_warnings,'findings':[dataclasses.asdict(f) for f in findings]}

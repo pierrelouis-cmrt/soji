@@ -1,4 +1,4 @@
-"""SimulatorDevice.init/hasTwin (0x1006a8394, 0x1006a8b64) and simulator outcomes."""
+"""Simulator device parsing, twin detection and simulator outcomes."""
 import os
 import plistlib
 import time

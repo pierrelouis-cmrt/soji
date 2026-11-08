@@ -1,6 +1,5 @@
-"""Pure recovered scheduling policy; callers own timers, consent and run accounting.
+"""Pure scheduling policy; callers own timers, consent and run accounting.
 
-ARM64 Sōji 2026.11.14: AnalysisCadence.due at 0x1005d0b58.
 This module never schedules or launches an agent by itself.
 """
 from dataclasses import dataclass

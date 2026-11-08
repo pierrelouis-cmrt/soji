@@ -1,4 +1,4 @@
-"""Official cleanup commands: exact recovered allowlist plus live scope checks."""
+"""Official cleanup commands: exact allowlist plus live scope checks."""
 from pathlib import Path
 import os
 import shutil
@@ -7,7 +7,7 @@ import json
 from .util import command
 
 def may_remove_permanently(finding):
-    """CleanCommands gate at 0x1006dbc9c (not a general delete authorization)."""
+    """Cleanup-command gate (not a general delete authorization)."""
     def value(name, default=None):
         return finding.get(name, default) if isinstance(finding, dict) else getattr(finding, name, default)
     return (value('tier') == 'regenerable' and value('recommendation') == 'remove'
@@ -19,7 +19,7 @@ class CommandPolicy:
     def __init__(self):self.hints={h['id']:h for h in json.loads(files('soji_cli').joinpath('data/hints.json').read_text())}
     def bound(self,action,path,home):
         hint=self.hints.get(action.get('hint'))
-        if not hint or action.get('argv')!=hint.get('cleanCommand'):raise ValueError('Command differs from recovered allowlist')
+        if not hint or action.get('argv')!=hint.get('cleanCommand'):raise ValueError('Command differs from allowlist')
         if os.path.realpath(home)!=str(Path.home().resolve()):raise ValueError('Official commands cannot target a synthetic/alternate home')
         from .engine import Catalog
         matched=Catalog(home).match(str(path))

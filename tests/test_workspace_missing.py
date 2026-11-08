@@ -1,12 +1,9 @@
-"""DerivedData missing-workspace early Outcome (consumer build 2026.11.14).
+"""DerivedData missing-workspace early outcome.
 
-Two evidence levels are tested separately:
-- CONFIRMED (static trace): SmartRules' early rule result is Careful and the
-  verifier combines it with `judged` (max, none propagates).
-- STATICALLY TRACED, NOT RUNTIME-OBSERVED: final per-mode selection. The level
-  becomes Finding.minLevel and CleanupLevels.apply (0x100660bf4) applies the
-  normal recency/age policy because levelByOwnRule is false for these rows.
-  No original-app run has confirmed these selections; the parity gap stays open.
+- The early rule result is Careful and is combined with `judged` (max, none
+  propagates).
+- Final per-mode selection: the level becomes the finding's minimum level and
+  the normal recency/age policy applies.
 """
 import os
 import plistlib
@@ -25,10 +22,9 @@ MODES = ('careful', 'balanced', 'aggressive')
 DAY = 86400
 
 
-class CostlyBranchUnreachable(unittest.TestCase):
+class NeverCostly(unittest.TestCase):
     def test_workspace_missing_hints_are_never_costly(self):
-        """The unported verifier adjustment (0x1006782f4) requires tier == costly.
-        Every shipped workspaceMissing hint is regenerable, so it cannot apply."""
+        """Every workspaceMissing hint is regenerable, never costly."""
         import json
         from soji_cli.engine import DATA
         hints = [h for h in json.loads((DATA / 'hints.json').read_text()) if (h.get('rule') or {}).get('workspaceMissing')]
@@ -96,7 +92,6 @@ class WorkspaceMissingScan(unittest.TestCase):
             self.assertEqual(f.rule_min_hours, {}, name)
 
     def test_missing_versus_present_old(self):
-        """Final selection: statically traced, not runtime-observed."""
         self.project('Missing', 20, self.home / 'code/gone')
         self.project('Present', 20, self.home / 'code/app')
         self.project('NoInfo', 20, None)  # absent WorkspacePath counts as missing
@@ -109,8 +104,7 @@ class WorkspaceMissingScan(unittest.TestCase):
         self.assertEqual(self.picks(rows['Present']), [False, True, True])
 
     def test_recent_data_still_follows_age_policy(self):
-        """Final selection for recently created caches: statically traced through
-        CleanupLevels.apply (forIdle 7 d / 1 d / 1 h, 300 s floor), not observed."""
+        """Recently created caches follow forIdle (7 d / 1 d / 1 h, 300 s floor)."""
         self.project('Days', 3, self.home / 'code/gone')
         self.project('Hours', 2 / 24, self.home / 'code/gone')
         self.project('Fresh', 60 / DAY, self.home / 'code/gone')
@@ -126,8 +120,7 @@ class WorkspaceMissingScan(unittest.TestCase):
         self.assertEqual(self.picks(rows['Missing']), [False, False, False])
 
     def test_explicit_judgment_takes_precedence(self):
-        """Confirmed (0x100678ec0, CleanupLevels.apply): with an agent judgement the
-        rule level is discarded; the judgement's levels decide by idle time."""
+        """With an agent judgement the rule level is discarded; the judgement's levels decide by idle time."""
         self.project('Missing', 20, self.home / 'code/gone')
         rows = self.scan()
         f = rows['Missing']['finding']

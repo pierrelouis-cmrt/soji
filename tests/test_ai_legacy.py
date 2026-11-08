@@ -103,7 +103,7 @@ class SubmissionTests(unittest.TestCase):
             Path(d,'submission.json').write_text(json.dumps({'findings':[]}))
             self.assertEqual(read_submission(d,answer)['findings'], [])
 
-    def test_recovered_failure_patterns_and_precedence(self):
+    def test_failure_patterns_and_precedence(self):
         cases = {'oauth token has revoked':'authentication', 'api error: 529':'rate-limit',
                  'billing_error':'quota', 'error: unexpected argument --bad':'cli',
                  'model alpha not supported; invalid api key':'model'}
@@ -116,7 +116,7 @@ class LaunchTests(unittest.TestCase):
         return SimpleNamespace(home=str(root), protected=[], roots=[str(root)], database=None,
             findings=[], bytes=0, report=lambda level: {'roots':[str(root)], 'findings':[]})
 
-    def test_presets_keep_recovered_mcp_extras(self):
+    def test_presets_keep_mcp_extras(self):
         with tempfile.TemporaryDirectory() as d:
             for preset in PRESETS:
                 if preset['id']=='custom': continue

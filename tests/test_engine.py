@@ -73,7 +73,7 @@ class DecisionTests(unittest.TestCase):
         for days in [0.1,0.5,1,2,6,8,30]:
             f=self.f(days);result=[f.decide(m,1000000000)[0] for m in ['careful','balanced','aggressive']]
             self.assertEqual(result,sorted(result))
-    def test_smart_original_rule(self):
+    def test_smart_rule(self):
         f=self.f(10,rule={'untouchedDays':14})
         f.special_min_hours=14*24;self.assertFalse(f.decide('balanced',1000000000)[0]);f.newest-=7*86400;self.assertTrue(f.decide('balanced',1000000000)[0])
     def test_project_rule(self):

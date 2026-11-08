@@ -1,4 +1,4 @@
-"""DeviceSupportFolder.newerBuild (0x1004c0c5c) and its SmartRules early outcome."""
+"""Device support newer-build detection and its SmartRules early outcome."""
 import os
 import time
 import unittest

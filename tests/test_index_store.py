@@ -1,4 +1,4 @@
-"""Regression fixtures for recovered index contracts; all mutations are disposable."""
+"""Regression fixtures for index contracts; all mutations are disposable."""
 import dataclasses
 import json
 import os
@@ -12,13 +12,13 @@ import unittest
 from unittest.mock import patch
 
 from soji_cli.engine import Node, Scanner, within
-from soji_cli.index import IndexStore, IndexedScanner, RECOVERED_DEFAULTS
+from soji_cli.index import IndexStore, IndexedScanner, INDEX_DEFAULTS
 from soji_cli.locations import cache_locations
 
 
 class IndexRecovery(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory(prefix='soji-index-recovery-')
+        self.tmp=tempfile.TemporaryDirectory(prefix='soji-index-')
         self.base=Path(self.tmp.name).resolve();self.root=self.base/'root';self.root.mkdir()
         self.database=self.base/'state/index.sqlite'
     def tearDown(self):self.tmp.cleanup()
@@ -55,10 +55,10 @@ class IndexRecovery(unittest.TestCase):
             store.save_verdict('/new','other-hash',{},102)
             self.assertIsNone(store.verdict_record('/new')['content'])
         finally:store.close()
-    def test_recovered_defaults(self):
-        self.assertEqual(RECOVERED_DEFAULTS['fullCheckInterval'],7*86400)
-        self.assertEqual(RECOVERED_DEFAULTS['snapshotDays'],60)
-        self.assertEqual(RECOVERED_DEFAULTS['rollUpBytes'],50_000_000)
+    def test_index_defaults(self):
+        self.assertEqual(INDEX_DEFAULTS['fullCheckInterval'],7*86400)
+        self.assertEqual(INDEX_DEFAULTS['snapshotDays'],60)
+        self.assertEqual(INDEX_DEFAULTS['rollUpBytes'],50_000_000)
     def test_daily_snapshot_is_first_complete_scan_and_growth_is_live(self):
         store=IndexStore(self.database)
         try:
@@ -322,7 +322,7 @@ class IndexRecovery(unittest.TestCase):
 class NativeRecovery(unittest.TestCase):
     def test_unavailable_versions_is_explicit_and_never_removes_fixture(self):
         helper=os.environ['SOJI_TEST_NATIVE']
-        with tempfile.TemporaryDirectory(prefix='soji-versions-recovery-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='soji-versions-') as tmp:
             missing=str(Path(tmp)/'missing.txt')
             result=subprocess.run([helper,'versions',missing],text=True,capture_output=True)
             self.assertNotEqual(result.returncode,0)
@@ -334,7 +334,7 @@ class NativeRecovery(unittest.TestCase):
             self.assertEqual(doc.read_text(),'disposable document')
     def test_metadata_sparse_hardlink_clone_and_symlink(self):
         helper=os.environ['SOJI_TEST_NATIVE']
-        with tempfile.TemporaryDirectory(prefix='soji-native-recovery-') as tmp:
+        with tempfile.TemporaryDirectory(prefix='soji-native-') as tmp:
             root=Path(tmp);file=root/'file';file.write_bytes(b'x'*65536)
             link=root/'hardlink';os.link(file,link)
             sparse=root/'sparse'

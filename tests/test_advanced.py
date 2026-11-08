@@ -81,7 +81,7 @@ class CommandTests(Fixture):
             with self.assertRaises(ValueError):CommandPolicy().bound(action,str(Path(home)/'other'),home)
         action['argv'].append('--unexpected')
         with self.assertRaises(ValueError):CommandPolicy().bound(action,target,home)
-    def test_all_eleven_recovered_commands_present(self):
+    def test_all_eleven_cleanup_commands_present(self):
         self.assertEqual(sum(bool(h.get('cleanCommand')) for h in CommandPolicy().hints.values()),11)
 
 class RoutineTests(Fixture):

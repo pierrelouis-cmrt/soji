@@ -19,10 +19,10 @@ with tempfile.TemporaryDirectory(prefix='soji-release-') as tmp:
     helper=BASE/'soji_cli/native-bin/soji-native';helper.parent.mkdir(exist_ok=True)
     subprocess.run(['/usr/bin/lipo','-create',*map(str,binaries),'-output',str(helper)],check=True)
     helper.chmod(0o755)
-    stage=temp/'Sōji';stage.mkdir()
-    for name in ['soji_cli','tests','native','scripts','research']:
+    stage=temp/'Soji';stage.mkdir()
+    for name in ['soji_cli','tests','native','scripts']:
         shutil.copytree(BASE/name,stage/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc','integration-*','tmp*'))
-    for name in ['soji','Launch Sōji.command','entrypoint.py','README.md','FIDELITY.md','build_release.py','NEXT_STEPS.md']:
+    for name in ['soji','Launch Sōji.command','entrypoint.py','README.md','build_release.py','NEXT_STEPS.md']:
         shutil.copy2(BASE/name,stage/name)
     payload=temp/'payload';payload.mkdir();shutil.copytree(stage/'soji_cli',payload/'soji_cli')
     (payload/'__main__.py').write_text('from soji_cli.__main__ import entry\nraise SystemExit(entry())\n')
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='soji-release-') as tmp:
     archive=OUT/f'Soji-{VERSION}.zip'
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for p in stage.rglob('*'):
-            if p.is_file():z.write(p,Path('Sōji')/p.relative_to(stage))
+            if p.is_file():z.write(p,Path('Soji')/p.relative_to(stage))
     shutil.copy2(archive,OUT/'Soji.zip')
 print(archive)
 print(OUT/'soji.pyz')

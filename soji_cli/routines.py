@@ -9,7 +9,7 @@ from .util import atomic_json,read_json
 from .cleanup import create_plan,Cleaner
 
 def idle_enough(timestamp, minimum_hours, now):
-    """RoutinePermit.idleEnough at 0x10044f05c: missing date refuses; >= boundary."""
+    """Routine idle check: missing date refuses; >= boundary."""
     return timestamp is not None and now-timestamp >= minimum_hours*3600
 
 

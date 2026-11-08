@@ -6,9 +6,8 @@ present/missing workspaces, Git states, simulator devices and agent activity.
 open files, installed apps, simctl/devicectl, native helper) and returns one
 normalized row per finding with the decision for each cleanup mode.
 
-The rows are the comparison unit described in NEXT_STEPS.md: the same corpus
-can later be scanned by the original app, normalized to the same shape and
-diffed with `diff_rows`. Ages are whole days so second-level drift between
+The rows are the comparison unit: two exports (for example before and after
+a change) are diffed with `diff_rows`. Ages are whole days so second-level drift between
 building and scanning never changes a decision.
 """
 from __future__ import annotations

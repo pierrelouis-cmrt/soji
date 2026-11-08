@@ -1,6 +1,6 @@
 # Sōji 0.4
 
-A macOS disk-cleanup command line, reconstructed from Sōji 2026.11.14: the same 375 cleanup rules, three modes and safety checks, without the UI. Python 3.10+, no pip dependencies. It includes a universal Swift helper (macOS 13+) for the disk walk, FSEvents, metadata, running apps and document versions. Parity status: [FIDELITY.md](FIDELITY.md). Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
+A macOS disk-cleanup command line: 375 cleanup rules, three modes (careful, balanced, aggressive) and layered safety checks. Python 3.10+, no pip dependencies. It includes a universal Swift helper (macOS 13+) for the disk walk, FSEvents, metadata, running apps and document versions. Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
 
 ## Scan
 
@@ -30,7 +30,7 @@ Run it from Claude Code, Codex or any agent with a shell:
 ./soji ai skill > ~/.claude/skills/soji/SKILL.md
 ```
 
-Sōji itself enforces:
+Sōji enforces:
 
 - ids must come from a session under 6 hours old;
 - only `remove` verdicts become plan items, each re-scanned and required to be unchanged;
@@ -69,7 +69,7 @@ Batch cleanup re-measures each selected session (including its freshly discovere
 
 - Routines (daily, weekly, monthly or `everyHours`) and `auto` (low free space) cover regenerable data only and remove permanently. They run only when invoked.
 - Example routine: `{"id":"nightly","enabled":true,"paths":["/Users/YOU/Library/Caches"],"groups":["App caches"],"mode":"careful","unusedForHours":168,"everyHours":24}`.
-- Templates: `soji_cli/data/routine-templates.json`.
+- Templates: `soji_terminal/data/routine-templates.json`.
 
 **Cleaning from the TUI:** mark rows with Space (or mark nothing to take every READY row in the current category, search and mode), press X, check the list, press Y. Items go to the Trash through the same plan and re-checks as `soji clean --apply` (plan saved under `tui-plans/` in the state folder, entries in `soji journal`); U restores the batch. Permanent deletion and tool actions (simulators, document versions, worktrees) stay terminal commands.
 
@@ -107,6 +107,5 @@ A quiet status bar shows disk scanning, category sorting, and cleanup progress. 
 | `cleanup.py`, `commands.py`, `uninstall.py`, `routines.py` | Plans and actions |
 | `agent.py` | `soji --ai`; `ai.py` and `mcp.py` are the legacy `analyse` path |
 | `tests/` | Fixture tests, plus the regression corpus (`corpus.py`, `corpus_expected.json`) |
-| `research/` | Evidence from the consumer build |
 
 Validation and release commands: [NEXT_STEPS.md](NEXT_STEPS.md#validation).

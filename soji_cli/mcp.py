@@ -1,4 +1,4 @@
-"""Independent stdio MCP server with the ten recovered tools and schemas."""
+"""Stdio MCP server with the ten disk tools and their schemas."""
 from __future__ import annotations
 import dataclasses
 import json

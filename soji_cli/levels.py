@@ -1,6 +1,6 @@
-"""Pure translations of four recovered ARM64 cleanup-level functions.
+"""Pure cleanup-level functions.
 
-Evidence: research/mode-instructions.json. These functions intentionally separate
+These functions intentionally separate
 level policy from filesystem/activity guards and UI selection. Units are seconds
 for timestamps/idle and hours for the values in a LevelJudgement.
 """
@@ -16,7 +16,7 @@ def _finite(value):
 
 
 def level_for_idle(since: float | None, now: float, recent_activity_hours: float = 0) -> str | None:
-    """SōjiModel.CleanupLevel.forIdle, ARM64 0x1004601b4."""
+    """Cleanup level reached after `now - since` seconds idle."""
     if since is None or not _finite(since) or not _finite(now):
         return None
     if not _finite(recent_activity_hours):
@@ -30,7 +30,7 @@ def level_for_idle(since: float | None, now: float, recent_activity_hours: float
 
 
 def judgment_level(judgment: Mapping, idle_seconds: float) -> str | None:
-    """SōjiModel.LevelJudgement.level(idle:), ARM64 0x100460e04.
+    """Level a per-item judgement grants after `idle_seconds`.
 
     The first eligible level wins. Eligibility at Careful therefore includes
     Balanced/Aggressive even if those keys are absent or nonmonotonic.
@@ -46,7 +46,7 @@ def judgment_level(judgment: Mapping, idle_seconds: float) -> str | None:
 
 def judged_minimum(tier: str, recommendation: str, list_only: bool,
                    claimed: str | None = None, comes_back: str | None = None) -> str | None:
-    """CleanupLevels.judged specialization, ARM64 0x100663310."""
+    """Minimum level from risk tier, recommendation and claimed level."""
     if recommendation not in ("remove", "trash") or list_only:
         return None
     if tier not in ("regenerable", "costly") or comes_back == "gone":
@@ -59,12 +59,9 @@ def judged_minimum(tier: str, recommendation: str, list_only: bool,
 
 
 def combine_rule_level(rule: str | None, judged: str | None) -> str | None:
-    """FindingVerifier.verify continuation, consumer build 2026.11.14 0x1006782cc-f0.
+    """Combine a rule level with the judged risk level.
 
     The stricter (later) level wins; no level on either side gives no level.
-    The conditional costly-tier adjustment at 0x1006782f4-0x10067834c (judged
-    level replaced by the rebuilds/downloads base when an unidentified flag at
-    frame+0x3fe9 is set) is NOT ported: that flag's source is unresolved.
     """
     if rule not in LEVELS or judged not in LEVELS:
         return None
@@ -75,7 +72,7 @@ def effective_minimum(judged: str | None, judgment: Mapping | None, tier: str,
                       newest_change: float | None, last_activity: float | None,
                       now: float, recent_activity_hours: float = 0,
                       app_cache: bool = False) -> str | None:
-    """CleanupLevels.effective, ARM64 0x10066130c.
+    """Effective minimum level once recency and agent activity are applied.
 
     Without a per-item judgment, supplied agent activity must be at least a day
     old. With a judgment, activity contributes to that judgment's idle time.

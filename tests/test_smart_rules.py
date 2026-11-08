@@ -1,4 +1,4 @@
-"""Regression cases derived from the installed ARM64 executable; all data is disposable."""
+"""SmartRules regression cases; all data is disposable."""
 import datetime as dt
 import os
 from pathlib import Path
@@ -10,7 +10,7 @@ from soji_cli.engine import Finding
 from soji_cli.specialized import (SpecializedRules,DeviceCatalog,version_match,
     workspace_missing,archive_uploads,rule_threshold_days,retention_count,device_build_prepared)
 
-class RecoveredRules(unittest.TestCase):
+class SmartRuleCases(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(prefix='soji-rules-')
         self.addCleanup(self.temp.cleanup)
@@ -111,7 +111,7 @@ class RecoveredRules(unittest.TestCase):
         self.plist('Derived/info.plist',{'WorkspacePath':str(self.home)})
         self.assertFalse(workspace_missing(folder))
         self.plist('Derived/info.plist',{'WorkspacePath':self.home.as_uri()})
-        self.assertTrue(workspace_missing(folder)) # original does not decode URLs
+        self.assertTrue(workspace_missing(folder)) # URLs are not decoded
     def test_prepared_build_requires_marker_and_visible_payload(self):
         folder=self.home/'device';folder.mkdir()
         self.assertFalse(device_build_prepared(folder))

@@ -4411,7 +4411,7 @@
       ]
     },
     "comesBack": "downloads",
-    "source": "VS Code docs, extension marketplace (extension cache and per-user data folder https://code.visualstudio.com/docs/configure/extensions/extension-marketplace, read 2026-11-06); same layout as Sōji's vscode-cache, cursor-cache and windsurf-cache; each fork keeps the VS Code user-data layout under its own product name"
+    "source": "VS Code docs, extension marketplace (extension cache and per-user data folder https://code.visualstudio.com/docs/configure/extensions/extension-marketplace, read 2026-11-06); same layout as the vscode-cache, cursor-cache and windsurf-cache hints; each fork keeps the VS Code user-data layout under its own product name"
   },
   {
     "id": "vscode-family-old-extensions",
