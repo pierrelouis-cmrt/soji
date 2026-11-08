@@ -3,12 +3,14 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import marshal
 import os
 from pathlib import Path
 import sqlite3
 import stat
 import threading
 import time
+import zlib
 from .engine import Scanner,Node,within
 from .platform import native,events
 
@@ -39,9 +41,98 @@ CREATE TABLE IF NOT EXISTS verdicts(path TEXT PRIMARY KEY,fingerprint TEXT NOT N
 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,started_at REAL,finished_at REAL,outcome TEXT,usage TEXT);
 CREATE TABLE IF NOT EXISTS links(path TEXT PRIMARY KEY,device INTEGER NOT NULL,inode INTEGER NOT NULL,nlink INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS links_identity ON links(device,inode);
+CREATE TABLE IF NOT EXISTS node_snapshot(id INTEGER PRIMARY KEY CHECK(id=1),format INTEGER NOT NULL,data BLOB NOT NULL);
 '''
+# Node rows are persisted as one zlib-compressed marshal snapshot of field
+# tuples (marshal builds plain values only and never runs code). One JSON row
+# per node cost ~5 s to write and ~3 s to read at 560k nodes; this is ~1 s
+# each way. Legacy per-row `nodes` tables are still read, then cleared.
+SNAPSHOT_FORMAT = 2
+UNCACHED = -2  # match decided by a marker condition: recomputed every run
 
 NODE_FIELDS=tuple(f.name for f in dataclasses.fields(Node))
+
+
+UNREADABLE_PROBES = 16
+
+
+def unreadable_sample(rows,limit=UNREADABLE_PROBES):
+    """Evenly spaced rows of a path-sorted list (deterministic)."""
+    rows=sorted(rows,key=lambda r:r[0])
+    if len(rows)<=limit:return rows
+    step=len(rows)/limit
+    return [rows[int(i*step)] for i in range(limit)]
+
+
+def readable_now(path,node):
+    """Would visit() now measure this unreadable row?"""
+    try:
+        if node.directory and node.reason!='Unreadable entry':
+            fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|getattr(os,'O_NOFOLLOW',0))
+            try:
+                with os.scandir(fd) as it:next(it,None)
+            finally:os.close(fd)
+        else:os.lstat(path)
+        return True
+    except OSError:return False
+
+
+def outermost(paths):
+    """Sorted unique paths with any path inside another one dropped."""
+    kept=SubtreeSet(())
+    for p in sorted(set(paths),key=lambda p:(p.count('/'),p)):
+        if not kept(p):kept.add(p)
+    return sorted(kept.roots)
+
+
+class SubtreeSet:
+    """`within(path, root)` for any root, in O(depth) with a per-folder memo."""
+    def __init__(self,roots):
+        self.roots=set(roots);self._memo={}
+    def add(self,root):
+        self.roots.add(root);self._memo.clear()
+    def __call__(self,path):
+        memo=self._memo;chain=[]
+        while True:
+            if path in self.roots:result=True;break
+            known=memo.get(path)
+            if known is not None:result=known;break
+            parent=os.path.dirname(path)
+            if parent==path:result=False;break
+            chain.append(path);path=parent
+        for p in chain:memo[p]=result
+        return result
+
+
+def snapshot_blob(nodes,catalog=None):
+    # Node holds only scalars and a list of str, all marshal-native. Path-only
+    # catalog matches (Catalog.pure) ride along, keyed by the catalog contents.
+    rows=[tuple(getattr(n,f) for f in NODE_FIELDS) for n in nodes.values()]
+    pure=getattr(catalog,'pure',None) or {}
+    codes=[pure.get(p,UNCACHED) for p in nodes] if pure else []
+    return zlib.compress(marshal.dumps((NODE_FIELDS,rows,getattr(catalog,'key',''),codes)),1)
+
+
+def read_snapshot(db):
+    """(nodes in walk order, (catalog key, {path: match code})): the snapshot,
+    else legacy JSON rows (no match cache)."""
+    row=db.execute('SELECT format,data FROM node_snapshot WHERE id=1').fetchone() if db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='node_snapshot'").fetchone() else None
+    if row and row[0]!=SNAPSHOT_FORMAT:raise ValueError('Index snapshot format is not supported; a full walk rebuilds it')
+    if row:
+        fields,rows,key,codes=marshal.loads(zlib.decompress(row[1]))
+        if tuple(fields)==NODE_FIELDS:
+            nodes={r[0]:Node(*r) for r in rows}
+        else:
+            index={f:i for i,f in enumerate(fields)}
+            nodes={r[index['path']]:Node(**{f:r[index[f]] for f in NODE_FIELDS if f in index}) for r in rows}
+        seed={p:c for p,c in zip(nodes,codes) if c!=UNCACHED} if len(codes)==len(nodes) else {}
+        return nodes,(key,seed)
+    return {p:Node(**json.loads(data)) for p,data in db.execute('SELECT path,data FROM nodes')},('',{})
+
+
+def read_nodes(db):
+    return read_snapshot(db)[0]
 
 
 def _link_rows(items):
@@ -64,7 +155,7 @@ class IndexStore:
         # from persisted node rows so incremental reconciliation stays exact.
         if not had_links:
             with self.db:
-                rows=((p,Node(**json.loads(data))) for p,data in self.db.execute('SELECT path,data FROM nodes').fetchall())
+                rows=list(read_nodes(self.db).items())
                 self.db.executemany('INSERT OR REPLACE INTO links VALUES(?,?,?,?)',list(_link_rows(rows)))
         # Existing terminal indexes predate the content reuse contract.
         if 'content' not in {row[1] for row in self.db.execute('PRAGMA table_info(verdicts)')}:
@@ -76,7 +167,20 @@ class IndexStore:
         return json.loads(row[0]) if row else default
     def set_meta(self,key,value):self.db.execute('INSERT OR REPLACE INTO meta VALUES(?,?)',(key,json.dumps(value)))
     def load(self):
-        return {p:Node(**json.loads(data)) for p,data in self.db.execute('SELECT path,data FROM nodes')}
+        nodes,self.match_seed=read_snapshot(self.db)
+        return nodes
+    def match_seed_only(self):
+        """(catalog key, {path: code}) without building nodes."""
+        row=self.db.execute('SELECT format,data FROM node_snapshot WHERE id=1').fetchone()
+        if not row or row[0]!=SNAPSHOT_FORMAT:return '',{}
+        fields,rows,key,codes=marshal.loads(zlib.decompress(row[1]))
+        at=list(fields).index('path')
+        return key,({r[at]:c for r,c in zip(rows,codes) if c!=UNCACHED} if len(codes)==len(rows) else {})
+    def loadable(self):
+        """A current-format snapshot, or a legacy per-row table, is present."""
+        row=self.db.execute('SELECT format FROM node_snapshot WHERE id=1').fetchone()
+        if row is not None:return row[0]==SNAPSHOT_FORMAT
+        return self.db.execute('SELECT 1 FROM nodes LIMIT 1').fetchone() is not None
     def links_for(self,identities):
         result={}
         for device,inode in identities:
@@ -90,18 +194,22 @@ class IndexStore:
     def save(self,scanner,event_id,signature,*,full_scan=True,volumes=None):
         with self.db:
             self.db.execute('DELETE FROM nodes')
-            # Node holds only scalars and a list of str: a shallow field dict
-            # serializes exactly like dataclasses.asdict without its deep copy.
-            dumps=json.dumps;fields=NODE_FIELDS
-            self.db.executemany('INSERT INTO nodes VALUES(?,?,?)',((p,str(Path(p).parent) if p=='/' or p.endswith('/') else os.path.dirname(p),dumps({f:getattr(n,f) for f in fields})) for p,n in scanner.nodes.items()))
+            self.db.execute('INSERT OR REPLACE INTO node_snapshot VALUES(1,?,?)',(SNAPSHOT_FORMAT,snapshot_blob(scanner.nodes,getattr(scanner,'catalog',None))))
             self.db.execute('DELETE FROM links')
             self.db.executemany('INSERT INTO links VALUES(?,?,?,?)',list(_link_rows(scanner.nodes.items())))
             self.set_meta('signature',signature);self.set_meta('eventID',event_id)
             now=time.time()
-            complete=not scanner.limited and not scanner.cancel.is_set() and not scanner.error and not any(n.own_errors for n in scanner.nodes.values())
+            finished=not scanner.limited and not scanner.cancel.is_set() and not scanner.error
+            complete=finished and not any(n.own_errors for n in scanner.nodes.values())
             self.set_meta('updatedAt',now);self.set_meta('complete',complete)
+            # Port choice: a walk that finished but met unreadable entries (TCC
+            # denials such as ~/Library/Caches/com.apple.Safari) is reusable.
+            # Incremental runs probe a sample of unreadable rows and re-walk
+            # them all if any became readable; `complete` still gates snapshots.
+            self.set_meta('reusable',finished)
             self.set_meta('roots',scanner.roots)
             if full_scan and complete:self.set_meta('fullCheckedAt',now)
+            if full_scan and finished:self.set_meta('walkedAt',now)
             if volumes is not None:self.set_meta('volumes',volumes)
             day=time.strftime('%Y-%m-%d',time.localtime(now))
             # snapshotIfDue (0x100515ff8) returns if ANY snapshot exists today.
@@ -110,7 +218,7 @@ class IndexStore:
                 self.db.executemany('INSERT INTO snapshots VALUES(?,?,?)',((day,p,n.size) for p,n in scanner.nodes.items() if n.directory))
             cutoff=time.strftime('%Y-%m-%d',time.localtime(now-RECOVERED_DEFAULTS['snapshotDays']*86400))
             self.db.execute('DELETE FROM snapshots WHERE day<?',(cutoff,))
-    def growth(self,limit=30,since=None):
+    def growth(self,limit=30,since=None,nodes=None):
         # Original IndexStore.growth (0x100534dcc) compares LIVE rows with
         # MAX(snapshot.day <= requested day), falling back to MIN(day).
         day=time.strftime('%Y-%m-%d',time.localtime(since)) if since is not None else ''
@@ -119,10 +227,10 @@ class IndexStore:
         if baseline is None:return []
         previous=dict(self.db.execute('SELECT path,bytes FROM snapshots WHERE day=?',(baseline,)))
         roots=set(self.meta('roots',[]));result=[]
-        for path,data in self.db.execute('SELECT path,data FROM nodes'):
-            n=json.loads(data)
-            if not n.get('directory') or path in roots:continue
-            size=n.get('size',0);delta=size-previous.get(path,0)
+        # Live rows: the scanner's own nodes when it just saved them.
+        for path,n in (nodes if nodes is not None else read_nodes(self.db)).items():
+            if not n.directory or path in roots:continue
+            size=n.size;delta=size-previous.get(path,0)
             if delta>0:result.append({'path':path,'bytes':size,'delta':delta})
         return sorted(result,key=lambda r:(-r['delta'],r['path']))[:max(0,limit)]
     def verdict(self,path,fingerprint,now,max_age=7*86400):
@@ -182,18 +290,19 @@ class IndexedScanner(Scanner):
         """Re-walk dirty subtrees, then refresh only cached names sharing a
         hardlink identity with a name added, removed or changed inside them.
         Aggregates are recomputed only for ancestors of changed rows."""
-        def inside(p):return any(within(p,root) for root in dirty)
+        inside=SubtreeSet(dirty)
         def identity(n):return (n.device,n.inode)
         def multi(n):return not n.directory and not n.reason and n.inode and getattr(n,'link_count',0)>1
-        old={}
+        old={p:n for p,n in self.nodes.items() if inside(p)}
+        for p in old:del self.nodes[p]
+        walks=[]
         for root in dirty:
-            for p in [p for p in self.nodes if within(p,root)]:
-                old[p]=self.nodes.pop(p)
             if os.path.lexists(root):
                 scan_root=next(r for r in self.roots if within(root,r))
                 depth=len(Path(root).parts)-len(Path(scan_root).parts)
                 device=self.nodes[scan_root].device if scan_root in self.nodes and root!=scan_root else None
-                self.visit(root,depth,device)
+                walks.append((root,depth,device,True))
+        self.walk(walks)
         fresh={p:n for p,n in self.nodes.items() if inside(p)}
         removed_ids={identity(n) for n in old.values() if multi(n)}
         added_ids={identity(n) for n in fresh.values() if multi(n)}
@@ -286,7 +395,9 @@ class IndexedScanner(Scanner):
             # Process/open-file snapshot runs alongside the index work below.
             from concurrent.futures import ThreadPoolExecutor
             pool=ThreadPoolExecutor(1);context=pool.submit(self.collect_context)
-            can_reuse=not self.refresh and store.meta('signature')==signature and store.meta('complete',False) and time.time()-store.meta('fullCheckedAt',0)<RECOVERED_DEFAULTS['fullCheckInterval']
+            reusable=store.meta('reusable',store.meta('complete',False))
+            walked=store.meta('walkedAt',store.meta('fullCheckedAt',0))
+            can_reuse=not self.refresh and store.meta('signature')==signature and reusable and time.time()-walked<RECOVERED_DEFAULTS['fullCheckInterval'] and store.loadable()
             saved=store.meta('eventID',0);current=native('event-id',*self.roots);event_id=current.get('eventID',0) if isinstance(current,dict) else 0
             if saved and (not event_id or event_id<saved):can_reuse=False
             volumes=current.get('volumes') if isinstance(current,dict) else None
@@ -297,11 +408,15 @@ class IndexedScanner(Scanner):
             if changes is not None and event_id>saved and any(x.get('replayComplete') is False for x in changes):lost=True
             if not can_reuse or lost:
                 self.nodes={}
+                # Path-only catalog matches stay valid across a full walk.
+                if store.loadable():
+                    try:self.catalog.seed(*store.match_seed_only())
+                    except (ValueError,TypeError,EOFError,zlib.error):pass
                 self.index_info={'strategy':'full','reason':'refresh, stale configuration, unavailable watcher, or event history lost'}
-                for root in self.roots:
-                    if self.budget():self.visit(root)
+                self.walk([(root,0,None,False) for root in self.roots])
             else:
                 self.nodes=store.load();dirty=[]
+                self.catalog.seed(*store.match_seed)
                 for event in changes:
                     if event.get('flags',0)&HISTORY_DONE:continue  # HistoryDone is a cursor marker, not a changed root
                     path=event.get('path')
@@ -309,9 +424,21 @@ class IndexedScanner(Scanner):
                     target=path if path in self.nodes and self.nodes[path].directory else str(Path(path).parent)
                     while target not in self.nodes and target!='/':target=str(Path(target).parent)
                     if any(within(target,r) for r in self.roots):dirty.append(target)
-                dirty=sorted(set(dirty));dirty=[p for p in dirty if not any(p!=q and within(p,q) for q in dirty)]
+                # A permission grant fires no event, and each denied open costs
+                # a privacy (TCC) check of several ms. Probe a spread sample of
+                # unreadable rows; if any became readable, re-walk them all.
+                # Unreadable rows always hold their findings, so a stale denial
+                # is never a cleanup risk; full walks and --refresh recheck all.
+                errored=[(p,n) for p,n in self.nodes.items() if n.own_errors]
+                probed=unreadable_sample(errored)
+                rechecked=any(readable_now(p,n) for p,n in probed)
+                if rechecked:
+                    for path,n in errored:
+                        target=path if n.directory and os.path.lexists(path) else os.path.dirname(path)
+                        if any(within(target,r) for r in self.roots):dirty.append(target)
+                dirty=outermost(dirty)
                 stats=self.reconcile(store,dirty)
-                self.index_info={'strategy':'incremental','dirtySubtrees':dirty,'reusedEntries':len(self.nodes)-self.visited,**stats}
+                self.index_info={'strategy':'incremental','dirtySubtrees':dirty,'unreadableRows':len(errored),'unreadableProbed':len(probed),'unreadableRechecked':rechecked,'reusedEntries':len(self.nodes)-self.visited,**stats}
                 if not dirty:self.current='Persistent index reused; FSEvents history checked'
             if any(r not in self.nodes for r in self.roots):self.limited=True
             context.result();pool.shutdown();pool=None
@@ -327,7 +454,7 @@ class IndexedScanner(Scanner):
             checkpoints=[x['checkpoint'] for x in (changes or []) if x.get('checkpoint')]
             # For a full walk retain the pre-walk cursor so mid-walk changes replay.
             checkpoint=max(checkpoints+[saved]) if can_reuse and not lost else event_id
-            store.save(self,checkpoint,signature,full_scan=not can_reuse or lost,volumes=volumes);self.growth=store.growth()
+            store.save(self,checkpoint,signature,full_scan=not can_reuse or lost,volumes=volumes);self.growth=store.growth(nodes=self.nodes)
         except Exception as e:self.error=type(e).__name__+': '+str(e)
         finally:
             if pool is not None:pool.shutdown()

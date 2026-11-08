@@ -21,6 +21,34 @@ def row(path, selected=True, kind=None, identity=True):
               identity={'inode': 1} if identity else None, size=1)
 
 
+class LayoutHelpers(unittest.TestCase):
+    def test_middle_truncation_keeps_the_leaf_name(self):
+        path = '~/Library/Developer/Xcode/DerivedData/OldProject-abcdef'
+        short = tui.middle_truncate(path, 30)
+        self.assertEqual(len(short), 30)
+        self.assertIn('…', short)
+        self.assertTrue(short.endswith('OldProject-abcdef'))
+        self.assertEqual(tui.middle_truncate('short', 30), 'short')
+
+    def test_row_text_fits_and_strips_control_characters(self):
+        text = tui.row_text('npm\x1b[2Jcache', '~/.npm/_cacache/' + 'x' * 80, 40)
+        self.assertLessEqual(len(text), 40)
+        self.assertNotIn('\x1b', text)
+
+    def test_footer_always_keeps_help_and_quit(self):
+        for width in (30, 80, 200):
+            line = tui.footer_line(width)
+            self.assertIn('? help', line)
+            self.assertIn('Q quit', line)
+        self.assertLessEqual(len(tui.footer_line(80)), 80)
+
+    def test_sidebar_line_shows_size_within_width(self):
+        line = tui.sidebar_line('Logs and crash reports and more', 920_000_000, 24, True)
+        self.assertEqual(len(line), 24)  # Marker included in the width.
+        self.assertTrue(line.startswith('› ') and line.endswith('920M'))
+        self.assertEqual(tui.compact_size(18_600_000_000), '18.6G')
+
+
 class TargetSelection(unittest.TestCase):
     def test_marked_rows_win_over_view_and_only_ready_rows_qualify(self):
         rows = [row('/a'), row('/b'), row('/c', selected=False), row('/d', kind='simulator-device'), row('/e', identity=False)]

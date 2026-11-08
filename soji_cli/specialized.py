@@ -211,9 +211,11 @@ def archive_uploads(info):
 class ProjectPins:
     def __init__(self):self.pins={'node':set(),'ruby':set(),'android':set()};self.files=[]
     def scan(self,paths):
+        names=('.nvmrc','.node-version','.ruby-version','build.gradle','build.gradle.kts')
         for path in paths:
+            if not path.endswith(names):continue
             p=Path(path)
-            if p.name not in ('.nvmrc','.node-version','.ruby-version','build.gradle','build.gradle.kts'):continue
+            if p.name not in names:continue
             try:
                 if p.is_symlink() or p.stat().st_size>1_000_000:continue
                 text=p.read_text(errors='replace');self.files.append(str(p))

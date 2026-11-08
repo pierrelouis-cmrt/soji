@@ -8,7 +8,6 @@ re-verification and journal as `soji clean PLAN --apply`.
 import collections
 import curses
 import json
-import os
 import textwrap
 import threading
 import time
@@ -128,6 +127,71 @@ def clean(text):
     return "".join(c if c.isprintable() else "?" for c in str(text))
 
 
+def middle_truncate(text, width):
+    """Fit text in width by eliding the middle, so a path keeps its leaf name."""
+    text = clean(text)
+    if width <= 0:
+        return ""
+    if len(text) <= width:
+        return text
+    if width < 8:
+        return text[:width]
+    tail = max(1, (width - 1) * 3 // 5)
+    return text[: width - 1 - tail] + "…" + text[-tail:]
+
+
+def row_text(label, path, width):
+    """`label · path`, shortening the path (middle) before the label."""
+    label = clean(label)
+    sep = "  ·  "
+    room = width - len(label) - len(sep)
+    if room >= 12:
+        return label + sep + middle_truncate(path, room)
+    return middle_truncate(label + sep + path, width)
+
+
+FOOTER_KEYS = (
+    ("↑↓", "items"), ("←→", "category"), ("1–3", "mode"), ("Space", "mark"),
+    ("X", "clean"), ("Enter", "details"), ("/", "search"), ("A", "eligible"),
+    ("S", "sort"), ("U", "undo"), ("?", "help"), ("Q", "quit"),
+)
+
+
+def footer_line(width):
+    """As many key hints as fit; `? help` and `Q quit` are always kept."""
+    always = [k for k in FOOTER_KEYS if k[0] in ("?", "Q")]
+    optional = [k for k in FOOTER_KEYS if k not in always]
+    shown = []
+    for key in optional:
+        candidate = shown + [key]
+        if len("  ".join(f"{a} {b}" for a, b in candidate + always)) > width:
+            break
+        shown = candidate
+    return "  ".join(f"{a} {b}" for a, b in shown + always)
+
+
+def compact_size(n):
+    """Short decimal size for narrow columns: `18.6G`, `920M`, `12K`."""
+    value = float(n)
+    for unit in ("B", "K", "M", "G", "T"):
+        if abs(value) < 1000 or unit == "T":
+            if unit == "B":
+                return f"{int(value)}B"
+            return f"{value:.1f}{unit}" if value < 100 else f"{value:.0f}{unit}"
+        value /= 1000
+    return str(n)
+
+
+def sidebar_line(name, size, width, active):
+    """`› Category        12.3 GB` fitted to the sidebar width."""
+    amount = compact_size(size)
+    room = max(1, width - len(amount) - 3)
+    name = clean(name)
+    if len(name) > room:
+        name = name[: room - 1] + "…"
+    return ("› " if active else "  ") + f"{name:<{room}} {amount}"
+
+
 def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
     def main(scr):
         try:
@@ -145,6 +209,11 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             curses.init_pair(i, fg, -1)
         scr.keypad(True)
         scr.timeout(100)
+        try:
+            # Esc closes panels; curses otherwise waits ~1 s for a sequence.
+            curses.set_escdelay(25)
+        except (AttributeError, curses.error):
+            pass
         thread = threading.Thread(target=scanner.run, daemon=True)
         thread.start()
         state = {
@@ -164,7 +233,9 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             "result": None,
             "lastBatch": None,
             "cleanup": None,
+            "selectedPath": None,
         }
+        message_seen = ("", 0.0)
         from .demo import DemoScanner
 
         demo = isinstance(scanner, DemoScanner)
@@ -227,6 +298,11 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 width=boxw - 4,
             )
 
+        def reset_cursor():
+            state["cursor"] = 0
+            state["offset"] = 0
+            state["selectedPath"] = None
+
         def put(y, x, text, attr=0, width=None):
             h, w = scr.getmaxyx()
             if y < 0 or y >= h or x < 0 or x >= w:
@@ -278,6 +354,12 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         f"Moved {result['completed']} item(s) to the Trash ({human(result['freed'])}); {result['failed']} refused."
                     )
                     rescan(False)
+            # Status messages fade after a few seconds instead of lingering.
+            if state["message"] != message_seen[0]:
+                message_seen = (state["message"], time.monotonic())
+            elif state["message"] and time.monotonic() - message_seen[1] > 8:
+                state["message"] = ""
+                message_seen = ("", 0.0)
             h, w = scr.getmaxyx()
             scr.erase()
             if h < 18 or w < 82:
@@ -288,7 +370,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     scanner.cancel.set()
                     break
                 continue
-            left = min(29, max(22, w // 5))
+            left = min(38, max(28, w * 3 // 10))
             right = left + 2
             put(1, 2, "SOJI / TERMINAL", curses.A_BOLD | curses.color_pair(1))
             put(1, right, "DISK ANALYSIS", curses.A_BOLD)
@@ -344,12 +426,10 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 put(
                     y,
                     2,
-                    ("› " if active else "  ") + g,
+                    sidebar_line(g, size, left - 3, active),
                     curses.A_BOLD | curses.color_pair(1) if active else 0,
                     width=left - 3,
                 )
-                if active and y + 1 < h - 5:
-                    pass
             put(h - 5, 2, human(scanner.bytes) + " measured", curses.A_BOLD)
             put(h - 4, 2, human(eligible) + " eligible", curses.color_pair(2))
             marked_rows = [f for f in findings if f.path in state["marked"]] if state["marked"] else []
@@ -407,9 +487,18 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 elif state["sort"] == "age":
                     cached_rows.sort(key=lambda f: f.newest)
                 rows_key = current_rows
+                # Keep the cursor on the same item when rows re-sort, the mode
+                # changes or a rescan lands, instead of jumping to its old index.
+                if state["selectedPath"] is not None:
+                    for i, f in enumerate(cached_rows):
+                        if f.path == state["selectedPath"]:
+                            state["cursor"] = i
+                            break
             rows = cached_rows
             state["cursor"] = min(state["cursor"], max(0, len(rows) - 1))
-            page = max(1, h - 16)
+            if rows:
+                state["selectedPath"] = rows[state["cursor"]].path
+            page = max(1, h - 15)
             state["offset"] = min(state["offset"], state["cursor"])
             if state["cursor"] >= state["offset"] + page:
                 state["offset"] = state["cursor"] - page + 1
@@ -430,7 +519,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     f"{status:<7}",
                     attr | curses.color_pair(2 if f.selected else 3 if f.holds else 4),
                 )
-                text = f.label + "  ·  " + f.path.replace(scanner.home, "~", 1)
+                text = row_text(f.label, f.path.replace(scanner.home, "~", 1),
+                                w - right - 23)
                 put(y, right + 22, text, attr)
             if not rows:
                 put(
@@ -442,10 +532,11 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     curses.A_DIM,
                 )
             selected = rows[state["cursor"]] if rows else None
+            view_ready = sum(f.size for f in rows if f.selected)
             put(
                 h - 5,
                 right,
-                f"{len(rows)} items  ·  sort: {state['sort']}"
+                f"{len(rows)} items  ·  {human(view_ready)} ready in view  ·  sort: {state['sort']}"
                 + ("  ·  filter: " + state["query"] if state["query"] else "")
                 + ("  ·  eligible only" if state["eligible"] else ""),
                 curses.A_DIM,
@@ -462,7 +553,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 2,
                 "Cleaning in progress · items are re-checked before moving to Trash"
                 if state["cleanup"] is not None else
-                "↑↓ items  ←→ category  1–3 mode  Space mark  X clean  U undo  Enter details  / search  A eligible  S sort  ? help  Q quit",
+                footer_line(w - 4),
                 curses.A_DIM,
             )
             if state["message"] and state["cleanup"] is None:
@@ -493,7 +584,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         "in-use items are refused. U: put the last batch back. Permanent deletion,",
                         "simulators, document versions and worktrees stay terminal commands.",
                         "",
-                        "↑/↓ or J/K: items     ←/→ or H/L: categories",
+                        "↑/↓ or J/K: items     ←/→ or H/L: categories     g / G: first / last",
                         "Enter: evidence       /: search       A: eligible only",
                         "S: cycle size/name/age   E: export JSON   R: rescan",
                         "C: cancel scan          Q: exit         Esc: close",
@@ -632,6 +723,10 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 state["cursor"] = min(len(rows) - 1, state["cursor"] + page)
             elif key in (curses.KEY_PPAGE,):
                 state["cursor"] = max(0, state["cursor"] - page)
+            elif key in (curses.KEY_HOME, ord("g")):
+                state["cursor"] = 0
+            elif key in (curses.KEY_END, ord("G")):
+                state["cursor"] = max(0, len(rows) - 1)
             elif key in (curses.KEY_LEFT, ord("h"), curses.KEY_RIGHT, ord("l")):
                 i = (
                     group_names.index(state["group"])
@@ -642,8 +737,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     group_names
                 )
                 state["group"] = group_names[i]
-                state["cursor"] = 0
-                state["offset"] = 0
+                reset_cursor()
             elif key in (ord("1"), ord("2"), ord("3")):
                 state["mode"] = MODES[key - ord("1")]
             elif key in (10, 13):
@@ -654,15 +748,13 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 state["detailOffset"] = 0
             elif key == ord("/"):
                 state["query"] = prompt("Search: ")
-                state["cursor"] = 0
-                state["offset"] = 0
+                reset_cursor()
             elif key == 27:
                 state["query"] = ""
                 state["eligible"] = False
             elif key in (ord("a"), ord("A")):
                 state["eligible"] = not state["eligible"]
-                state["cursor"] = 0
-                state["offset"] = 0
+                reset_cursor()
             elif key in (ord("s"), ord("S")):
                 state["sort"] = {"size": "name", "name": "age", "age": "size"}[
                     state["sort"]
@@ -693,13 +785,9 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 elif state_dir is None:
                     state["message"] = "Cleaning unavailable: no state directory."
                 else:
+                    known = {f.path for f in findings}
                     targets, skipped = cleanup_targets(
-                        rows,
-                        {
-                            p
-                            for p in state["marked"]
-                            if any(f.path == p for f in findings)
-                        },
+                        rows, {p for p in state["marked"] if p in known}
                     )
                     if targets:
                         state["confirm"] = (targets, skipped)

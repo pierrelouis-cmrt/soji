@@ -230,9 +230,74 @@ class IndexRecovery(unittest.TestCase):
     def test_periodic_full_check_uses_age_of_full_walk(self):
         self.run_scan();store=IndexStore(self.database)
         try:
-            store.set_meta('fullCheckedAt',time.time()-8*86400);store.db.commit()
+            store.set_meta('fullCheckedAt',time.time()-8*86400);store.set_meta('walkedAt',time.time()-8*86400);store.db.commit()
         finally:store.close()
         self.assertEqual(self.run_scan().index_info['strategy'],'full')
+    def test_unreadable_folder_keeps_index_reusable_and_is_rechecked(self):
+        denied=self.root/'denied';denied.mkdir();(denied/'blob').write_bytes(b'x'*50_000)
+        os.chmod(denied,0)
+        try:
+            first=self.run_scan()
+            self.assertEqual(first.index_info['strategy'],'full')
+            self.assertTrue(first.nodes[str(denied)].own_errors)
+            store=IndexStore(self.database)
+            try:self.assertFalse(store.meta('complete'));self.assertTrue(store.meta('reusable'))
+            finally:store.close()
+            second=self.run_scan()
+            self.assertEqual(second.index_info['strategy'],'incremental')
+            self.assertEqual(second.index_info['dirtySubtrees'],[])  # Still denied: cached row kept.
+            self.assertFalse(second.index_info['unreadableRechecked'])
+            self.assertTrue(second.nodes[str(denied)].own_errors)
+            self.assertNotIn(str(denied/'blob'),second.nodes)
+        finally:os.chmod(denied,0o755)
+        # A permission grant fires no event; the recheck measures it anyway.
+        third=self.run_scan()
+        self.assertEqual(third.index_info['strategy'],'incremental')
+        self.assertTrue(third.index_info['unreadableRechecked'])
+        self.assertFalse(third.nodes[str(denied)].own_errors)
+        self.assertIn(str(denied/'blob'),third.nodes)
+        self.assertEqual(third.nodes[str(self.root)].files,self.full_walk().nodes[str(self.root)].files)
+    def full_walk(self):
+        s=Scanner([str(self.root)],home=str(self.root),context=False,min_bytes=0);s.started=time.monotonic()
+        s.visit(str(self.root));return s
+    def test_snapshot_round_trip_and_unknown_format_forces_full_walk(self):
+        (self.root/'cache').mkdir(exist_ok=True);(self.root/'cache'/'a.bin').write_bytes(b'x'*5000)
+        first=self.run_scan()
+        second=self.run_scan()
+        self.assertEqual(second.index_info['strategy'],'incremental')
+        self.assertEqual(list(second.nodes),list(first.nodes))
+        for p,n in first.nodes.items():self.assertEqual(dataclasses.asdict(second.nodes[p]),dataclasses.asdict(n))
+        store=IndexStore(self.database)
+        try:store.db.execute('UPDATE node_snapshot SET format=99');store.db.commit()
+        finally:store.close()
+        self.assertEqual(self.run_scan().index_info['strategy'],'full')
+    def test_path_only_matches_are_reused_and_conditional_ones_recomputed(self):
+        from soji_cli.engine import Catalog,NO_MATCH
+        home=str(self.root)
+        first=Catalog(home)
+        paths=[home+'/Library/Caches/com.example.app',home+'/proj/node_modules',home+'/proj/package.json',home+'/notes.txt']
+        results=[first.match(p) for p in paths]
+        second=Catalog(home);second.seed(first.key,dict(first.pure))
+        self.assertEqual([second.match(p) for p in paths],results)
+        self.assertTrue(set(first.pure)<=set(paths))
+        self.assertIn(NO_MATCH,first.pure.values())
+        third=Catalog(home);third.seed('other-catalog',dict(first.pure))
+        self.assertEqual(third.seeded,{})
+        # Conditional hints (inside/notInside/near) are never cached.
+        conditional={i for i,r in enumerate(first.records) if r[1].get('inside') or r[1].get('notInside') or r[1].get('near')}
+        self.assertFalse(conditional & set(first.pure.values()))
+    def test_unreadable_sample_is_spread_and_bounded(self):
+        from soji_cli.index import unreadable_sample
+        rows=[(f'/r/{i:03}',None) for i in range(100)]
+        sample=unreadable_sample(list(reversed(rows)),limit=4)
+        self.assertEqual([p for p,_ in sample],['/r/000','/r/025','/r/050','/r/075'])
+        self.assertEqual(len(unreadable_sample(rows[:3])),3)
+    def test_outermost_and_subtree_set(self):
+        from soji_cli.index import outermost,SubtreeSet
+        self.assertEqual(outermost(['/a/b/c','/a/b','/a/b c','/x','/a/b']),['/a/b','/a/b c','/x'])
+        inside=SubtreeSet(['/a/b'])
+        self.assertTrue(inside('/a/b') and inside('/a/b/c/d'))
+        self.assertFalse(inside('/a/bc') or inside('/a') or inside('/a/b c'))
     def test_regressed_cursor_and_incomplete_replay_force_full(self):
         self.run_scan(100)
         self.assertEqual(self.run_scan(99).index_info['strategy'],'full')

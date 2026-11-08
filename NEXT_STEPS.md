@@ -20,6 +20,8 @@
 | Costly-tier verifier adjustment | `levels.combine_rule_level` | Flag source unresolved; omitted. Simulators are the costly rows it matters for: the hint text says spare twins go "from Balanced", which needs the flag, so the port keeps its stricter 7-day judgement for twins |
 | Worktree activity in the parent project clock | `engine.project_age` | `<project>/.claude/worktrees` counts as project use; unverified |
 | Outside link to a small single-link file | `index.reconcile` | Files ≥ 1 MiB (largest 20,000) are re-checked on every incremental run; smaller ones wait for the weekly full check. Estimates only |
+| Unreadable rows in a reusable index | `index.IndexedScanner.run` | Port choice: a finished walk with TCC-denied folders stays reusable (`reusable`/`walkedAt` meta). Each denied open costs a TCC check (~7 ms), so incremental runs probe 16 spread unreadable rows and re-walk all of them only if one became readable. A grant that unlocks none of the probed rows waits for the weekly full walk or `--refresh`; unreadable rows always hold their findings. `complete` still gates snapshots and `fullCheckedAt` |
+| Native walk parity outside APFS | `SojiNative.swift` `walk` | Compressed and hard-linked entries use bulk attributes on APFS (verified equal to `lstat`); other filesystems re-read them with `fstatat`. Run `scripts/walk_parity.py` on a new filesystem type before trusting it |
 | Native busy filter, settle measurement | `SojiNative.swift`, `nativeplans.py` | Conservative holds |
 | System receipts, uninstalled co-owners | `uninstall.py` | Excluded |
 
@@ -29,6 +31,7 @@
 python3 -m unittest discover -s tests -q
 SOJI_TEST_NATIVE="$PWD/soji_cli/native-bin/soji-native" python3 -m unittest discover -s tests -p 'test_index_recovery.py' -q
 python3 scripts/native_integration.py     # real FSEvents, fake agent; no model call
+python3 scripts/walk_parity.py ~/Library ~/code   # native walk == Python walk, node for node (read-only)
 python3 build_release.py                  # needs Xcode CLT; universal helper
 python3 dist/soji.pyz --version
 ```

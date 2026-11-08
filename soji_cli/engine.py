@@ -5,6 +5,7 @@ import collections
 import dataclasses
 import fnmatch
 import functools
+import hashlib
 import json
 from importlib.resources import files as resource_files
 import os
@@ -61,6 +62,9 @@ def glob_regex(pattern: str) -> re.Pattern:
             pieces.append('(?=[^/]*(?:/|$))'+body)
             if i < len(parts)-1: pieces.append('/')
     return re.compile('^' + ''.join(pieces) + '$', re.IGNORECASE)
+
+
+NO_MATCH = -1
 
 
 @dataclasses.dataclass(slots=True)
@@ -234,6 +238,12 @@ class Catalog:
         self.markers_cache = {}
         self.match_cache = {}
         self.parent_cache = {}
+        # Path-only results that later runs may reuse (see `pure`).
+        self.records = [r for rs in self.by_last.values() for r in rs] + self.wild
+        self.record_index = {(r[1]['id'], r[2]): i for i, r in enumerate(self.records)}
+        self.pure = {}
+        self.seeded = {}
+        self.key = hashlib.sha256(json.dumps([self.hints, self.locations], sort_keys=True).encode()).hexdigest()
 
     def exists(self, folder: Path, markers: list[str]) -> bool:
         key=(str(folder),tuple(markers))
@@ -278,18 +288,35 @@ class Catalog:
         return [*exact, *wild] if exact else wild
 
     def _match(self, path: str):
+        # A seeded result came from the same catalog (Catalog.key) and the same
+        # path string, and depends on nothing else: no marker condition decided it.
+        code = self.seeded.get(path)
+        if code is not None:
+            self.pure[path] = code
+            if code == NO_MATCH: return None
+            record = self.records[code]
+            return record[1], record[2]
         name = os.path.basename(path) if not path.endswith('/') else Path(path).name
         candidates = self._candidates(path, name)
-        if not candidates: return None
-        p=Path(path)
+        if not candidates:
+            self.pure[path] = NO_MATCH
+            return None
+        p=Path(path);pure=True
         for regex,hint,pattern in candidates:
             if not regex.fullmatch(path): continue
+            if hint.get('inside') or hint.get('notInside') or hint.get('near'):pure=False
             if hint.get('inside') and not self.exists(p,hint['inside']):continue
             if hint.get('notInside') and self.exists(p,hint['notInside']):continue
             # Recovered marker semantics say nearby. Ancestor depth here is reconstructed.
             if hint.get('near') and not any(self.exists(a,hint['near']) for a in list(p.parents)[:4]):continue
+            if pure:self.pure[path]=self.record_index[(hint['id'],pattern)]
             return hint,pattern
+        if pure:self.pure[path]=NO_MATCH
         return None
+
+    def seed(self, key, codes):
+        """Reuse path-only results saved by a previous run of the same catalog."""
+        if key == self.key: self.seeded = codes
 
 
 class Scanner:
@@ -411,6 +438,19 @@ class Scanner:
         if failed:node.errors+=1;node.own_errors+=1;self.unreadable+=1
         return node
 
+    def walk(self,roots):
+        """Measure roots [(path, depth, device, stop_node)] like visit().
+
+        The native bulk walker produces identical nodes much faster; visit()
+        is the reference and the fallback. stop_node=False roots are skipped
+        once the budget is spent (Scanner.run); True roots get a "stopped" row.
+        """
+        from . import walker
+        if not self._inodes and walker.available(self) and walker.walk(self,roots):return
+        for path,depth,device,stop_node in roots:
+            if not stop_node and not self.budget():break
+            self.visit(path,depth,device)
+
     def project_for(self,path: str) -> str | None:
         for parent in list(Path(path).parents)[:8]:
             if str(parent)=='/':break
@@ -513,9 +553,7 @@ class Scanner:
             # Process/open-file snapshots (subprocesses) overlap the walk.
             with ThreadPoolExecutor(1) as pool:
                 context=pool.submit(self.collect_context)
-                for root in self.roots:
-                    if not self.budget():break
-                    self.visit(root)
+                self.walk([(root,0,None,False) for root in self.roots])
                 context.result()
             self._build_findings()
         except Exception as exc:self.error=f'{type(exc).__name__}: {exc}'
@@ -580,9 +618,12 @@ class Scanner:
         self.set_progress('categorize',3,4,'Checking file metadata')
         if self.context:
             from .platform import native
-            for start in range(0,len(self.findings),64):
-                batch=self.findings[start:start+64]
-                values=native('metadata',*[f.path for f in batch])
+            # 512 rows per helper launch (was 64), four launches at a time:
+            # ~100 sequential launches cost ~1.5 s. Applied in row order.
+            batches=[self.findings[start:start+512] for start in range(0,len(self.findings),512)]
+            with ThreadPoolExecutor(4) as pool:
+                answers=list(pool.map(lambda batch:native('metadata',*[f.path for f in batch],timeout=30),batches))
+            for batch,values in zip(batches,answers):
                 if isinstance(values,list):
                     bypath={v['path']:v for v in values}
                     for f in batch:

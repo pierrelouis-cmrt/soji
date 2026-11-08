@@ -51,16 +51,16 @@ class MCPServer:
         if not self.database:return []
         import sqlite3
         try:
-            with ro_sqlite(self.database) as db:
-                if path and direct:
-                    rows=db.execute('SELECT data FROM nodes WHERE parent=? AND path!=? LIMIT ?',(path,path,limit)).fetchall()
-                elif path:
-                    prefix=path.rstrip('/')+'/'
-                    rows=db.execute("SELECT data FROM nodes WHERE substr(path,1,?)=? ORDER BY CAST(json_extract(data,'$.size') AS INTEGER) DESC LIMIT ?",(len(prefix),prefix,limit)).fetchall()
-                else:rows=db.execute("SELECT data FROM nodes ORDER BY CAST(json_extract(data,'$.size') AS INTEGER) DESC LIMIT ?",(limit,)).fetchall()
+            from .index import read_nodes
+            with ro_sqlite(self.database) as db:nodes=list(read_nodes(db).values())
+            if path and direct:
+                rows=[n for n in nodes if n.path!=path and os.path.dirname(n.path)==path][:limit]
+            else:
+                prefix=path.rstrip('/')+'/' if path else ''
+                rows=sorted((n for n in nodes if n.path.startswith(prefix)),key=lambda n:n.size,reverse=True)[:limit]
             result=[]
             for row in rows:
-                value=json.loads(row[0])
+                value=dataclasses.asdict(row)
                 try:self.path(value['path'])
                 except ValueError:continue
                 result.append(value)

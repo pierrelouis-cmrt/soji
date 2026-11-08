@@ -1,6 +1,6 @@
 # Sōji 0.4
 
-A macOS disk-cleanup command line, reconstructed from Sōji 2026.11.14: the same 375 cleanup rules, three modes and safety checks, without the UI. Python 3.10+, no pip dependencies. It includes a universal Swift helper (macOS 13+) for FSEvents, metadata, running apps and document versions. Parity status: [FIDELITY.md](FIDELITY.md). Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
+A macOS disk-cleanup command line, reconstructed from Sōji 2026.11.14: the same 375 cleanup rules, three modes and safety checks, without the UI. Python 3.10+, no pip dependencies. It includes a universal Swift helper (macOS 13+) for the disk walk, FSEvents, metadata, running apps and document versions. Parity status: [FIDELITY.md](FIDELITY.md). Open work: [NEXT_STEPS.md](NEXT_STEPS.md).
 
 ## Scan
 
@@ -13,6 +13,7 @@ A macOS disk-cleanup command line, reconstructed from Sōji 2026.11.14: the same
 
 - State lives in `~/Library/Application Support/Soji` (`--state PATH` to change). Scans keep an incremental index (`--no-index` to skip it, `--refresh` to force a full walk). Scans never delete anything or call a model.
 - Options: `--protect PATH`; `--max-files`, `--max-seconds` and `--min-mb` bound the scan; `--recent-activity-hours` sets the recent-use window; `--no-context` turns off process/activity checks, and rows are then held as unverified.
+- The disk walk runs in the helper (parallel `getattrlistbulk`, results identical to the Python walk); without the helper, or with `SOJI_NATIVE_WALK=0`, the Python walk is used. Cleanup always re-measures targets with the Python walk. `SOJI_NATIVE_WALK_THREADS` sets the worker count (default: up to 8).
 - The single-file `dist/soji.pyz` runs anywhere with Python 3.10+. For the TUI, double-click `Launch Sōji.command`.
 
 ## AI mode
@@ -80,6 +81,7 @@ A quiet status bar shows disk scanning, category sorting, and cleanup progress. 
 |---|---|
 | 1 / 2 / 3 | Mode |
 | ↑ ↓ or J / K | Items |
+| g / G (Home / End) | First / last item |
 | ← → or H / L | Categories |
 | Enter | Details |
 | / | Search |
@@ -100,7 +102,7 @@ A quiet status bar shows disk scanning, category sorting, and cleanup progress. 
 |---|---|
 | `engine.py`, `locations.py`, `levels.py`, `specialized.py` | Scan, match, modes, SmartRules |
 | `activity.py`, `gitstate.py`, `apps.py` | Activity, Git, apps and tools |
-| `index.py`, `native/SojiNative.swift` | Index and macOS helper |
+| `index.py`, `walker.py`, `native/SojiNative.swift` | Index, native walk and macOS helper |
 | `catalogs.py`, `nativeplans.py` | Sessions, Trash, versions, runtimes |
 | `cleanup.py`, `commands.py`, `uninstall.py`, `routines.py` | Plans and actions |
 | `agent.py` | `soji --ai`; `ai.py` and `mcp.py` are the legacy `analyse` path |
