@@ -62,15 +62,16 @@ class AgentModeTests(unittest.TestCase):
         ]
         r = self.propose(b, verdicts)
         accepted = {a['path'] for a in r['accepted']}
-        self.assertEqual(accepted, {'~/Library/Caches/com.example.Known', '~/.nvm/versions/node/v18.0.0'})
+        self.assertEqual(accepted, {'~/Library/Caches/com.example.Known'})
         reasons = {x['id']: x['reason'] for x in r['rejected']}
+        self.assertIn('Project pin discovery incomplete',reasons[ids['~/.nvm/versions/node/v18.0.0']])
         self.assertIn('Uncommitted', reasons[ids['~/code/dirty-web/node_modules']])
         self.assertIn('Listed for review', reasons[ids['~/Documents/report.pdf']])
         self.assertIn('Active version', reasons[ids['~/.nvm/versions/node/v20.1.0']])
         self.assertIn('Unknown id', reasons['deadbeef00'])
         self.assertEqual(reasons[ids['~/Library/Caches/com.example.Known']], 'Duplicate verdict')
         plan = json.loads(Path(r['plan']).read_text())
-        self.assertEqual(len(plan['items']), 2)
+        self.assertEqual(len(plan['items']), 1)
         # The plan revalidates through the normal cleanup path, agent judgment included.
         from soji_cli.cleanup import Cleaner, validate_plan
         validate_plan(plan)  # the plan file must pass `soji clean` integrity checks
