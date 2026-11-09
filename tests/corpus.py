@@ -237,8 +237,16 @@ def hermetic(home: str | None = None):
     With `home`, Git discovery stops at its parent so fixture projects never
     resolve to an enclosing repository (such as this one).
     """
-    from soji_cli import apps, catalogs, engine, platform, specialized
+    from soji_cli import apps, catalogs, engine, platform, specialized, gitstate
     unavailable = {'error': 'Native helper disabled for corpus scan'}
+    real_git_env = gitstate.git_env
+
+    def fixture_git_env():
+        # Production strips inherited GIT_*; explicitly keep fixture discovery
+        # inside this fake home, including when the corpus lives in a checkout.
+        env = real_git_env()
+        if home:env['GIT_CEILING_DIRECTORIES'] = str(Path(home).parent)
+        return env
 
     def native(operation, *args, **kw):
         return [] if operation=='apps' else unavailable
@@ -255,6 +263,7 @@ def hermetic(home: str | None = None):
         self.open_paths = []
 
     patches = [
+        (gitstate, 'git_env', fixture_git_env),
         (engine.Scanner, 'collect_context', collect_context),
         (platform, 'native', native), (apps, 'native', native), (catalogs, 'native', native),
         (specialized, 'json_command', json_command), (catalogs, 'json_command', json_command),

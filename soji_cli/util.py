@@ -107,6 +107,7 @@ def command(argv,timeout=8,env=None):
         r=subprocess.run([str(x) for x in argv],capture_output=True,text=True,timeout=timeout,env=env)
         return r.returncode,r.stdout[:16_000_000],r.stderr[:4000]
     except (OSError,subprocess.TimeoutExpired) as e:return -1,'',str(e)
+    except UnicodeDecodeError as e:return -1,'','Undecodable output: '+str(e)  # callers treat as failure
 
 
 def json_command(argv,timeout=8):

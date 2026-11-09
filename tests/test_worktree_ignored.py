@@ -41,6 +41,11 @@ class IgnoredWorktreeData(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
         root = Path(self.tmp.name).resolve()
+        fake_home = root / 'fake-home'
+        fake_home.mkdir()
+        home_env = patch.dict(os.environ, {'HOME': str(fake_home)})
+        home_env.start()
+        self.addCleanup(home_env.stop)
         self.home = root / 'home'
         self.state = root / 'state'
         self.repo = self.home / 'code/app'
@@ -185,6 +190,120 @@ class IgnoredWorktreeData(unittest.TestCase):
         self.assertFalse(work.exists())
 
 
+    def update_ignore(self, text):
+        (self.repo / '.gitignore').write_text(text)
+        git(self.repo, 'commit', '-qam', 'fixture ignore rules')
+        git(self.repo, 'push', '-q')
+
+    def test_collapsed_directories_block_in_every_mode(self):
+        self.update_ignore('*.pyc\n*.db\n.env\n*.sqlite\n')
+        for folder, files in [('__pycache__', ['__pycache__/important.db', '__pycache__/x.pyc']),
+                              ('node_modules', ['node_modules/.env', 'node_modules/app.sqlite'])]:
+            with self.subTest(folder=folder):
+                self.assertBlocked(*self.worktree('collapse-'+folder, files))
+
+    def test_nested_git_directory_or_file_blocks_in_every_mode(self):
+        for rel in ('node_modules/.git', 'node_modules/linked/.git'):
+            with self.subTest(rel=rel):
+                self.assertBlocked(*self.worktree('gitfile-'+str(len(rel)), [rel, 'node_modules/unique.txt']))
+        work, made = self.worktree('nested-repo', ['node_modules/linked/fix.js'])
+        nested = work / 'node_modules/linked'
+        git(nested, 'init', '-q', '-b', 'main')
+        git(nested, 'add', '.')
+        git(nested, 'commit', '-qm', 'unpushed fix')
+        self.assertBlocked(work, made)
+
+    def test_hidden_index_edits_block_in_every_mode(self):
+        for flag in ('--assume-unchanged', '--skip-worktree'):
+            with self.subTest(flag=flag):
+                work, _ = self.worktree(flag[2:])
+                git(work, 'update-index', flag, 'README.md')
+                readme = work / 'README.md'
+                readme.write_text('only copy of README.md')
+                self.assertBlocked(work, [readme], reason=flag[2:])
+
+    def test_ignore_stat_blocks_in_every_mode(self):
+        work, _ = self.worktree('ignore-stat')
+        git(work, 'config', 'core.ignoreStat', 'true')
+        self.assertBlocked(work, [], reason='core.ignoreStat')
+
+    def test_cache_content_shapes(self):
+        self.update_ignore('__pycache__/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n')
+        for folder in ('__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache'):
+            with self.subTest(folder=folder):
+                self.assertBlocked(*self.worktree('unsafe-'+folder, [folder+'/important.db']))
+        work, _ = self.worktree('valid-caches', ['__pycache__/x.pyc', '.pytest_cache/v/cache/nodeids',
+                                               '.mypy_cache/3.12/a.data.json', '.ruff_cache/0.14.1/1234'])
+        self.assertTrue(GitInspector().inspect(str(work), worktree=True)['contentsVerified'])
+        self.remove(work)
+        self.assertFalse(work.exists())
+
+    def test_walk_limits_and_errors_fail_closed(self):
+        work, made = self.worktree('bounded', ['node_modules/pkg/index.js'])
+        for guard in (patch.object(gitstate, 'WALK_ENTRIES', 0),
+                      patch.object(gitstate, 'WALK_SECONDS', -1),
+                      patch.object(gitstate.os, 'scandir', side_effect=PermissionError('fixture denial'))):
+            with guard:
+                state = GitInspector().inspect(str(work), worktree=True)
+                self.assertFalse(state['verified'], state)
+                with self.assertRaises(ValueError):
+                    self.remove(work)
+        self.assertTrue(all(p.exists() for p in made))
+
+    def test_internal_symlink_is_not_followed(self):
+        work, _ = self.worktree('symlink', ['node_modules/pkg/index.js'])
+        outside = self.home / 'outside'
+        outside.mkdir()
+        unique = outside / 'unique.txt'
+        unique.write_text('only copy')
+        (outside / '.git').mkdir()
+        (work / 'node_modules/link').symlink_to(outside, target_is_directory=True)
+        self.remove(work)
+        self.assertEqual(unique.read_text(), 'only copy')
+
+    def test_inherited_git_environment_cannot_redirect_inspect_or_remove(self):
+        work, _ = self.worktree('env-safe')
+        poisoned = {'GIT_DIR': str(self.repo / '.git'), 'GIT_WORK_TREE': str(self.repo),
+                    'GIT_INDEX_FILE': str(self.home / 'wrong-index'), 'GIT_CONFIG_COUNT': '1',
+                    'GIT_CONFIG_KEY_0': 'core.ignoreStat', 'GIT_CONFIG_VALUE_0': 'true',
+                    'GIT_CONFIG_PARAMETERS': "'core.ignoreStat=true'"}
+        with patch.dict(os.environ, poisoned):
+            state = GitInspector().inspect(str(work), worktree=True)
+            self.assertEqual(state['root'], str(work))
+            self.assertTrue(state['contentsVerified'], state)
+            self.remove(work)
+        self.assertFalse(work.exists())
+        self.assertEqual((self.repo / 'README.md').read_text(), 'fixture\n')
+
+    def test_undecodable_inventory_blocks(self):
+        work, _ = self.worktree('bad-bytes')
+        # macOS refuses invalid UTF-8 filenames, so inject undecodable bytes at
+        # the inventory subprocess boundary. The real command decoder runs.
+        real = gitstate.command
+        def command(argv, **kwargs):
+            if 'ls-files' in argv and '--others' in argv:
+                return real([sys.executable, '-c', 'import os; os.write(1, bytes([255]))'])
+            return real(argv, **kwargs)
+        with patch.object(gitstate, 'command', command):
+            state = GitInspector().inspect(str(work), worktree=True)
+            self.assertFalse(state['verified'], state)
+            with self.assertRaises(ValueError):
+                self.remove(work)
+        self.assertTrue(work.exists())
+
+    def test_ignore_check_failure_blocks(self):
+        work, made = self.worktree('ignore-check', ['node_modules/pkg/index.js'])
+        real = gitstate.command
+        def command(argv, **kwargs):
+            return (-1, '', 'fixture failure') if 'check-ignore' in argv else real(argv, **kwargs)
+        with patch.object(gitstate, 'command', command):
+            state = GitInspector().inspect(str(work), worktree=True)
+            self.assertFalse(state['verified'], state)
+            with self.assertRaises(ValueError):
+                self.remove(work)
+        self.assertTrue(all(p.exists() for p in made))
+
+
 class InventoryParsing(unittest.TestCase):
     def test_classification(self):
         for entry in ('node_modules/', 'a/b/node_modules/', '__pycache__/', 'x/.pytest_cache/', '.DS_Store', 'm.pyc'):
@@ -192,6 +311,16 @@ class InventoryParsing(unittest.TestCase):
         for entry in ('local-data/', 'app.sqlite', 'a.ipynb', 'exports/', 'build/', 'dist/', '.env',
                       'node_modules', 'node_modules.sqlite', '.venv/', 'node_modules/x.db'):
             self.assertFalse(gitstate.disposable_ignored(entry), entry)
+
+    def test_tracked_flags_fail_closed(self):
+        root = '/disposable-fixture-not-created'
+        for bad in ('H file', 'H ../escape\0', 'bad\0', 'H /abs\0'):
+            self.assertIs(gitstate.tracked_flags(bad, root), False)
+        self.assertIn('assume-unchanged', gitstate.tracked_flags('h file\0', root))
+        with patch.object(gitstate.os, 'lstat', side_effect=FileNotFoundError):
+            self.assertIsNone(gitstate.tracked_flags('S absent\0', root))
+        with patch.object(gitstate.os, 'lstat', side_effect=PermissionError):
+            self.assertIs(gitstate.tracked_flags('S unreadable\0', root), False)
 
     def test_parsing(self):
         self.assertEqual(gitstate.ignored_inventory(''), [])

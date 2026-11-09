@@ -609,6 +609,10 @@ class Cleaner:
             if not state.get('verified') or state.get('reason') or state.get('mainWorktree')!=action['repository']:raise ValueError('Worktree is no longer clean, merged and pushed'+(f": {state['reason']}" if state.get('reason') else ''))
             if state.get('contentsVerified') is not True:raise ValueError('Worktree contents (ignored files) are not verified disposable')
             argv=['/usr/bin/git','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-C',action['repository'],'worktree','remove','--',action['path']]
+            from .gitstate import git_env
+            code,_,err=command(argv,timeout=120,env=git_env())
+            if code:raise OSError(err)
+            return
         elif action['kind']=='simulator-device':argv=['/usr/bin/xcrun','simctl','delete',action['udid']]
         elif action['kind']=='simulator-runtime':argv=['/usr/bin/xcrun','simctl','runtime','delete',action['identifier']]
         elif action['kind']=='document-version':

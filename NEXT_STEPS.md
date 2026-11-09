@@ -74,3 +74,14 @@ Each item has a regression in `tests/test_nov8_regressions.py` (fake home, every
 ## Journal/undo/refusal follow-up (2026-11-09, isolated branch)
 
 `fix/journal-undo-refusal-sol-20261109` builds on `9651c55` without altering its exclusive staging/rollback implementation. It records agent provenance plus planned/fresh policy, checks Trash identity and unreadability, derives partial recovery from members, stores structured refusal codes with overlapping-path memory and a non-renewing 24 h timestamp, and blocks cleanup on malformed/unreadable refusal history. Missing running-app inventories hold owner-dependent rules and surface a scan warning. Shared risk groups drive plan/TUI warnings; failed TUI restores remain retryable. Staged objects, ancestors and descendants are held, including catalog rows and fresh native/uninstall early returns. Tests and remaining limits: `docs/journal-undo-refusal-2026-11-09.md`. This is an isolated implementation, not an integration/review or permission for real cleanup.
+
+### Worktree second-review follow-up (2026-11-09)
+
+On the replacement branch based on `52bb0e5`, P1-1/2/3 now have guards for
+itself-ignored directories, bounded content walks with no nested `.git`, and
+hidden index edits/core.ignoreStat. Inspection and removal sanitize inherited
+Git environment; decoding failure is unverified. Original tests and reviewer
+proof tests are preserved; optional cache expansion was omitted. See
+`docs/WORKTREE_SAFETY_VALIDATION_2026-11-09.md` for exact validation and the audit
+for the unresolved concurrent-mutation race. This work is local and still needs
+independent review/integration; it does not certify the installed application.
