@@ -50,9 +50,15 @@ def policy_record(f,mode,now=None,source='fresh'):
             'threshold':threshold,'reason':reason,'decision':decision,'matchedPattern':get('matched_pattern')}
 
 
+# Rollback outcomes where a staged .soji-removing-* object was left in place.
+ROLLBACK_KEPT=('conflict','refused','unavailable','failed')
+
+
 def recoverability(entry):
     """Whether a journal entry (or member) can still be undone."""
     status=entry.get('status');method=entry.get('method')
+    if entry.get('rollback') in ROLLBACK_KEPT:return 'staged copy kept for manual review: '+str(entry.get('stagedPath'))
+    if entry.get('rollback')=='restored-other-identity':return 'not removed (rollback restored a different object to the original path)'
     if status=='restored':return 'restored'
     if status not in ('done','partial'):return None
     if method=='permanent' or entry.get('stagedName'):return 'unrecoverable (removed permanently)'
@@ -413,20 +419,22 @@ class Cleaner:
                                 break
                         compound_status(entry)
                     else:self.move(entry,entry['id'],entry,plan,want_permanent)
-                self.append(entry)
+                # The filesystem outcome is final here; a journal failure must not relabel it.
+                self._journal_best_effort(entry)
             except Exception as e:
                 kept=[r for r in [entry,*entry.get('members',[])] if r.get('rollback') not in (None,'restored')]
                 entry['status']='failed'
                 # Never drop the note that a refused rollback left a staged object behind.
                 entry['error']=str(e) if not kept else f"{kept[0]['error']}; then {e}"
-                self.append(entry)
+                self._journal_best_effort(entry)
             entries.append(entry)
             report('clean',len(entries),item['path'])
         report('done',len(entries))
         return {'entries':entries,'notice':TRASH_NOTICE if any(e.get('method')=='trash' and e['status'] in ('done','partial') for e in entries) else None,
                 'completed':sum(e['status']=='done' for e in entries),
                 'partial':sum(e['status']=='partial' for e in entries),
-                'failed':sum(e['status']!='done' for e in entries)}
+                'failed':sum(e['status']!='done' for e in entries),
+                'journalError':next((e['journalError'] for e in entries if e.get('journalError')),None)}
     def system_trash(self,rec,entry,fd,name,original):
         """FileManager.trashItem via the native helper, bound to the verified identity."""
         from .platform import native
@@ -456,8 +464,12 @@ class Cleaner:
             current={'device':original.st_dev,'inode':original.st_ino,'type':stat.S_IFMT(original.st_mode),'parentDevice':parent.st_dev,'parentInode':parent.st_ino,'mtimeNs':original.st_mtime_ns,'ctimeNs':original.st_ctime_ns}
             if current!=expected:raise ValueError('Target or parent changed before operation')
             if want_permanent:
-                staged='.soji-removing-'+tag;rec['stagedName']=staged;self.append(entry)
-                os.rename(name,staged,src_dir_fd=fd,dst_dir_fd=fd)
+                from .platform import rename_exclusive
+                staging='.soji-removing-'+tag;rec['stagedName']=staging;self.append(entry)
+                # Exclusive: never replaces an existing name; unavailable means nothing moved.
+                try:rename_exclusive(fd,name,fd,staging)
+                except BaseException:rec.pop('stagedName',None);raise
+                staged=staging
                 staged_stat=os.stat(staged,dir_fd=fd,follow_symlinks=False)
                 if staged_stat.st_ino!=original.st_ino:raise ValueError('Staged identity mismatch')
                 rec.update(phase='removing',stagedPath=str(Path(rec['path']).parent/staged))
@@ -502,13 +514,24 @@ class Cleaner:
         from .platform import rename_exclusive,ExclusiveRenameUnavailable
         name=Path(rec['path']).name;staged_path=str(Path(rec['path']).parent/staged)
         rec['stagedPath']=staged_path
+        other=False
         try:
-            now=os.stat(staged,dir_fd=fd,follow_symlinks=False)
-            if (now.st_dev,now.st_ino)!=(original.st_dev,original.st_ino):
-                rec['rollback']='refused';reason='staged object identity changed; not restored'
-            else:
-                rename_exclusive(fd,staged,fd,name)
-                rec['rollback']='restored';rec.pop('stagedPath',None);rec.pop('phase',None);return
+            try:now=os.stat(staged,dir_fd=fd,follow_symlinks=False)
+            except FileNotFoundError:
+                rec.pop('stagedPath',None);rec['rollback']='missing';rec['phase']='rollback-missing'
+                rec['error']=f"{rec.get('error')}; rollback impossible: staged object {staged_path} no longer exists"
+                self._journal_best_effort(entry);return
+            # A different object (e.g. an app's atomic save) may have been staged;
+            # the exclusive rename cannot replace anything, so put it back too.
+            other=(now.st_dev,now.st_ino)!=(original.st_dev,original.st_ino)
+            rename_exclusive(fd,staged,fd,name)
+            rec.pop('stagedPath',None);rec.pop('phase',None)
+            if other:
+                rec['rollback']='restored-other-identity'
+                rec['error']=f"{rec.get('error')}; rollback restored a different object than the reviewed one to {rec['path']}; nothing was removed"
+                self._journal_best_effort(entry)
+            else:rec['rollback']='restored'
+            return
         except FileExistsError:
             rec['rollback']='conflict';reason='original path was recreated meanwhile; both kept'
         except ExclusiveRenameUnavailable as x:
@@ -517,9 +540,14 @@ class Cleaner:
             if x.errno==errno.ENOTEMPTY:rec['rollback']='conflict';reason='original path was recreated meanwhile; both kept'
             else:rec['rollback']='failed';reason=f'rollback failed ({x.strerror or x})'
         rec['phase']='rollback-'+rec['rollback']
+        if other:reason+=' (the staged object is not the reviewed one; it may be new user data)'
         rec['error']=f"{rec.get('error')}; rollback {rec['rollback']}: {reason}; staged object left at {staged_path}"
-        try:self.append(entry)
-        except Exception:pass
+        self._journal_best_effort(entry)
+    def _journal_best_effort(self,entry):
+        """Append, recording rather than raising a journal failure on the entry."""
+        try:self.append(entry);return True
+        except Exception as x:
+            entry['journalError']=f'Journal could not be written: {x}';return False
     def tool_action(self,action):
         if action['kind']=='git-worktree':
             from .gitstate import GitInspector
@@ -561,7 +589,7 @@ class Cleaner:
     def recover(self,apply=False):
         results=[]
         for e in self.entries():
-            kept=[r for r in [e,*e.get('members',[])] if r.get('rollback') in ('conflict','refused','unavailable','failed')]
+            kept=[r for r in [e,*e.get('members',[])] if r.get('rollback') in ROLLBACK_KEPT]
             if kept:
                 # Report only: a staged object kept by a refused rollback is never
                 # renamed back or removed here; a person must compare both copies.

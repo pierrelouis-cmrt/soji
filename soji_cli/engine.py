@@ -34,6 +34,7 @@ PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Librar
 CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
 from .installs import ATOMIC_GROUPS, DEV_GROUPS  # noqa: E402
 SESSION_HINTS = ('claude-sessions', 'codex-sessions')
+STAGED_PREFIX = '.soji-removing-'  # never a cleanup target; see Scanner.staged_inside
 SESSION_FLOOR_SECONDS = 86400
 SPECIAL_RULES = {'checkDeviceBuilds', 'checkSimulatorDevice', 'keepVersionPointedToBy', 'keepProjectPinnedVersions', 'onlyIfOwnerInstalled', 'notIfAppleOwned', 'onlyIfOwnerNotInstalled', 'checkWorkspaceExists'}
 
@@ -529,6 +530,14 @@ class Scanner:
             if match:return match if match[0]['id']==self.inherit_hint and generic_container(match) else None
         return None
 
+    def staged_inside(self,path: str) -> str | None:
+        """A measured `.soji-removing-*` object at or below path (cleanup.Cleaner.move staging)."""
+        cache=getattr(self,'_staged_cache',None)
+        if cache is None or cache[0]!=len(self.nodes):
+            cache=(len(self.nodes),[p for p in self.nodes if os.path.basename(p).startswith(STAGED_PREFIX)])
+            self._staged_cache=cache
+        return next((p for p in cache[1] if within(p,path)),None)
+
     def classify(self,node: Node,match=None) -> Finding:
         match=match or self.catalog.match(node.path)
         if match:
@@ -541,6 +550,8 @@ class Scanner:
             else:group='Other folders'
             f=Finding(node.path,node.size,node.apparent,node.files,node.newest,group,Path(node.path).name or '/',smart_rule='No hint matched; review only')
         f.recent_activity_hours=self.recent_activity_hours
+        staged=self.staged_inside(node.path)
+        if staged:f.holds.append(f'Contains a Sōji staged object kept after a failed permanent removal ({staged}); it may be displaced user data: review it with `soji recover`, never cleaned automatically')
         if node.errors:f.holds.append(f'Incomplete measurement ({node.errors} errors or scan limit)')
         if node.skipped:f.holds.append(node.reason or 'Contains an excluded or unreadable subtree')
         if node.secret:f.holds.append('Contains credential or environment-file names')
