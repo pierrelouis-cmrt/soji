@@ -174,3 +174,32 @@ Final residual-marker validation on `e8a7237`: **462 tests OK, zero skips**,
 135.225 s with disposable native helper; **99 targeted tests OK**. Exact logs
 and commands are in the marker follow-up. Fresh independent targeted approval
 remains pending; main is unchanged.
+
+
+## Local main integration completed — 2026-11-09
+
+This is the current outcome; earlier pending-review/main-unchanged statements
+above are preserved historical snapshots. Final residual review **APPROVE**
+(proof/report commit `bc93f33a50b997651dfecbddc76d2eff80b65c92`), no blocking
+P1/P2 in that review. Main fast-forwarded from `21ce749` to reviewed integration
+head `cb8865c73b1b219518b8aecbebbb25c4768b7e55`; finalization adds documentation
+only. Production/tests/native remain byte-identical to independently reviewed
+`e8a7237c2ea079834eebd6328e6a18b011d34d3b`.
+
+Independent evidence: original proof 1 OK, boundary tests 3 OK, targeted 189 OK,
+full native 462 OK (135.528 s), all zero skips. Full suite was **not rerun** for
+this documentation-only finalization. Reviewer proof modules were not cherry-picked;
+only the final approval report is copied durably.
+
+Worktree cleanup stays disabled; positive project-gone inference remains absent.
+Unknown pin scopes/metadata retain conservative holds. Snapshot races, soft pin
+budgets, persistent journal failures and untested future atomic-family formats
+remain limitations. Installed binary is unchanged; no release/install/push/PR or
+real-home scan/cleanup/Trash/repair/restore. Recovery scripts remain unchanged.
+Fixtures precede disposable macOS account/VM validation, then read-only plans,
+then any separately authorized limited cleanup with verified independent recovery.
+
+Full bug/TUI state table, commit provenance and staged validation plan:
+[final local status](docs/SAFETY_STATUS_2026-11-09.md).
+Exact independent commands, scope and approval:
+[final review](docs/FINAL_INDEPENDENT_REVIEW_2026-11-09.md).
