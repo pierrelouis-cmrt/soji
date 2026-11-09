@@ -19,8 +19,9 @@ class GenericReferences(FakeHome):
         for hint in consumers:
             # Substitute literal disposable marker paths; the production handler
             # is shared by each real catalog consumer, with nvm separately tested.
-            target=self.home/'families'/hint['id']/'1.0.0'
-            target.mkdir(parents=True);(target.parent/'2.0.0').mkdir()
+            target=Path(hint['patterns'][0].replace('~',str(self.home),1).replace('*','1.0.0'))
+            twin=Path(hint['patterns'][0].replace('~',str(self.home),1).replace('*','2.0.0'))
+            target.mkdir(parents=True);twin.mkdir()
             marker=self.home/'markers'/hint['id'];marker.parent.mkdir(exist_ok=True)
             for variant in ('unreadable','invalid-utf8','oversized','malformed','empty','dangling','outside','loop'):
                 with self.subTest(hint=hint['id'],variant=variant):
@@ -32,7 +33,7 @@ class GenericReferences(FakeHome):
                     if variant=='unreadable':marker.chmod(0)
                     try:
                         self.assertIn('reference unknown',rules.active_reason(str(target),[str(marker)]))
-                        self.assertIn('reference unknown',rules.active_reason(str(target.parent/'2.0.0'),[str(marker)]))
+                        self.assertIn('reference unknown',rules.active_reason(str(twin),[str(marker)]))
                     finally:
                         if variant=='unreadable':marker.chmod(0o600)
                         marker.unlink()
@@ -40,11 +41,56 @@ class GenericReferences(FakeHome):
                 self.assertIsNone(rules.active_reason(str(target),[str(marker)]))
                 marker.write_text('1.0.0\n')
                 self.assertIn('Active version:',rules.active_reason(str(target),[str(marker)]))
-                self.assertIsNone(rules.active_reason(str(target.parent/'2.0.0'),[str(marker)]))
+                self.assertIsNone(rules.active_reason(str(twin),[str(marker)]))
                 marker.unlink();marker.symlink_to(target)
                 self.assertIn('Active version:',rules.active_reason(str(target),[str(marker)]))
-                self.assertIsNone(rules.active_reason(str(target.parent/'2.0.0'),[str(marker)]))
+                self.assertIsNone(rules.active_reason(str(twin),[str(marker)]))
                 marker.unlink()
+
+    def test_seven_consumers_reject_linked_metadata_and_unknown_units(self):
+        rules=self.scan().specialized
+        consumers=[h for h in rules.scanner.catalog.hints if h.get('rule',{}).get('keepVersionPointedToBy') and h['id']!='nvm-versions']
+        self.assertEqual(len(consumers),7)
+        for hint in consumers:
+            candidate=Path(hint['patterns'][0].replace('~',str(self.home),1).replace('*','3.1.0'))
+            other=Path(hint['patterns'][0].replace('~',str(self.home),1).replace('*','3.2.0'))
+            candidate.mkdir(parents=True);other.mkdir()
+            marker=self.home/'markers'/hint['id'];marker.parent.mkdir(exist_ok=True)
+            for variant in ('text','unreadable-text','oversized-text','unknown-directory','unknown-product-directory','version-named-text'):
+                with self.subTest(consumer=hint['id'],variant=variant):
+                    target=candidate.parent/('99.0.0' if variant=='version-named-text' else 'unexpected-99.0.0' if variant=='unknown-product-directory' else 'selection')
+                    if variant in ('unknown-directory','unknown-product-directory'):target.mkdir()
+                    else:target.write_text('3.1.0\n' if variant!='oversized-text' else '3.1.0'+' '*4096)
+                    marker.symlink_to(target)
+                    if variant=='unreadable-text':target.chmod(0)
+                    try:
+                        self.assertIn('reference unknown',rules.active_reason(str(candidate),[str(marker)]))
+                        self.assertIn('reference unknown',rules.active_reason(str(other),[str(marker)]))
+                    finally:
+                        if variant=='unreadable-text':target.chmod(0o600)
+                        marker.unlink()
+                        if variant in ('unknown-directory','unknown-product-directory'):target.rmdir()
+                        else:target.unlink()
+            # Positively recognized version root, then executable descendant.
+            marker.symlink_to(other)
+            self.assertIsNone(rules.active_reason(str(candidate),[str(marker)]))
+            self.assertIn('Active version:',rules.active_reason(str(other),[str(marker)]))
+            marker.unlink();executable=other/'bin/tool';executable.parent.mkdir();executable.write_text('fixture');executable.chmod(0o700)
+            marker.symlink_to(executable)
+            self.assertIsNone(rules.active_reason(str(candidate),[str(marker)]))
+            self.assertIn('Active version:',rules.active_reason(str(other),[str(marker)]))
+            marker.unlink();marker.write_text('3.2.0\n')
+            self.assertIsNone(rules.active_reason(str(candidate),[str(marker)]))
+            marker.unlink()
+
+    def test_standalone_executable_version_link_remains_usable(self):
+        root=self.home/'.local/share/claude/versions'
+        candidate=write(root/'1.0.0','fixture executable');candidate.chmod(0o700)
+        other=write(root/'2.0.0','fixture executable');other.chmod(0o700)
+        marker=self.home/'.local/bin/claude';marker.parent.mkdir(parents=True);marker.symlink_to(other)
+        rules=self.scan().specialized
+        self.assertIsNone(rules.active_reason(str(candidate),[str(marker)]))
+        self.assertIn('Active version:',rules.active_reason(str(other),[str(marker)]))
 
     def test_ruby_marker_becomes_unknown_after_plan_preserves_runtime(self):
         for version,days in [('3.1.0',180),('3.2.0',120),('3.3.0',90)]:

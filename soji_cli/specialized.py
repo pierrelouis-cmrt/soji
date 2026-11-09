@@ -584,6 +584,34 @@ class SpecializedRules:
         """The marker holding `path` as (possibly) active, or None."""
         found=self._active(path,markers)
         return found[0] if found else None
+    def referenced_version_root(self,path,resolved):
+        """Recognize a real version unit or its executable, never arbitrary metadata.
+
+        A family-relative path alone proves nothing: the unit must have a
+        version identity recognized by the same catalog rule as the candidate.
+        Text-marker links and unsupported layouts deliberately remain unknown.
+        """
+        family=Path(os.path.realpath(Path(path).parent))
+        try:
+            relative=resolved.relative_to(family)
+            if not relative.parts:return None
+            root=family/relative.parts[0]
+            match=getattr(self.scanner.catalog,'match',None)
+            if not callable(match):return None
+            candidate=match(path);referenced=match(str(root))
+            if not candidate or not referenced or candidate[0]['id']!=referenced[0]['id']:return None
+            if not candidate[0].get('rule',{}).get('keepVersionPointedToBy') or version_number(root.name) is None:return None
+            if split_version(root.name)[0]!=split_version(Path(path).name)[0]:return None
+            info=root.lstat();mine=Path(path).lstat()
+            if stat.S_ISLNK(info.st_mode) or stat.S_IFMT(info.st_mode)!=stat.S_IFMT(mine.st_mode):return None
+            if resolved==root:
+                if stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode) and info.st_mode&0o111:return root
+                return None
+            target=resolved.stat()
+            if stat.S_ISDIR(info.st_mode) and stat.S_ISREG(target.st_mode) and target.st_mode&0o111:return root
+        except (OSError,ValueError):pass
+        return None
+
     def _active(self,path,markers):
         # Literal marker paths: keepVersionPointedToBy is never globbed.
         name=Path(path).name
@@ -609,10 +637,9 @@ class SpecializedRules:
             try:
                 if stat.S_ISLNK(info.st_mode):
                     resolved=p.resolve(strict=True)
-                    family=os.path.realpath(Path(path).parent)
-                    if not inside(str(resolved),family) or str(resolved)==family:
-                        return marker,unknown+' (target outside version family)'
-                    if inside(str(resolved),os.path.realpath(path)):return marker,'Active version: '+marker
+                    root=self.referenced_version_root(path,resolved)
+                    if root is None:return marker,unknown+' (unsupported linked version identity or text metadata)'
+                    if inside(str(root),os.path.realpath(path)):return marker,'Active version: '+marker
                 elif stat.S_ISREG(info.st_mode) and info.st_size<=4095:
                     # One numeric version token is the supported generic text layout.
                     # Executable wrappers, empty/multiline/binary metadata and unknown

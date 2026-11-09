@@ -101,10 +101,15 @@ class SmartRuleCases(unittest.TestCase):
         marker.write_text('22')
         self.assertIsNone(self.rules.active('/x/v22.0',[str(self.home/'act*')]))
     def test_active_relative_symlink_descendant(self):
-        target=self.home/'versions/v1/bin';target.mkdir(parents=True)
-        marker=self.home/'current';marker.symlink_to('versions/v1/bin')
-        self.assertEqual(self.rules.active(str(target.parent),[str(marker)]),str(marker))
-        self.assertIsNone(self.rules.active(str(self.home/'versions/v10'),[str(marker)]))
+        from soji_cli.engine import Catalog
+        self.home=self.home.resolve();self.rules.home=self.home
+        self.rules.scanner.catalog=Catalog(str(self.home))
+        target=self.home/'.rbenv/versions/1.0.0/bin/ruby';target.parent.mkdir(parents=True)
+        target.write_text('fixture executable');target.chmod(0o700)
+        other=self.home/'.rbenv/versions/2.0.0';other.mkdir()
+        marker=self.home/'.rbenv/version';marker.symlink_to('versions/1.0.0/bin/ruby')
+        self.assertEqual(self.rules.active(str(target.parent.parent),[str(marker)]),str(marker))
+        self.assertIsNone(self.rules.active(str(other),[str(marker)]))
     def test_workspace_missing_includes_bad_metadata_and_empty_path(self):
         folder=self.home/'Derived';folder.mkdir()
         self.assertTrue(workspace_missing(folder))
