@@ -4,6 +4,7 @@ candidate data. No backend or license circumvention is involved.
 """
 from __future__ import annotations
 import dataclasses
+import errno
 import hashlib
 import json
 import os
@@ -414,7 +415,10 @@ class Cleaner:
                     else:self.move(entry,entry['id'],entry,plan,want_permanent)
                 self.append(entry)
             except Exception as e:
-                entry['status']='failed';entry['error']=str(e)
+                kept=[r for r in [entry,*entry.get('members',[])] if r.get('rollback') not in (None,'restored')]
+                entry['status']='failed'
+                # Never drop the note that a refused rollback left a staged object behind.
+                entry['error']=str(e) if not kept else f"{kept[0]['error']}; then {e}"
                 self.append(entry)
             entries.append(entry)
             report('clean',len(entries),item['path'])
@@ -480,14 +484,42 @@ class Cleaner:
                 finally:os.close(tfd)
             return True
         except Exception as e:
-            if staged and fd is not None and not removal_started:
-                try:os.rename(staged,Path(rec['path']).name,src_dir_fd=fd,dst_dir_fd=fd)
-                except OSError:pass
             rec['status']='prepared' if moved else 'failed';rec['error']=str(e)
+            if staged and fd is not None and not removal_started:
+                self.rollback_staged(fd,staged,rec,entry,original)
             if removal_started:rec['partialDeletionPossible']=True
             return False
         finally:
             if fd is not None:os.close(fd)
+    def rollback_staged(self,fd,staged,rec,entry,original):
+        """Put a staged, not-yet-removed object back without replacing anything.
+
+        Only an atomic no-replace rename is used. If the original name was
+        recreated meanwhile, or the rename cannot be done exclusively, both
+        objects are kept, the staged path is recorded (best-effort: the
+        journal may be what failed) and rec['error'] says so.
+        """
+        from .platform import rename_exclusive,ExclusiveRenameUnavailable
+        name=Path(rec['path']).name;staged_path=str(Path(rec['path']).parent/staged)
+        rec['stagedPath']=staged_path
+        try:
+            now=os.stat(staged,dir_fd=fd,follow_symlinks=False)
+            if (now.st_dev,now.st_ino)!=(original.st_dev,original.st_ino):
+                rec['rollback']='refused';reason='staged object identity changed; not restored'
+            else:
+                rename_exclusive(fd,staged,fd,name)
+                rec['rollback']='restored';rec.pop('stagedPath',None);rec.pop('phase',None);return
+        except FileExistsError:
+            rec['rollback']='conflict';reason='original path was recreated meanwhile; both kept'
+        except ExclusiveRenameUnavailable as x:
+            rec['rollback']='unavailable';reason=f'no atomic no-replace rename ({x.strerror}); not restored'
+        except OSError as x:
+            if x.errno==errno.ENOTEMPTY:rec['rollback']='conflict';reason='original path was recreated meanwhile; both kept'
+            else:rec['rollback']='failed';reason=f'rollback failed ({x.strerror or x})'
+        rec['phase']='rollback-'+rec['rollback']
+        rec['error']=f"{rec.get('error')}; rollback {rec['rollback']}: {reason}; staged object left at {staged_path}"
+        try:self.append(entry)
+        except Exception:pass
     def tool_action(self,action):
         if action['kind']=='git-worktree':
             from .gitstate import GitInspector
@@ -529,6 +561,13 @@ class Cleaner:
     def recover(self,apply=False):
         results=[]
         for e in self.entries():
+            kept=[r for r in [e,*e.get('members',[])] if r.get('rollback') in ('conflict','refused','unavailable','failed')]
+            if kept:
+                # Report only: a staged object kept by a refused rollback is never
+                # renamed back or removed here; a person must compare both copies.
+                results.append({'id':e['id'],'rollbackKept':[{'path':r['path'],'stagedPath':r.get('stagedPath'),'rollback':r['rollback']} for r in kept],
+                                'status':'Rollback did not restore the staged object; it was kept beside the original path for manual review'})
+                continue
             if e.get('partialDeletionPossible'):
                 results.append({'id':e['id'],'partialDeletionPossible':True,'stagedPath':e.get('stagedPath'),'status':'Permanent removal interrupted; remaining staged data is not an intact undo copy'})
                 continue
