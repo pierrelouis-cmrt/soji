@@ -219,7 +219,7 @@ def hermetic(home: str | None = None):
     unavailable = {'error': 'Native helper disabled for corpus scan'}
 
     def native(operation, *args, **kw):
-        return unavailable
+        return [] if operation=='apps' else unavailable
 
     def json_command(argv, timeout=8):
         argv = [str(a) for a in argv]

@@ -66,7 +66,7 @@ class AppCatalog:
     # System-wide roots are class-level so hermetic tests can pin them.
     SYSTEM_ROOTS=(Path('/Applications'),Path('/System/Applications'))
     def __init__(self,home,processes=()):
-        self.home=Path(home);self.apps=[];self.processes=processes;self.running=[];self._identities={}
+        self.home=Path(home);self.apps=[];self.processes=processes;self.running=[];self.running_available=False;self._identities={}
     def identity(self,app):
         """Signing identity, looked up lazily: only uninstall planning and verification call this."""
         if app['path'] not in self._identities:
@@ -89,8 +89,10 @@ class AppCatalog:
                     if not name.endswith('.app'):continue
                     dirs.remove(name);p=Path(folder,name);info=read_plist(p/'Contents/Info.plist')
                     self.apps.append({'path':str(p),'bundle':info.get('CFBundleIdentifier',''),'name':info.get('CFBundleDisplayName') or info.get('CFBundleName') or p.stem,'version':info.get('CFBundleShortVersionString','')})
-        running=native('apps')
-        if isinstance(running,list):self.running=running
+        try:running=native('apps')
+        except Exception:running=None
+        self.running_available=isinstance(running,list) and all(isinstance(r,dict) and (isinstance(r.get('bundleID'),str) and bool(r['bundleID']) or isinstance(r.get('path'),str) and r['path'].startswith('/')) for r in running)
+        if self.running_available:self.running=running
         return self
     def owner(self,path):
         parts=Path(path).parts;tokens=[]

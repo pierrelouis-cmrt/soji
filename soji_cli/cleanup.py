@@ -22,9 +22,21 @@ TRASH_NOTICE='Undo works only while the items are still in the Trash. Once the T
 # being retried until a snapshot happens to pass.
 LIVE_USE_REASONS=('File open or process working in this folder','Owning application is running','Running: ',
                   'A running program is installed here','Codex session has a writer lock',
-                  'Coding agent or editor used this project recently','Codex is running and this session changed recently')
+                  'Coding agent or editor used this project recently','Codex is running and this session changed recently',
+                  'Contents changed since analysis','identity changed','Identity changed','Target or parent changed',
+                  'Session members changed','Target changed before operation')
 LIVE_USE_HOLD=86400
-HIGH_RISK_GROUPS=('Toolchains and SDKs','Project dependencies','Editor extensions')
+from .safety import HIGH_RISK_GROUPS, staged_ancestor
+
+
+class SafetyRefusal(ValueError):
+    def __init__(self,message,code='active-use',at=None):
+        super().__init__(message);self.code=code;self.at=at
+
+
+def refusal_code(error):
+    if isinstance(error,SafetyRefusal):return error.code
+    return 'active-use' if any(r in str(error) for r in LIVE_USE_REASONS) else None
 
 
 def soji_version():
@@ -44,10 +56,13 @@ def policy_record(f,mode,now=None,source='fresh'):
                    'minProjectIdleHours':(get('rule_project_min_hours') or {}).get(mode),
                    'ruleLevel':get('rule_level'),'projectIdleHours':get('project_idle_hours')}
         reason=get('rule_early_reason') or get('smart_rule') or f"{get('label')} rule ({get('hint_id')}): age and guard checks only"
+    agent=next((e.get('judgment') for e in reversed(get('evidence',[]) or []) if e.get('check')=='agent'),None)
+    if isinstance(agent,dict):reason=(get('levels') or {}).get('reason') or agent.get('reason') or reason
     decision=get('decision')
     if not isinstance(f,dict) and now is not None:decision=f.decide(mode,now)[1]
     return {'source':source,'rule':get('hint_id'),'label':get('label'),'group':get('group'),'mode':mode,
-            'threshold':threshold,'reason':reason,'decision':decision,'matchedPattern':get('matched_pattern')}
+            'threshold':threshold,'reason':reason,'decision':decision,'matchedPattern':get('matched_pattern'),
+            **({'findingSource':get('source'),'recommendation':get('recommendation'),'confidence':get('confidence'),'agentJudgment':agent} if isinstance(agent,dict) else {})}
 
 
 # Rollback outcomes where a staged .soji-removing-* object was left in place.
@@ -65,7 +80,18 @@ def recoverability(entry):
     if method!='trash':return 'not a Trash move'
     target=entry.get('trashedTo')
     if not target:return 'unrecoverable (no Trash location recorded)'
-    return 'recoverable while in Trash' if os.path.lexists(target) else 'unrecoverable (Trash emptied)'
+    try:current=file_identity(target)
+    except FileNotFoundError:return 'unrecoverable (Trash emptied)'
+    except OSError:return 'Trash unreadable; status unknown'
+    expected=entry.get('trashedIdentity')
+    if not expected:return 'Trash identity unrecorded; status unknown'
+    if not same_trash_identity(current,expected):return 'Trash item replaced or changed; not recoverable by Sōji'
+    return 'recoverable while in Trash'
+
+
+def same_trash_identity(current,expected):
+    # macOS Trash xattrs may change ctime without changing the object.
+    return bool(expected) and {k:v for k,v in current.items() if k!='ctimeNs'}=={k:v for k,v in expected.items() if k!='ctimeNs'}
 
 
 def file_identity(path):
@@ -249,19 +275,22 @@ class Cleaner:
         if refusals is None:
             refusals={}
             now=time.time()
-            for e in self.entries():
-                error=e.get('error') or ''
-                if e.get('status')=='failed' and now-e.get('at',0)<LIVE_USE_HOLD and any(r in error for r in LIVE_USE_REASONS):
-                    if e.get('at',0)>refusals.get(e['path'],(0,''))[0]:refusals[e['path']]=(e['at'],error)
+            for e in self.entries(strict=True):
+                for rec in [e,*e.get('members',[])]:
+                    error=rec.get('error') or '';at=rec.get('refusalAt',rec.get('at',e.get('at',0)))
+                    if rec.get('status')=='failed' and now-at<LIVE_USE_HOLD and (rec.get('refusalCode') or refusal_code(error)):
+                        if at>refusals.get(rec['path'],(0,''))[0]:refusals[rec['path']]=(at,error)
             if batch is not None:batch['refusals']=refusals
-        return refusals.get(path)
+        return max((v for p,v in refusals.items() if inside(path,p) or inside(p,path)),default=None)
     def fresh(self,item,plan):
         from .engine import Scanner
         path=item['path'];self._fresh_finding=None
+        staged=staged_ancestor(path)
+        if staged:raise SafetyRefusal('Sōji staged object requires manual review: '+staged,'staged-copy')
         refused=self.live_use_refusal(path)
         if refused:
             hours=(time.time()-refused[0])/3600
-            raise ValueError(f'In use {hours:.1f} h ago ({refused[1].removeprefix("Fresh guards refuse: ")}); skipped for 24 h rather than retried until a momentary check passes')
+            raise SafetyRefusal(f'In use {hours:.1f} h ago ({refused[1].removeprefix("Fresh guards refuse: ")}); skipped for 24 h rather than retried until a momentary check passes',at=refused[0])
         if not any(inside(path,r) for r in plan['roots']):raise ValueError('Outside scan roots')
         if path in plan['roots']:raise ValueError('Refusing a scan root itself')
         uninstall_action=(item.get('action') or {}).get('kind')=='uninstall'
@@ -270,13 +299,23 @@ class Cleaner:
         if inside(path,str(self.state)):raise ValueError('Cannot clean own state')
         if any(inside(path,p) or inside(p,path) for p in plan.get('protected',[])):raise ValueError('Protected path overlap')
         identity=file_identity(path)
-        if identity!=item['identity']:raise ValueError('File or parent identity changed since analysis')
+        if identity!=item['identity']:raise SafetyRefusal('File or parent identity changed since analysis','identity-changed')
         members=session_members(item) if 'members' in item else None
         for m in members or ():
             if any(inside(m['path'],p) or inside(p,m['path']) for p in plan.get('protected',[])):raise ValueError('Protected path overlap')
             try:current=file_identity(m['path'])
             except OSError:raise ValueError('Session member missing since analysis: '+m['path'])
-            if current!=m['identity']:raise ValueError('Session member identity changed since analysis: '+m['path'])
+            if current!=m['identity']:raise SafetyRefusal('Session member identity changed since analysis: '+m['path'],'identity-changed')
+        if uninstall_action or native_action:
+            # These paths return before Scanner measurement. Protect staged
+            # copies here too, with an incomplete inventory treated as unknown.
+            seen=0
+            def unreadable(error):raise SafetyRefusal('Staged-copy inventory unreadable; cleanup blocked','staged-unknown') from error
+            for folder,dirs,files in os.walk(path,followlinks=False,onerror=unreadable):
+                seen+=len(dirs)+len(files)
+                if seen>100000:raise SafetyRefusal('Staged-copy inventory incomplete; cleanup blocked','staged-unknown')
+                if any(name.startswith('.soji-removing-') for name in [*dirs,*files]):
+                    raise SafetyRefusal('Contains a Sōji staged object; review with `soji recover`','staged-copy')
         if uninstall_action:
             from .uninstall import verify_uninstall
             verify_uninstall(item,plan['home']);return identity
@@ -326,7 +365,7 @@ class Cleaner:
             mn=scan.nodes.get(m['path'])
             if mn is None:raise ValueError('Fresh target could not be measured')
             if mn.errors or mn.skipped or mn.secret:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
-            if mn.size!=m['size'] or mn.newest!=m['newest'] or mn.files!=m['files']:raise ValueError('Contents changed since analysis'+(': '+m['path'] if members else ''))
+            if mn.size!=m['size'] or mn.newest!=m['newest'] or mn.files!=m['files']:raise SafetyRefusal('Contents changed since analysis'+(': '+m['path'] if members else ''),'contents-changed')
         if item.get('hint') in ('claude-sessions','codex-sessions','trash-item') and measure_root!=path:
             # Re-derive the catalog row (FindingPart policy, compound members)
             # from its catalog root, not from a bare file.
@@ -360,7 +399,11 @@ class Cleaner:
             AIAnalyzer(self.state).apply(scan,[judgment])
             f=next(candidate for candidate in scan.findings if candidate.path==path)
         # Part-based session/Trash catalogs already reconstruct their own policy.
-        if not f.decide(plan['mode'],time.time())[0]:raise ValueError('Fresh guards refuse: '+f.decide(plan['mode'],time.time())[1])
+        selected,reason=f.decide(plan['mode'],time.time())
+        if not selected:
+            code=refusal_code(reason)
+            if code:raise SafetyRefusal('Fresh guards refuse: '+reason,code)
+            raise ValueError('Fresh guards refuse: '+reason)
         if f.action.get('kind')=='official-command' and item.get('method')!='trash':
             from .commands import may_remove_permanently
             if not may_remove_permanently(f):raise ValueError('Fresh finding does not permit an official command')
@@ -391,7 +434,9 @@ class Cleaner:
             try:
                 self._fresh_finding=None
                 self.fresh(item,plan)
-                if self._fresh_finding is not None:entry['policy']=policy_record(self._fresh_finding,plan['mode'],time.time())
+                if self._fresh_finding is not None:
+                    entry['planPolicy']=entry['policy']
+                    entry['policy']=policy_record(self._fresh_finding,plan['mode'],time.time())
                 report('clean',len(entries),item['path'])
                 action=item.get('action') or {}
                 if action.get('kind') in ('simulator-device','simulator-runtime','document-version','official-command','git-worktree'):
@@ -426,6 +471,10 @@ class Cleaner:
                 entry['status']='failed'
                 # Never drop the note that a refused rollback left a staged object behind.
                 entry['error']=str(e) if not kept else f"{kept[0]['error']}; then {e}"
+                code=refusal_code(e)
+                if code:
+                    entry['refusalCode']=code
+                    if isinstance(e,SafetyRefusal) and e.at is not None:entry['refusalAt']=e.at
                 self._journal_best_effort(entry)
             entries.append(entry)
             report('clean',len(entries),item['path'])
@@ -497,6 +546,8 @@ class Cleaner:
             return True
         except Exception as e:
             rec['status']='prepared' if moved else 'failed';rec['error']=str(e)
+            code=refusal_code(e)
+            if code:rec['refusalCode']=code;entry['refusalCode']=code
             if staged and fd is not None and not removal_started:
                 self.rollback_staged(fd,staged,rec,entry,original)
             if removal_started:rec['partialDeletionPossible']=True
@@ -545,6 +596,7 @@ class Cleaner:
         self._journal_best_effort(entry)
     def _journal_best_effort(self,entry):
         """Append, recording rather than raising a journal failure on the entry."""
+        if entry.get('refusalCode') and self._batch is not None:self._batch.pop('refusals',None)
         try:self.append(entry);return True
         except Exception as x:
             entry['journalError']=f'Journal could not be written: {x}';return False
@@ -564,13 +616,23 @@ class Cleaner:
         else:raise ValueError('Unknown action')
         code,_,err=command(argv,timeout=120)
         if code:raise OSError(err)
-    def entries(self):
+    def entries(self,strict=False):
         result={}
-        if not self.journal.exists():return []
-        with self.journal.open() as f:
+        try:journal=self.journal.open()
+        except FileNotFoundError:return []
+        except OSError as exc:
+            if strict:raise SafetyRefusal('Refusal history unreadable; cleanup blocked','history-unknown') from exc
+            raise
+        with journal as f:
             for line in f:
-                try:e=json.loads(line);result[e['id']]=e
-                except (ValueError,KeyError):continue
+                try:
+                    e=json.loads(line)
+                    if not isinstance(e,dict) or not isinstance(e.get('id'),str):raise ValueError('Invalid journal record')
+                    if strict and (not isinstance(e.get('path'),str) or not isinstance(e.get('at',0),(int,float))):raise ValueError('Invalid refusal history')
+                    result[e['id']]=e
+                except (ValueError,KeyError,TypeError):
+                    if strict:raise SafetyRefusal('Refusal history unreadable; cleanup blocked','history-unknown')
+                    continue
         return list(result.values())
     def report(self):
         """Journal entries annotated with whether undo can still work."""
@@ -580,10 +642,10 @@ class Cleaner:
             if e.get('members'):
                 e['members']=[{**m,'recovery':recoverability(m)} for m in e['members']]
                 states={m['recovery'] for m in e['members'] if m['recovery']}
-                e['recovery']=('unrecoverable (Trash emptied)' if 'unrecoverable (Trash emptied)' in states
-                               else next(iter(states)) if len(states)==1 else ', '.join(sorted(states)) or None)
+                e['recovery']=next(iter(states)) if len(states)==1 else ', '.join(sorted(states)) or None
             else:e['recovery']=recoverability(e)
-            e['recoverable']=e['recovery']=='recoverable while in Trash'
+            e['recoverable']=(any(m['recovery']=='recoverable while in Trash' for m in e['members'])
+                              if e.get('members') else e['recovery']=='recoverable while in Trash')
             out.append(e)
         return out
     def recover(self,apply=False):
@@ -644,12 +706,10 @@ class Cleaner:
         e.update(status='restored',restoredAt=time.time());self.append(e);return e
     def restore(self,e):
         source=e['trashedTo'];dest=e['path']
-        if not os.path.lexists(source):raise ValueError('Unrecoverable (Trash emptied): '+source+' no longer exists')
-        # macOS stamps Trash items with xattrs (com.apple.macl), bumping ctime only.
-        def same(current):
-            want=dict(e.get('trashedIdentity') or {});current=dict(current)
-            want.pop('ctimeNs',None);current.pop('ctimeNs',None)
-            return bool(want) and current==want
+        try:current=file_identity(source)
+        except FileNotFoundError:raise ValueError('Unrecoverable (Trash emptied): '+source+' no longer exists')
+        except OSError as exc:raise ValueError('Trash unreadable; status unknown: '+source) from exc
+        def same(current):return same_trash_identity(current,e.get('trashedIdentity'))
         if os.path.lexists(dest):raise ValueError('Original destination exists; refusing overwrite')
         if not same(file_identity(source)):raise ValueError('Trashed item changed')
         # ~/.Trash itself may not be openable (macOS privacy protection); then

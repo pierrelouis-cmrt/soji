@@ -34,7 +34,7 @@ PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Librar
 CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
 from .installs import ATOMIC_GROUPS, DEV_GROUPS  # noqa: E402
 SESSION_HINTS = ('claude-sessions', 'codex-sessions')
-STAGED_PREFIX = '.soji-removing-'  # never a cleanup target; see Scanner.staged_inside
+from .safety import STAGED_PREFIX, staged_ancestor
 SESSION_FLOOR_SECONDS = 86400
 SPECIAL_RULES = {'checkDeviceBuilds', 'checkSimulatorDevice', 'keepVersionPointedToBy', 'keepProjectPinnedVersions', 'onlyIfOwnerInstalled', 'notIfAppleOwned', 'onlyIfOwnerNotInstalled', 'checkWorkspaceExists'}
 
@@ -146,6 +146,7 @@ class Finding:
     def decide(self, mode: str, now: float) -> tuple[bool, str]:
         mode=ALIASES.get(mode,mode)
         if mode not in MODES:raise ValueError('Unknown cleanup level: '+mode)
+        if staged_ancestor(self.path):return False,'Sōji staged object requires manual review with `soji recover`; never cleaned automatically'
         if self.holds: return False, '; '.join(dict.fromkeys(self.holds))
         if mode in self.mode_holds:return False,self.mode_holds[mode]
         if self.recommendation in ('keep','review'):return False,'Agent recommends '+self.recommendation
@@ -536,7 +537,7 @@ class Scanner:
         if cache is None or cache[0]!=len(self.nodes):
             cache=(len(self.nodes),[p for p in self.nodes if os.path.basename(p).startswith(STAGED_PREFIX)])
             self._staged_cache=cache
-        return next((p for p in cache[1] if within(p,path)),None)
+        return staged_ancestor(path) or next((p for p in cache[1] if within(p,path)),None)
 
     def classify(self,node: Node,match=None) -> Finding:
         match=match or self.catalog.match(node.path)
@@ -585,6 +586,8 @@ class Scanner:
             state=self.git.inspect(project,worktree=f.group=='Agent worktrees') if self.git else {}
             if state.get('reason'):f.holds.append(state['reason'])
             f.evidence.append({'check':'git','state':state})
+        if f.rule.get('notWhileOwnerRuns') and self.apps is not None and not self.apps.running_available:
+            f.holds.append('Owning application running status unknown; running-app inventory unavailable')
         if self.specialized:self.specialized.evaluate(f)
         if self.context_warnings:f.holds.extend(self.context_warnings)
         from .cleanup import file_identity
@@ -665,6 +668,10 @@ class Scanner:
         self.set_progress('categorize',2,4,'Sorting session and Trash catalogs')
         from .catalogs import expand_catalogs
         self.findings=expand_catalogs(self)
+        for f in self.findings:
+            staged=next((hit for p in [f.path,*[m['path'] for m in f.members]] if (hit:=self.staged_inside(p))),None)
+            if staged and not any('staged object' in h for h in f.holds):
+                f.holds.append('Sōji staged object requires manual review: '+staged)
         self.set_progress('categorize',3,4,'Checking file metadata')
         if self.context:
             from .platform import native
@@ -682,6 +689,8 @@ class Scanner:
                         if meta.get('cloud'):f.holds.append('Cloud-managed or online-only item')
                         if meta:f.evidence.append({'check':'nativeMetadata',**meta})
         self.findings.sort(key=lambda f:f.size,reverse=True)
+        if self.context and not self.apps.running_available:
+            self.context_warnings.append('Running-app inventory unavailable; owner-running checks unknown')
         self.set_progress('categorize',4,4,'Categories ready')
 
     def decisions(self,mode):

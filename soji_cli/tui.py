@@ -33,8 +33,7 @@ MODE_WARNING = {
     "balanced": "Review paths; software may need rebuilding.",
     "aggressive": "HIGH RISK: may break apps, runtimes or dependencies.",
 }
-RISK_GROUPS = {"Toolchains and SDKs", "Project dependencies", "Build output",
-               "Agent and editor history", "Agent worktrees"}
+from .safety import HIGH_RISK_GROUPS as RISK_GROUPS
 
 
 def cleanup_warnings(mode, targets):
@@ -147,7 +146,8 @@ def undo_entries(entries, state_dir, cleaner=None):
         if e["status"] not in ("done", "partial"):
             continue
         try:
-            cleaner.undo(e["id"])
+            result = cleaner.undo(e["id"])
+            e.update(result)
             restored += 1
         except Exception as exc:
             errors.append(f"{e['path']}: {exc}")
@@ -878,7 +878,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     state["message"] = "Nothing to undo in this session."
                 else:
                     restored, errors = undo_entries(state["lastBatch"], state_dir)
-                    state["lastBatch"] = None
+                    state["lastBatch"] = [e for e in state["lastBatch"] if e["status"] in ("done", "partial")] or None
                     state["message"] = f"Restored {restored} item(s) from the Trash" + (
                         f"; {len(errors)} failed: " + errors[0] if errors else "."
                     )
