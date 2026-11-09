@@ -1,6 +1,12 @@
 """Shared safety boundaries for planning, execution and presentation."""
 from pathlib import Path
 
+class SafetyRefusal(ValueError):
+    """A refusal whose policy code and original clock survive journal retries."""
+    def __init__(self,message,code='active-use',at=None):
+        super().__init__(message);self.code=code;self.at=at
+
+
 HIGH_RISK_GROUPS=frozenset(('Toolchains and SDKs','Project dependencies','Editor extensions',
                            'Build output','Agent and editor history','Agent worktrees'))
 STAGED_PREFIX='.soji-removing-'

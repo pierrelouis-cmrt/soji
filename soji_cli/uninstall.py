@@ -14,6 +14,7 @@ from . import apps as appmod
 from .apps import AppCatalog,apple_group
 from .cleanup import file_identity,digest
 from .util import inside
+from .safety import SafetyRefusal
 
 
 def _plain(p,h):
@@ -72,7 +73,7 @@ def uninstall_plan(target,home):
     if not app:raise ValueError('Installed application not found')
     if app['bundle'].startswith('com.apple.') or app['path'].startswith('/System/'):raise ValueError('System/Apple apps cannot be uninstalled')
     if not cat.running_available:raise ValueError('Running-app inventory unavailable; uninstall refused')
-    if cat.is_running(app):raise ValueError('Quit the app before creating an uninstall plan')
+    if cat.is_running(app):raise SafetyRefusal('Quit the app before creating an uninstall plan')
     removable,shared=leftovers(app,home,cat)
     ident=cat.identity(app)
     items=[]
@@ -93,7 +94,7 @@ def verify_uninstall(item,home):
     expected=action.get('appIdentity')
     if expected is None or file_identity(current['path'])!=expected:raise ValueError('Application identity changed; recreate uninstall plan')
     if not cat.running_available:raise ValueError('Running-app inventory unavailable; uninstall refused')
-    if cat.is_running(current):raise ValueError('App is running')
+    if cat.is_running(current):raise SafetyRefusal('App is running')
     if item['path']==current['path']:return {'app':current,'runningAvailable':True,'running':False,'identityVerified':True}
     reason=action.get('attribution','bundle-or-name')
     if reason!='bundle-or-name' and 'codeIdentity' not in action:raise ValueError('Signing attribution missing; recreate uninstall plan')

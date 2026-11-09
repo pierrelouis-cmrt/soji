@@ -7,6 +7,7 @@ import dataclasses
 import errno
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import stat
@@ -26,17 +27,31 @@ LIVE_USE_REASONS=('File open or process working in this folder','Owning applicat
                   'Contents changed since analysis','identity changed','Identity changed','Target or parent changed',
                   'Session members changed','Target changed before operation')
 LIVE_USE_HOLD=86400
-from .safety import HIGH_RISK_GROUPS, staged_ancestor
-
-
-class SafetyRefusal(ValueError):
-    def __init__(self,message,code='active-use',at=None):
-        super().__init__(message);self.code=code;self.at=at
+from .safety import HIGH_RISK_GROUPS, staged_ancestor, SafetyRefusal
 
 
 def refusal_code(error):
     if isinstance(error,SafetyRefusal):return error.code
     return 'active-use' if any(r in str(error) for r in LIVE_USE_REASONS) else None
+
+
+def validate_history_record(entry):
+    """Every clock usable by cooldown arithmetic must be finite, never bool."""
+    members=entry.get('members',[])
+    if not isinstance(members,list):raise ValueError('Invalid refusal history members')
+    for record in [entry,*members]:
+        if not isinstance(record,dict) or not isinstance(record.get('path'),str):
+            raise ValueError('Invalid refusal history record')
+        for field in ('at','refusalAt'):
+            if field not in record:continue  # legacy members inherit the entry clock
+            value=record[field]
+            try:valid=type(value) in (int,float) and math.isfinite(value)
+            except OverflowError:valid=False
+            if not valid:raise ValueError('Invalid refusal history timestamp: '+field)
+
+
+def reject_json_constant(value):
+    raise ValueError('Invalid JSON numeric constant: '+value)
 
 
 def soji_version():
@@ -642,9 +657,9 @@ class Cleaner:
         with journal as f:
             for line in f:
                 try:
-                    e=json.loads(line)
+                    e=json.loads(line,parse_constant=reject_json_constant) if strict else json.loads(line)
                     if not isinstance(e,dict) or not isinstance(e.get('id'),str):raise ValueError('Invalid journal record')
-                    if strict and (not isinstance(e.get('path'),str) or not isinstance(e.get('at',0),(int,float))):raise ValueError('Invalid refusal history')
+                    if strict:validate_history_record(e)
                     result[e['id']]=e
                 except (ValueError,KeyError,TypeError):
                     if strict:raise SafetyRefusal('Refusal history unreadable; cleanup blocked','history-unknown')
