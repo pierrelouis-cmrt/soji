@@ -101,3 +101,33 @@ this branch cannot mark that requirement fully complete. See
 `docs/BASELINE_SOL_2026-11-09.md` and its validation outputs for scope, recovery,
 corpus changes and remaining version-family risks. This is not integrated main
 or authorization to clean real data; A–D and independent review remain gates.
+
+
+## Provisional integrated safety status — 2026-11-09
+
+The chronology above describes earlier snapshots. Current isolated integration:
+`integration/safety-sol-20261109`, implementation `d26dd11` after base `21ce749`.
+See [integrated status](docs/INTEGRATED_SAFETY_STATUS_2026-11-09.md) for review
+findings, provenance, validation and limits.
+
+Permanent agent-worktree removal is **disabled**, across all modes and direct,
+old-plan and actionless execution routes. Git ignored-file heuristics are useful
+inventory diagnostics, not proof of content disposability or race prevention.
+Independent review reproduced unique ignored notes, a nested bare repository,
+and a concurrent writer losing data at `68aff51`; disabling the feature blocks
+these routes rather than claiming those heuristics fixed them.
+
+Excluded/protected, private, depth-limited or cross-mount dependency scope now
+means unknown pins and holds affected version families, including full-scan
+reuse. This intentionally sacrifices availability; the per-item live pin walk
+may cost up to 120 seconds / 5 million entries. No unsafe caching was added.
+Unknown running-app inventory blocks uninstall creation and fresh execution.
+Regular native document files retain identity/ancestor guards without a directory
+walk; native/uninstall successes record verifier-specific fresh evidence and
+planned policy. Transient strict checkpoint failures retain `journalError`.
+
+The original six requirements and A–D are tracked in the integrated report.
+Missing session identity keeps normal thresholds; positive gone inference is
+still unimplemented. Other atomic version-family active references remain a
+limitation. The installed binary is unchanged; no main update, push or release.
+Final approval waits for independent cross-review of the integrated head.
