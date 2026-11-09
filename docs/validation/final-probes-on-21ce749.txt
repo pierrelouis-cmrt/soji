@@ -1,0 +1,314 @@
+
+[p1a] selected per mode: {'careful': [], 'balanced': ['.cache/codex-runtimes/codex-runtime-install-wDayCH'], 'aggressive': ['.cache/codex-runtimes/codex-runtime-install-wDayCH']}
+
+[p1b] selected per mode: {'careful': [], 'balanced': ['.cache/codex-runtimes/codex-runtime-install-wDayCH'], 'aggressive': ['.cache/codex-runtimes/codex-runtime-install-wDayCH']}
+
+[p1c] selected per mode: {'careful': [], 'balanced': ['.cache/codex-runtimes/codex-runtime-install-L2Mqle'], 'aggressive': ['.cache/codex-runtimes/codex-runtime-install-L2Mqle']}
+[p1c] L2Mqle evidence: [{'check': 'retention', 'keepNewestPer': 'folder', 'rank': 1, 'versionRank': None, 'siblings': 2, 'keepNewest': 1, 'counts': {'careful': 2, 'balanced': 1, 'aggressive': 1}, 'basis': 'kept if among the newest by timestamp or by version label'}, {'check': 'codexRuntime', 'current': None, 'basis': 'bundleVersion in payload/*/runtime.json vs codex-primary-runtime and sibling installs'}]
+
+[p1d] OLD holds: []
+
+[p1e] interior item: failed Fresh guards refuse: Inside installed software (installed app, extension or tool folder: /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpcjbcolss/home/.cache/codex-runtimes/codex-runtime-install-L2Mqle); only the whole install can be cleaned
+
+[p2a] selected: [('balanced', '.config/yarn/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('balanced', '.local/share/nvim/mason/packages/pyright/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('balanced', '.bun/install/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.config/yarn/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.local/share/nvim/mason/packages/pyright/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.bun/install/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')]
+
+[p2b] selected: [('balanced', '.config/coc/extensions/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.config/coc/extensions/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')]
+
+[p2c] selected: [('balanced', 'Tools/ext-install/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', 'Tools/ext-install/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')]
+
+[p2d] selected: []
+
+[p2e] balanced selected: ['Library/Application Support/Code/CachedData', 'Library/Application Support/Code/CachedExtensionVSIXs', 'Library/Application Support/Code/Code Cache', 'Library/Application Support/Code/GPUCache', 'Library/Application Support/Google/GoogleUpdater/crx_cache']
+
+[p3a] gone evidence: {'check': 'sessionProjectMoved', 'gone': True, 'signals': [], 'basis': 'renamed/moved checks: parent present, Git remote name, registered worktree, main repository, successor project'} | levels: {'careful': 48, 'balanced': 24, 'aggressive': 3, 'reason': 'Session project is gone; one level earlier'} | balanced: (True, 'Idle 1.3 d; eligible from balanced')
+
+[p3b] gone evidence: {'check': 'sessionProjectMoved', 'gone': True, 'signals': [], 'basis': 'renamed/moved checks: parent present, Git remote name, registered worktree, main repository, successor project'} | levels: {'careful': 48, 'balanced': 24, 'aggressive': 3, 'reason': 'Session project is gone; one level earlier'} | balanced: (True, 'Idle 1.3 d; eligible from balanced')
+
+[p3c] floor violations: []
+======================================================================
+FAIL: test_complete_install_without_runtime_json_is_not_proof (tests.test_runtime_supersession.Supersession.test_complete_install_without_runtime_json_is_not_proof)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 81, in test_complete_install_without_runtime_json_is_not_proof
+    self.assert_held_everywhere(s, OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpo0q8epco/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpo0q8epco/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_dangling_primary_link_holds_all (tests.test_runtime_supersession.Supersession.test_dangling_primary_link_holds_all)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 150, in test_dangling_primary_link_holds_all
+    self.assert_held_everywhere(s, OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpnjqowvx1/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpnjqowvx1/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_fresh_refuses_program_started_through_symlink (tests.test_runtime_supersession.Supersession.test_fresh_refuses_program_started_through_symlink)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 275, in test_fresh_refuses_program_started_through_symlink
+    self.assertIn('A running program is installed here', self.fresh(launch))
+                                                         ~~~~~~~~~~^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 251, in fresh
+    with self.assertRaises(ValueError) as caught:
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_fresh_refuses_when_reference_disappears (tests.test_runtime_supersession.Supersession.test_fresh_refuses_when_reference_disappears)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 259, in test_fresh_refuses_when_reference_disappears
+    msg = self.fresh(lambda: (self.home / PRIMARY).unlink())
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 251, in fresh
+    with self.assertRaises(ValueError) as caught:
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_fresh_refuses_when_reference_moves_to_candidate (tests.test_runtime_supersession.Supersession.test_fresh_refuses_when_reference_moves_to_candidate)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 266, in test_fresh_refuses_when_reference_moves_to_candidate
+    self.assertIn('codex-primary-runtime points to this install', self.fresh(relink))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'codex-primary-runtime points to this install' not found in 'Fresh guards refuse: Current Codex runtime: Same bundle version as the active codex-primary-runtime'
+
+======================================================================
+FAIL: test_incident_layout_in_use_install_kept_when_newer_install_arrives (tests.test_runtime_supersession.Supersession.test_incident_layout_in_use_install_kept_when_newer_install_arrives)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 119, in test_incident_layout_in_use_install_kept_when_newer_install_arrives
+    self.assert_held_everywhere(s, ACTIVE, NEW, PRIMARY)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp83zioynx/home/.cache/codex-runtimes/codex-runtime-install-L2Mqle inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp83zioynx/home/.cache/codex-runtimes/codex-runtime-install-L2Mqle: Idle 29.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_missing_candidate_metadata_with_valid_reference_holds_inventory (tests.test_runtime_supersession.Supersession.test_missing_candidate_metadata_with_valid_reference_holds_inventory)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 229, in test_missing_candidate_metadata_with_valid_reference_holds_inventory
+    self.assert_held_everywhere(self.scan(), OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpavezlag1/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpavezlag1/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_missing_primary_holds_every_install (tests.test_runtime_supersession.Supersession.test_missing_primary_holds_every_install)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 72, in test_missing_primary_holds_every_install
+    self.assert_held_everywhere(s, OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpkczayc0f/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmpkczayc0f/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_positive_reference_supersedes_other_installs (tests.test_runtime_supersession.Supersession.test_positive_reference_supersedes_other_installs)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 162, in test_positive_reference_supersedes_other_installs
+    self.assertIn('codex-primary-runtime points to this install', ' '.join(rows[ACTIVE].holds))
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'codex-primary-runtime points to this install' not found in 'Current Codex runtime: Same bundle version as the active codex-primary-runtime'
+
+======================================================================
+FAIL: test_primary_link_outside_installs_holds_all (tests.test_runtime_supersession.Supersession.test_primary_link_outside_installs_holds_all)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 129, in test_primary_link_outside_installs_holds_all
+    self.assert_held_everywhere(s, OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmph6d9ygu2/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmph6d9ygu2/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_primary_link_to_arbitrary_descendant_is_not_runtime_reference (tests.test_runtime_supersession.Supersession.test_primary_link_to_arbitrary_descendant_is_not_runtime_reference)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 135, in test_primary_link_to_arbitrary_descendant_is_not_runtime_reference
+    self.assert_held_everywhere(self.scan(), OLD, ACTIVE)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp9zrv6evy/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp9zrv6evy/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_program_inside_symlinked_install_folder_holds (tests.test_runtime_supersession.Supersession.test_program_inside_symlinked_install_folder_holds)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 199, in test_program_inside_symlinked_install_folder_holds
+    self.assert_held_everywhere(s, OLD)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 65, in assert_held_everywhere
+    self.assert_never_selected_inside(s, self.home / rel, strict=False)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp8pxgavad/home/.cache/codex-runtimes/codex-runtime-install-wDayCH inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp8pxgavad/home/.cache/codex-runtimes/codex-runtime-install-wDayCH: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_program_launched_through_symlink_holds_whole_install (tests.test_runtime_supersession.Supersession.test_program_launched_through_symlink_holds_whole_install)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_runtime_supersession.py", line 186, in test_program_launched_through_symlink_holds_whole_install
+    self.assertTrue(any(h.startswith('A running program is installed here') for h in self.rows(s)[OLD].holds),
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    self.rows(s)[OLD].holds)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true : []
+
+======================================================================
+FAIL: test_p2g_plugin_git_clone (tests.test_baseline_review_probes.OwnershipProof.test_p2g_plugin_git_clone)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 353, in test_p2g_plugin_git_clone
+    self.assert_never_selected_inside(self.scan(), plug)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_nov8_regressions.py", line 112, in assert_never_selected_inside
+    self.assertFalse(inside, f'{mode} selected {f.path} inside {root}: {f.decision}')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : balanced selected /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp1v8ncpo_/home/.local/share/nvim/lazy/markdown-preview.nvim/app/node_modules inside /private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/tmp1v8ncpo_/home/.local/share/nvim/lazy/markdown-preview.nvim: Idle 40.0 d; eligible from balanced
+
+======================================================================
+FAIL: test_p1a_no_primary_lower_version_install_is_still_selected (tests.test_baseline_review_probes.R1Runtime.test_p1a_no_primary_lower_version_install_is_still_selected)
+codex-primary-runtime missing: nothing positively identifies the
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 69, in test_p1a_no_primary_lower_version_install_is_still_selected
+    self.assertNotIn(OLD, sel[m], f'{m}: superseded only by max-version/newest, no positive proof')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '.cache/codex-runtimes/codex-runtime-install-wDayCH' unexpectedly found in ['.cache/codex-runtimes/codex-runtime-install-wDayCH'] : balanced: superseded only by max-version/newest, no positive proof
+
+======================================================================
+FAIL: test_p1b_complete_install_without_runtime_json_is_selected (tests.test_baseline_review_probes.R1Runtime.test_p1b_complete_install_without_runtime_json_is_selected)
+An install with a full payload (node/python binaries) but no
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 82, in test_p1b_complete_install_without_runtime_json_is_selected
+    self.assertNotIn(OLD, sel[m], f'{m}: missing metadata is not proof of supersession')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '.cache/codex-runtimes/codex-runtime-install-wDayCH' unexpectedly found in ['.cache/codex-runtimes/codex-runtime-install-wDayCH'] : balanced: missing metadata is not proof of supersession
+
+======================================================================
+FAIL: test_p1c_incident_install_loses_protection_when_primary_version_install_arrives (tests.test_baseline_review_probes.R1Runtime.test_p1c_incident_install_loses_protection_when_primary_version_install_arrives)
+Opus' own fixture: primary is 26.1105 while the in-use L2Mqle is
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 98, in test_p1c_incident_install_loses_protection_when_primary_version_install_arrives
+    self.assertNotIn(ACTIVE, sel[m], m)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: '.cache/codex-runtimes/codex-runtime-install-L2Mqle' unexpectedly found in ['.cache/codex-runtimes/codex-runtime-install-L2Mqle'] : balanced
+
+======================================================================
+FAIL: test_p1d_process_via_symlink_path_not_seen_as_running_inside (tests.test_baseline_review_probes.R1Runtime.test_p1d_process_via_symlink_path_not_seen_as_running_inside)
+ps comm reports the exec path as invoked (symlink not resolved).
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 114, in test_p1d_process_via_symlink_path_not_seen_as_running_inside
+    self.assertTrue(any('running program' in h for h in rows[OLD].holds))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_p2a_global_package_manager_installs (tests.test_baseline_review_probes.R2Shipped.test_p2a_global_package_manager_installs)
+Global tool installs outside INSTALL_LOCATIONS: bun global (bun.lock),
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 178, in test_p2a_global_package_manager_installs
+    self.check(['.bun/install/global', '.config/yarn/global', '.local/share/nvim/mason/packages/pyright'], 'p2a')
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 170, in check
+    self.assertFalse(bad)
+    ~~~~~~~~~~~~~~~~^^^^^
+AssertionError: [('balanced', '.config/yarn/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('balanced', '.local/share/nvim/mason/packages/pyright/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('balanced', '.bun/install/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.config/yarn/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.local/share/nvim/mason/packages/pyright/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.bun/install/global/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')] is not false
+
+======================================================================
+FAIL: test_p2b_dotfiles_vcs_ancestor_makes_shipped_deps_a_real_project (tests.test_baseline_review_probes.R2Shipped.test_p2b_dotfiles_vcs_ancestor_makes_shipped_deps_a_real_project)
+~/.config tracked by a dotfiles Git repo (node_modules ignored):
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 189, in test_p2b_dotfiles_vcs_ancestor_makes_shipped_deps_a_real_project
+    self.check(['.config/coc/extensions'], 'p2b')
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 170, in check
+    self.assertFalse(bad)
+    ~~~~~~~~~~~~~~~~^^^^^
+AssertionError: [('balanced', '.config/coc/extensions/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', '.config/coc/extensions/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')] is not false
+
+======================================================================
+FAIL: test_p2c_vcs_ancestor_cancels_manifest_install_exclusion (tests.test_baseline_review_probes.R2Shipped.test_p2c_vcs_ancestor_cancels_manifest_install_exclusion)
+A folder with a VS Code extension manifest is an install root, but
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 199, in test_p2c_vcs_ancestor_cancels_manifest_install_exclusion
+    self.check(['Tools/ext-install'], 'p2c')
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 170, in check
+    self.assertFalse(bad)
+    ~~~~~~~~~~~~~~~~^^^^^
+AssertionError: [('balanced', 'Tools/ext-install/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced'), ('aggressive', 'Tools/ext-install/node_modules', 'node-modules', 'Idle 40.0 d; eligible from balanced')] is not false
+
+======================================================================
+FAIL: test_p3a_moved_to_other_parent_and_remote_renamed (tests.test_baseline_review_probes.R3Sessions.test_p3a_moved_to_other_parent_and_remote_renamed)
+levo-terminal moved from ~/Documents/Github to ~/code and renamed
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 265, in test_p3a_moved_to_other_parent_and_remote_renamed
+    self.assertFalse(moved['gone'], 'renamed+moved project must not be judged gone')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : renamed+moved project must not be judged gone
+
+======================================================================
+FAIL: test_p3b_non_git_project_renamed_in_place_without_new_activity (tests.test_baseline_review_probes.R3Sessions.test_p3b_non_git_project_renamed_in_place_without_new_activity)
+A non-Git project renamed in the same parent, not yet opened by an
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-baseline-proof-4fu7u5e2/tests/test_baseline_review_probes.py", line 276, in test_p3b_non_git_project_renamed_in_place_without_new_activity
+    self.assertFalse(moved['gone'])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 38 tests in 15.199s
+
+FAILED (failures=23)

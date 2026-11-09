@@ -91,3 +91,13 @@ proof tests are preserved; optional cache expansion was omitted. See
 `docs/WORKTREE_SAFETY_VALIDATION_2026-11-09.md` for exact validation and the audit
 for the unresolved concurrent-mutation race. This work is local and still needs
 independent review/integration; it does not certify the installed application.
+### Sol baseline follow-up (2026-11-09, isolated branch)
+
+`fix/sol-baseline-20261109-4471` fixes the reproduced Codex reference/metadata
+supersession and symlinked-process gaps, plus global/plugin dependency exclusions
+and parent-VCS false proof. Missing-project sessions retain normal thresholds.
+The root-commit/completeness-based positive "gone" optimization is still open;
+this branch cannot mark that requirement fully complete. See
+`docs/BASELINE_SOL_2026-11-09.md` and its validation outputs for scope, recovery,
+corpus changes and remaining version-family risks. This is not integrated main
+or authorization to clean real data; A–D and independent review remain gates.
