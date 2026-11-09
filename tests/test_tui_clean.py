@@ -49,6 +49,37 @@ class LayoutHelpers(unittest.TestCase):
         self.assertEqual(tui.compact_size(18_600_000_000), '18.6G')
 
 
+class SafetyWarnings(unittest.TestCase):
+    def test_all_modes_explain_trash_only_undo_before_paths(self):
+        for mode in ("careful", "balanced", "aggressive"):
+            lines = tui.cleanup_warnings(mode, [])
+            self.assertIn("Emptying Trash", lines[0])
+            self.assertIn("impossible", lines[0])
+            self.assertIn("every selected path", lines[1])
+
+    def test_aggressive_and_high_risk_groups_warn_about_damage(self):
+        lines = tui.cleanup_warnings("aggressive", [NS(group="Toolchains and SDKs"),
+                                                       NS(group="Agent and editor history")])
+        text = " ".join(lines)
+        for word in ("AGGRESSIVE", "software", "runtimes", "dependencies", "rebuilding", "History"):
+            self.assertIn(word, text)
+        self.assertIn("HIGH RISK", tui.MODE_WARNING["aggressive"])
+        self.assertNotIn("HIGH-RISK GROUPS", " ".join(tui.cleanup_warnings("balanced", [NS(group="App caches")])))
+
+    def test_long_confirmation_can_reveal_every_path_and_final_warning(self):
+        lines = tui.cleanup_warnings("aggressive", []) + ["/fixture/" + str(i) + "/" + "x" * 160 for i in range(100)] + ["FINAL CHECK"]
+        seen = set()
+        _, _, total = tui.modal_page(lines, 45, 6, 0)
+        for offset in range(total):
+            page, actual, _ = tui.modal_page(lines, 45, 6, offset)
+            seen.update(page)
+            self.assertLessEqual(actual, total - 6)
+        self.assertIn("FINAL CHECK", seen)
+        for i in range(100):
+            self.assertTrue(any(line.startswith("/fixture/" + str(i) + "/") for line in seen))
+        self.assertEqual(tui.modal_page(["short"], 40, 6, 999), (["short"], 0, 1))
+
+
 class TargetSelection(unittest.TestCase):
     def test_marked_rows_win_over_view_and_only_ready_rows_qualify(self):
         rows = [row('/a'), row('/b'), row('/c', selected=False), row('/d', kind='simulator-device'), row('/e', identity=False)]
@@ -157,12 +188,13 @@ class ProgressFeedback(unittest.TestCase):
                 pass
             def getch(self):
                 self.reads += 1
-                if self.reads == 4:
+                if self.reads == 6:
                     done.set()
-                if self.reads > 6:
+                if self.reads > 8:
                     raise AssertionError("TUI failed to exit")
-                return {1: ord("x"), 2: ord("y"), 3: ord("q"),
-                        4: ord("r"), 5: 27, 6: ord("q")}[self.reads]
+                return {1: ord("x"), 2: tui.curses.KEY_NPAGE,
+                        3: tui.curses.KEY_PPAGE, 4: ord("y"), 5: ord("q"),
+                        6: ord("r"), 7: 27, 8: ord("q")}[self.reads]
 
         screen = Screen()
         with patch.object(tui.curses, "wrapper", side_effect=lambda fn: fn(screen)), \
@@ -171,8 +203,12 @@ class ProgressFeedback(unittest.TestCase):
              patch.object(tui.curses, "init_pair"), \
              patch.object(tui.curses, "color_pair", return_value=0), \
              patch.object(tui, "CleanupJob", return_value=job):
-            tui.run_tui(FakeScanner(), state_dir="/unused")
-        self.assertEqual(screen.reads, 6)
+            tui.run_tui(FakeScanner(), mode="aggressive", state_dir="/unused")
+        self.assertTrue(any("HIGH RISK: may break apps" in frame for frame in screen.frames))
+        self.assertTrue(any("Emptying Trash" in frame and "CLEAN — CONFIRM" in frame for frame in screen.frames))
+        self.assertTrue(any("Emptying Trash" in frame and "CLEAN — DONE" in frame for frame in screen.frames))
+        self.assertFalse(any("freed." in frame for frame in screen.frames))
+        self.assertEqual(screen.reads, 8)
         self.assertEqual(FakeScanner.initializations, 2)  # Initial scan + one post-batch rescan.
         self.assertEqual(FakeScanner.decision_calls, 2)  # Repaints reuse the stable analysis.
         self.assertTrue(any("Cleaning  " in frame and "1/2 · 50%" in frame for frame in screen.frames))

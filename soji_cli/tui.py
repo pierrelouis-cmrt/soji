@@ -16,7 +16,7 @@ import threading
 import time
 from pathlib import Path
 
-from .engine import MODE_TEXT, MODES, human
+from .engine import MODES, human
 
 # Actions that need `soji clean --execute-tools --permanent`; never run from the TUI.
 TOOL_ACTIONS = (
@@ -25,6 +25,35 @@ TOOL_ACTIONS = (
     "document-version",
     "git-worktree",
 )
+
+
+TRASH_WARNING = "Undo works only while items remain in Trash. Emptying Trash makes Sōji undo impossible."
+MODE_WARNING = {
+    "careful": "Review paths; undo needs Trash contents.",
+    "balanced": "Review paths; software may need rebuilding.",
+    "aggressive": "HIGH RISK: may break apps, runtimes or dependencies.",
+}
+RISK_GROUPS = {"Toolchains and SDKs", "Project dependencies", "Build output",
+               "Agent and editor history", "Agent worktrees"}
+
+
+def cleanup_warnings(mode, targets):
+    lines = [TRASH_WARNING, "Review every selected path before confirming; safety checks cannot guarantee software will keep working."]
+    if mode == "aggressive":
+        lines.append("AGGRESSIVE: shorter idle thresholds and broader eligibility can remove needed software, runtimes and dependencies. Reinstalling or rebuilding may be required.")
+    groups = sorted({f.group for f in targets if getattr(f, "group", None) in RISK_GROUPS})
+    if groups:
+        lines.append("HIGH-RISK GROUPS: " + ", ".join(groups) + ". History can be permanently lost after Trash is emptied.")
+    return lines
+
+
+def modal_page(lines, width, room, offset):
+    """Wrap before paging so even a long path can be inspected in full."""
+    wrapped = []
+    for line in lines:
+        wrapped.extend(textwrap.wrap(clean(line), max(1, width), subsequent_indent="  ") or [""])
+    offset = min(max(0, offset), max(0, len(wrapped) - room))
+    return wrapped[offset:offset + room], offset, len(wrapped)
 
 
 def cleanup_targets(rows, marked):
@@ -272,6 +301,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             "detailOffset": 0,
             "marked": set(),
             "confirm": None,
+            "modalOffset": 0,
             "result": None,
             "lastBatch": None,
             "cleanup": None,
@@ -309,33 +339,22 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
         def modal(title, lines, footer):
             h, w = scr.getmaxyx()
             boxw = min(w - 8, 108)
-            wrapped = []
-            for line in lines:
-                wrapped.extend(
-                    textwrap.wrap(clean(line), boxw - 5, subsequent_indent="  ") or [""]
-                )
-            boxh = min(h - 4, max(8, len(wrapped) + 5))
+            _, _, total = modal_page(lines, boxw - 5, 1, 0)
+            boxh = min(h - 4, max(8, total + 5))
             ox = (w - boxw) // 2
             oy = (h - boxh) // 2
             for y in range(oy, oy + boxh):
                 put(y, ox, " " * boxw, curses.A_REVERSE, width=boxw)
             put(oy + 1, ox + 2, title, curses.A_REVERSE | curses.A_BOLD, width=boxw - 4)
             room = boxh - 5
-            shown = wrapped if len(wrapped) <= room else wrapped[: room - 1]
+            shown, state["modalOffset"], total = modal_page(
+                lines, boxw - 5, room, state["modalOffset"])
             for i, line in enumerate(shown):
                 put(oy + 3 + i, ox + 2, line, curses.A_REVERSE, width=boxw - 4)
-            if len(shown) < len(wrapped):
-                put(
-                    oy + 3 + len(shown),
-                    ox + 2,
-                    f"… and {len(wrapped) - len(shown)} more lines",
-                    curses.A_REVERSE | curses.A_DIM,
-                    width=boxw - 4,
-                )
             put(
                 oy + boxh - 2,
                 ox + 2,
-                footer,
+                "↑↓ scroll · " + footer,
                 curses.A_REVERSE | curses.A_BOLD,
                 width=boxw - 4,
             )
@@ -432,7 +451,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 )
                 put(3, x, label, attr)
                 x += len(label) + 2
-            put(4, right, MODE_TEXT[state["mode"]], curses.A_DIM)
+            put(4, right, MODE_WARNING[state["mode"]], curses.A_BOLD | curses.color_pair(3))
+            put(5, right, "Undo needs Trash contents; do not empty Trash.", curses.color_pair(3))
             # The status bar animates at 10 Hz; decisions and large table sorts
             # only need recomputing when the analysis or view actually changes.
             current_analysis = (
@@ -613,7 +633,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         "",
                         "1 Careful — only clearly disposable items.",
                         "2 Balanced — stale items, with per-item judgments.",
-                        "3 Aggressive — unused recoverable items.",
+                        "3 Aggressive — HIGH RISK: may break apps, runtimes or dependencies.",
+                        TRASH_WARNING,
                         "",
                         "All modes respect holds, retained versions, activity, and identity.",
                         "375 hints with their rules, and an incremental index.",
@@ -623,7 +644,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         "X: clean the marked rows, or with nothing marked, every READY row in the current view",
                         "   (category, search and mode). A confirmation lists everything first.",
                         "Items go to the Trash after the same re-checks as soji clean; held, changed or",
-                        "in-use items are refused. U: put the last batch back. Permanent deletion,",
+                        "in-use items are checked. U attempts to restore the last batch from Trash. Permanent deletion,",
                         "simulators, document versions and worktrees stay terminal commands.",
                         "",
                         "↑/↓ or J/K: items     ←/→ or H/L: categories     g / G: first / last",
@@ -683,6 +704,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     f"{len(targets)} item(s), {human(sum(f.size for f in targets))}, will be moved to the Trash ({state['mode']} mode).",
                     "",
                 ]
+                lines += cleanup_warnings(state["mode"], targets) + [""]
                 lines += [
                     f"{human(f.size):>10}  {f.path.replace(scanner.home, '~', 1)}"
                     for f in targets
@@ -695,15 +717,17 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 lines += [
                     "",
                     "Each item is re-checked first; anything changed, in use or held is refused.",
-                    "Undo afterwards with U, or soji journal / soji undo ID --apply.",
+                    "Attempt undo with U, or soji journal / soji undo ID --apply, while Trash contents survive.",
                 ]
                 modal(
-                    "CLEAN — CONFIRM", lines, "Y move to Trash · any other key cancels"
+                    "CLEAN — CONFIRM", lines, "Y move to Trash · Esc cancel"
                 )
             elif state["result"]:
                 r = state["result"]
                 lines = [
-                    f"Moved {r['completed']} item(s) to the Trash · {human(r['freed'])} freed.",
+                    f"Moved {r['completed']} item(s) to the Trash · {human(r['freed'])} moved (space may remain occupied).",
+                    TRASH_WARNING,
+                    "Check affected software before considering further cleanup.",
                     "",
                 ]
                 failed = [e for e in r["entries"] if e["status"] != "done"]
@@ -717,17 +741,25 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         + [""]
                     )
                 lines += [
-                    "Press U to put this batch back. Rescanning in the background.",
+                    "Close this panel, then press U to attempt undo. Rescanning in the background.",
                     "Plan saved: " + r["plan"].replace(str(Path.home()), "~", 1),
                 ]
-                modal("CLEAN — DONE", lines, "any key closes")
+                modal("CLEAN — DONE", lines, "Esc close")
             scr.refresh()
             key = scr.getch()
             if key == -1:
                 continue
+            if state["confirm"] or state["result"]:
+                if key in (curses.KEY_DOWN, ord("j"), curses.KEY_NPAGE):
+                    state["modalOffset"] += 10 if key == curses.KEY_NPAGE else 1
+                    continue
+                if key in (curses.KEY_UP, ord("k"), curses.KEY_PPAGE):
+                    state["modalOffset"] = max(0, state["modalOffset"] - (10 if key == curses.KEY_PPAGE else 1))
+                    continue
             if state["confirm"]:
                 targets, _ = state["confirm"]
                 state["confirm"] = None
+                state["modalOffset"] = 0
                 if key not in (ord("y"), ord("Y")):
                     state["message"] = "Clean cancelled; nothing was moved."
                     continue
@@ -740,6 +772,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 continue
             if state["result"]:
                 state["result"] = None
+                state["modalOffset"] = 0
                 continue
             if state["help"] or state["details"]:
                 if key in (curses.KEY_DOWN, ord("j")):
@@ -832,6 +865,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         rows, {p for p in state["marked"] if p in known}
                     )
                     if targets:
+                        state["modalOffset"] = 0
                         state["confirm"] = (targets, skipped)
                     else:
                         state["message"] = "Nothing to clean here: no READY rows" + (

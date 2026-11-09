@@ -32,6 +32,9 @@ PRIVATE_SUFFIXES = ('.photoslibrary', '.photolibrary', '.aplibrary', '.keychain-
 SECRET_SUFFIXES = ('.pem', '.key', '-keypair.json', '.p12', '.pfx')
 PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Library/CloudStorage', 'Library/Mobile Documents', 'Library/Application Support/com.apple.TCC', 'Library/Application Support/Soji')
 CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
+from .installs import ATOMIC_GROUPS, DEV_GROUPS  # noqa: E402
+SESSION_HINTS = ('claude-sessions', 'codex-sessions')
+SESSION_FLOOR_SECONDS = 86400
 SPECIAL_RULES = {'checkDeviceBuilds', 'checkSimulatorDevice', 'keepVersionPointedToBy', 'keepProjectPinnedVersions', 'onlyIfOwnerInstalled', 'notIfAppleOwned', 'onlyIfOwnerNotInstalled', 'checkWorkspaceExists'}
 
 
@@ -152,6 +155,9 @@ class Finding:
         idle=(now-max(stamp,self.last_activity or stamp))/3600
         floor=max(300,self.recent_activity_hours*3600)
         if now-stamp<floor:return False,'Changed within the recent-activity window'
+        # Sessions: a hard floor no downgrade or judgement can lower.
+        if self.hint_id in SESSION_HINTS and mode in ('careful','balanced') and now-self.newest<SESSION_FLOOR_SECONDS:
+            return False,f'Session changed {(now-self.newest)/3600:.1f} h ago; never cleaned within 24 h at {mode}'
         if self.levels is None and self.rule_level is None:
             if self.default_holds:return False,'; '.join(self.default_holds)
             minimum=self.rule_min_hours.get(mode,self.special_min_hours)
@@ -195,8 +201,11 @@ def generic_container(match) -> bool:
     """
     if not match:return False
     hint,pattern=match
+    from .installs import ATOMIC_GROUPS
+    # An installed toolchain/extension is one unit: never split it file by file.
     return (pattern.rstrip('/').rsplit('/',1)[-1]=='*' and not hint.get('reviewOnly')
-            and hint['tier']!='userData' and not any(k in (hint.get('rule') or {}) for k in UNIT_RULES))
+            and hint['tier']!='userData' and hint['group'] not in ATOMIC_GROUPS
+            and not any(k in (hint.get('rule') or {}) for k in UNIT_RULES))
 
 
 class Catalog:
@@ -239,6 +248,8 @@ class Catalog:
             self.wild_buckets[prefix].append((i, record, head, tail))
         self.markers_cache = {}
         self.match_cache = {}
+        from .installs import InstallTrees
+        self.installs = InstallTrees(home, self)
         self.parent_cache = {}
         # Path-only results that later runs may reuse (see `pure`).
         self.records = [r for rs in self.by_last.values() for r in rs] + self.wild
@@ -311,6 +322,12 @@ class Catalog:
             if hint.get('unlessContains') and self.exists(p,hint['unlessContains']):continue
             # Ancestor markers may sit in up to four ancestors.
             if hint.get('onlyIfAncestorContains') and not any(self.exists(a,hint['onlyIfAncestorContains']) for a in list(p.parents)[:4]):continue
+            if hint['group'] in DEV_GROUPS and pattern.startswith('**/'):
+                # Project output only exists in projects: never inside installed
+                # software, and dependencies only in a real (locked/VCS) project.
+                pure=False
+                if not self.installs.project_area(path) or self.installs.containing(path):continue
+                if hint['group']=='Project dependencies' and not self.installs.real_project(path):continue
             if pure:self.pure[path]=self.record_index[(hint['id'],pattern)]
             return hint,pattern
         if pure:self.pure[path]=NO_MATCH
@@ -481,6 +498,17 @@ class Scanner:
             stamps.append(self.nodes[p].newest)
         return max(0,(self.now-max(stamps))/3600)
 
+    def running_inside(self,path: str) -> str:
+        """Executable path of a running process located in `path`, or ''."""
+        if getattr(self,'_exe_source',None) is not self.processes:
+            self._exe_source=self.processes
+            self._exes=sorted(p for p in self.processes if isinstance(p,str) and p.startswith('/'))
+        key=path.casefold().rstrip('/')
+        i=bisect.bisect_left(self._exes,key+'/')
+        if i<len(self._exes) and self._exes[i].startswith(key+'/'):return self._exes[i]
+        i=bisect.bisect_left(self._exes,key)
+        return self._exes[i] if i<len(self._exes) and self._exes[i]==key else ''
+
     def is_open(self,path: str) -> bool:
         i=bisect.bisect_left(self.open_paths,path)
         # Exact path and descendants; bisect again for the directory prefix.
@@ -518,6 +546,14 @@ class Scanner:
         if node.secret:f.holds.append('Contains credential or environment-file names')
         if self.now-node.newest<300:f.holds.append('Changed or created within the last 5 minutes')
         if self.is_open(node.path):f.holds.append('File open or process working in this folder')
+        program=self.running_inside(node.path)
+        if program:f.holds.append('A running program is installed here: '+program)
+        install=self.catalog.installs.containing(node.path)
+        if install:
+            # Shipped code of installed software: only the whole install root,
+            # through its own rule, can ever be a cleanup unit.
+            f.holds.append(f'Inside installed software ({install[1]}: {install[0]}); only the whole install can be cleaned')
+            f.evidence.append({'check':'installTree','root':install[0],'reason':install[1]})
         running=[]
         for proc in f.rule.get('notWhileRunning',[]):
             if any(Path(p).name==proc.casefold() or p.endswith('/'+proc.casefold()) for p in self.processes):running.append(proc)
@@ -599,7 +635,8 @@ class Scanner:
             n=self.nodes[path]
             if n.size<self.min_bytes and not n.reason:return
             match=self.catalog.match(path) or inherited
-            descend_review=bool(match and (match[0].get('reviewOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash'))
+            descend_review=bool(match and (match[0].get('reviewOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash')
+                                and match[0]['group'] not in ATOMIC_GROUPS)
             split=bool(not descend_review and generic_container(match) and below.get(path,set())-{match[0]['id']})
             if (match and not descend_review and not split) or not n.children or n.reason:
                 self.findings.append(self.classify(n,match));return

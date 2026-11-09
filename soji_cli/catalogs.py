@@ -52,9 +52,18 @@ def expand_catalogs(scanner):
                 probe=ActivityIndex(scanner.home,scanner.now);probe.jsonl_metadata(n.path,'session')
                 if probe.records:
                     cwd=probe.records[0].path
-                    if not Path(cwd).exists() and finding.hint_id=='claude-sessions':
-                        f.levels={'careful':f.levels['balanced'],'balanced':f.levels['aggressive'],'aggressive':3,'reason':'Session project is gone; one level earlier'}
-                    f.evidence.append({'check':'sessionProject','path':cwd,'exists':Path(cwd).exists()})
+                    exists=Path(cwd).exists()
+                    if not exists and finding.hint_id=='claude-sessions':
+                        gone,signals=session_project_gone(scanner,cwd)
+                        if gone:
+                            f.levels={'careful':f.levels['balanced'],'balanced':f.levels['aggressive'],'aggressive':3,'reason':'Session project is gone; one level earlier'}
+                        f.evidence.append({'check':'sessionProjectMoved','gone':gone,'signals':signals,
+                                           'basis':'renamed/moved checks: parent present, Git remote name, registered worktree, main repository, successor project'})
+                    f.evidence.append({'check':'sessionProject','path':cwd,'exists':exists})
+                # Hard floor whatever the downgrade or judgement: a session
+                # changed within a day is never taken at Careful or Balanced.
+                f.levels={**f.levels,'careful':max(SESSION_FLOOR_HOURS,f.levels.get('careful',SESSION_FLOOR_HOURS)),
+                          'balanced':max(SESSION_FLOOR_HOURS,f.levels.get('balanced',SESSION_FLOOR_HOURS))}
                 result.append(f)
         elif finding.group=='Trash' and finding.path in scanner.nodes:
             children=scanner.nodes[finding.path].children
@@ -69,6 +78,108 @@ def expand_catalogs(scanner):
 
 
 CLAUDE_SIDECARS=('subagents','tool-results')
+SESSION_FLOOR_HOURS=24
+
+
+def _git_dir(repo):
+    g=Path(repo)/'.git'
+    try:
+        if g.is_dir():return g
+        if g.is_file():
+            text=g.read_text(encoding='utf-8',errors='replace').strip()
+            if text.startswith('gitdir:'):
+                target=Path(text[7:].strip())
+                return target if target.is_absolute() else (Path(repo)/target)
+    except OSError:pass
+    return None
+
+
+def _remote_names(git_dir):
+    """Repository names (last URL segment, without .git) of every remote."""
+    names=set()
+    for config in (git_dir/'config',git_dir.parent.parent/'config' if git_dir.parent.name=='worktrees' else None):
+        if config is None:continue
+        try:text=config.read_text(encoding='utf-8',errors='replace')
+        except OSError:continue
+        for line in text.splitlines():
+            key,_,value=line.strip().partition('=')
+            if key.strip()=='url' and value.strip():
+                names.add(value.strip().rstrip('/').rsplit('/',1)[-1].rsplit(':',1)[-1].removesuffix('.git').casefold())
+    return names
+
+
+def _registered_worktrees(git_dir):
+    """Worktree paths a repository lists (`git worktree list`, read from disk)."""
+    result=set()
+    try:entries=list((git_dir/'worktrees').iterdir())[:500]
+    except OSError:return result
+    for entry in entries:
+        try:target=(entry/'gitdir').read_text(encoding='utf-8',errors='replace').strip()
+        except OSError:continue
+        if target:result.add(os.path.dirname(target) if target.endswith('/.git') else target)
+    return result
+
+
+def session_project_gone(scanner,cwd):
+    """(gone, signals) for a session cwd that no longer exists.
+
+    A missing folder is often a renamed or moved project (or a worktree that
+    git still lists). Gone is returned only when no such signal exists and the
+    evidence is complete; any doubt keeps the normal session policy.
+    """
+    cache=scanner.__dict__.setdefault('_session_gone_cache',{})
+    if cwd in cache:return cache[cwd]
+    signals=[]
+    cwd=os.path.realpath(cwd);parent=os.path.dirname(cwd);name=os.path.basename(cwd).casefold()
+    activity=getattr(scanner,'activity',None)
+    if activity is None or activity.errors:signals.append('activity history incomplete')
+    if not os.path.isdir(parent):signals.append('parent folder missing or unmounted: '+parent)
+    # Candidate repositories: folders agents/editors worked in, plus siblings.
+    candidates=set()
+    for record in (activity.records if activity else ())[:20000]:
+        if os.path.isdir(record.path):candidates.add(record.path)
+    try:
+        with os.scandir(parent) as it:
+            for i,entry in enumerate(it):
+                if i>=500:break
+                if entry.is_dir(follow_symlinks=False):candidates.add(entry.path)
+    except OSError:pass
+    candidates.discard(cwd)
+    repos={}
+    for folder in sorted(candidates)[:5000]:
+        git_dir=_git_dir(folder)
+        if git_dir is not None:repos[folder]=git_dir
+    for folder,git_dir in repos.items():
+        if name in _remote_names(git_dir):signals.append(f'renamed or moved: {folder} has a remote named {name}')
+        listed=_registered_worktrees(git_dir)
+        if any(w==cwd or w.startswith(cwd+'/') for w in listed):signals.append(f'worktree still registered in {folder}')
+    parts=cwd.split('/')
+    if 'worktrees' in parts:
+        # A worktree is gone only when its main repository is known.
+        i=len(parts)-1-parts[::-1].index('worktrees')
+        owner='/'.join(parts[:i])
+        names={p.casefold() for p in parts[i+1:] if p}
+        main=None
+        if owner.endswith('/.claude') or owner.endswith('/.codex') or owner.endswith('/.cursor'):
+            main=os.path.dirname(owner) if os.path.dirname(owner) in repos or _git_dir(os.path.dirname(owner)) else None
+        if main is None:
+            main=next((f for f,g in repos.items() if os.path.basename(f).casefold() in names or names&_remote_names(g)),None)
+        if main is None:signals.append('worktree whose main repository cannot be found (renamed project?)')
+    else:
+        # Successor: a sibling project whose recorded use starts where this
+        # one's ends (a rename shows up exactly like that).
+        last=activity.last(cwd) if activity else None
+        if last is not None:
+            for folder in candidates:
+                if os.path.dirname(folder)!=parent:continue
+                records=[r.at for r in activity.records if r.path==folder or r.path.startswith(folder+'/')]
+                try:changed=os.lstat(folder).st_ctime
+                except OSError:changed=0
+                if (records and min(records)>=last.at-86400) or (not records and folder in repos and changed>=last.at-86400):
+                    signals.append(f'possible rename: {folder} became active when this project stopped')
+    result=(not signals,signals)
+    cache[cwd]=result
+    return result
 
 
 def claude_session_units(scanner,project):

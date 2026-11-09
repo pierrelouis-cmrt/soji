@@ -46,3 +46,25 @@ python3 dist/soji.pyz --version
 ```
 
 Destructive paths are tested only on disposable fixtures.
+
+## November 8 safety audit (2026-11-09)
+
+- [Evidence, additional findings and staged validation](docs/audit-2026-11-08.md). TUI now warns about aggressive software/runtime/dependency damage and Trash-only undo before confirmation and after completion; confirmation/results scroll, and moved bytes are no longer called freed space.
+- Historical audit snapshot: baseline runtime fragmentation, shipped dependency selection, renamed-session retention, journal policy metadata/missing-Trash classification and owner-running consistency were unresolved during the TUI audit. The later Opus patch below implements the baseline fixes; do not reimplement them from this historical bullet. Independent review of residual gaps remains necessary. Do not validate by running broad real-home cleanup.
+- Keep destructive validation inside `tests/corpus.py` fake homes with disposable Trash. Review all selected paths and affected software before any later real validation; emptied Trash cannot supply undo data. Preserve user repair/restore scripts.
+
+- Independent review adds four open P1 gates: permanent-stage rollback overwriting newly recreated user data; ignored files lost by permanent Git worktree removal; fresh cleanup checks losing project-pin scope; chained nvm default aliases left unprotected. Details and regression suggestions are in the audit. These are fixture-confirmed findings, not witnessed causes in the November 8 journal. Review newer shared-workspace engine/install changes separately before updating baseline status.
+
+- Post-Opus overlap check: read the completed Opus result, re-ran all 15 November regression tests (OK), then re-ran the archived independent fixtures on the current checkout. All four additional P1 defects still reproduce. The next implementation scope is these four defects; baseline/TUI changes should be preserved and independently reviewed, not rebuilt. See [the updated orchestrator handoff](docs/SAFETY_ORCHESTRATOR_PROMPT.md). Opus reports a full 285-test run (OK, two skipped) and 27 native index tests; those broader runs were not repeated during this overlap check.
+
+## Changelog: November 8 fixes (2026-11-09)
+
+Each item has a regression in `tests/test_nov8_regressions.py` (fake home, every mode), and the corpus gained the same paths. Golden rows were only added; none changed.
+
+- **Toolchains are whole units.** Groups `Toolchains and SDKs` and `Editor extensions` (`installs.ATOMIC_GROUPS`) are never split around nested hints or descended for review, so a runtime is selected whole or not at all. The split of `codex-runtime-install-L2Mqle` into ~50 rows caused the damage. Every row is now held while a running process's executable lives inside it, on top of the open-file and newest-change guards that already applied to the whole subtree.
+- **Codex runtimes.** `codex-runtimes` matches only `codex-runtime-install-*` and keeps the newest install by time and version. The new `checkCodexRuntime` holds the install matching `codex-primary-runtime`, the highest bundle version and any unreadable one. Superseded installs stay candidates.
+- **Installed software is not a project.** Rows inside `installs.INSTALL_LOCATIONS` (editor/Raycast/Zed extensions, Electron `app-*`, `~/.t3/tools`, Codex runtimes and releases), inside an atomic-rule match, or under a folder with an extension/app manifest (not counting a VCS checkout) are held in every mode. `Project dependencies` and `Build output` `**/` rules never match there or anywhere under `~/Library`, and dependency rules need a lockfile or a VCS checkout.
+- **Renamed projects.** A missing session cwd is "gone" only with no rename/move signal: parent present, no Git remote of that name, no registered worktree, main repository found for a worktree, no sibling project whose use began as this one stopped, and complete activity history. Sessions changed within 24 h are never taken at Careful/Balanced, whatever levels or judgement apply (`Finding.decide`).
+- **Journal.** Entries record `mode`, `version`, `planCreatedAt`, `rule` and `policy` (rule, threshold applied, reason, decision; from the fresh check). `soji journal` adds `recovery`/`recoverable` and reports `unrecoverable (Trash emptied)`. `soji undo` says so instead of failing obscurely. Plans and apply results carry the Trash-only undo notice, and plans warn about high-risk groups.
+- **In-use refusals stick.** A fresh-guard refusal for live use (open files, owner app running, running program, agent activity) refuses the same path for 24 h, rather than retrying until a momentary snapshot passes (the Obsidian `Code Cache` case).
+- Open: `checkCodexRuntime` relies on Codex's current folder layout. Rename detection has no stored repo identity (root commit) yet; Sōji could record path → root commit for active projects to tell renames apart from deletions.

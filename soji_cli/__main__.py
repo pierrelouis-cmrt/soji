@@ -36,7 +36,7 @@ def main():
         args=p.parse_args(argv)
         from .cleanup import Cleaner,validate_plan
         cleaner=Cleaner(args.state)
-        if action=='journal':emit(cleaner.entries());return 0
+        if action=='journal':emit(cleaner.report());return 0
         if action=='recover':emit(cleaner.recover(args.apply));return 0
         if not args.target:p.error('A plan path or journal entry ID is required')
         if action=='undo':

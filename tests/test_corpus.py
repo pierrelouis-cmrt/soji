@@ -42,6 +42,22 @@ class CorpusRegression(unittest.TestCase):
             picks = [row[m]['selected'] for m in corpus.MODES]
             self.assertEqual(picks, sorted(picks), row['path'])
 
+    def test_installed_software_and_active_runtime_never_selected(self):
+        # November 8: shipped code and the runtime in use, in every mode.
+        never = ('~/.vscode/extensions/', '~/.config/raycast/extensions/', '~/Library/Application Support/Zed/',
+                 '~/Library/Application Support/discord/app-', '~/.t3/tools/', '~/.cache/codex-runtimes/codex-primary-runtime',
+                 '~/.cache/codex-runtimes/codex-runtime-install-L2Mqle', '~/code/loose-web/')
+        for row in self.rows:
+            if row['path'].startswith(never):
+                self.assertFalse(any(row[m]['selected'] for m in corpus.MODES), row['path'])
+                self.assertNotIn(row['group'], ('Project dependencies', 'Build output'), row['path'])
+        superseded = next(r for r in self.rows if r['path'].endswith('codex-runtime-install-wDayCH'))
+        self.assertTrue(superseded['balanced']['selected'])
+
+    def test_renamed_project_sessions_not_downgraded(self):
+        row = next(r for r in self.rows if r['path'].endswith('-code-old-name/renamed.jsonl'))
+        self.assertFalse(row['balanced']['selected'], row)
+
     def test_held_rows_never_selected(self):
         for row in self.rows:
             if row['holds']:

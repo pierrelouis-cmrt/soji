@@ -13,7 +13,7 @@ import re
 import tempfile
 from .util import read_plist,read_json,json_command,command,inside
 
-FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel'}
+FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel','checkCodexRuntime'}
 # How `keepNewestPer` reads in a hold.
 KEEP_PER_TEXT={'app':'app','device':'device','product':'product','majorVersion':'major version','minorVersion':'minor version','folder':'folder'}
 
@@ -63,6 +63,42 @@ def rule_threshold_days(rule,mode):
             days=value*factor
             result[key]=max(1,days) if mode=='aggressive' else days
     return result
+
+def codex_bundle_version(folder):
+    """bundleVersion of a Codex runtime folder (its own or payload/*/runtime.json).
+
+    Returns (version tuple or None, readable). A folder without runtime.json is
+    an unfinished install: (None, True). An unreadable/malformed one: (None, False).
+    """
+    root=Path(folder)
+    candidates=[root/'runtime.json',*sorted(root.glob('payload/*/runtime.json'))]
+    for candidate in candidates:
+        try:
+            if candidate.is_symlink() or not candidate.is_file():continue
+            data=json.loads(candidate.read_text(encoding='utf-8'))
+            version=data.get('bundleVersion') if isinstance(data,dict) else None
+            if not isinstance(version,str) or not re.fullmatch(r'[0-9]+(\.[0-9]+)*',version):return None,False
+            return tuple(int(x) for x in version.split('.')),True
+        except (OSError,ValueError):return None,False
+    return None,True
+
+
+def codex_runtime_current(path,siblings):
+    """Why a codex-runtime-install-* folder is the current runtime, or ''.
+
+    Current means: same bundle as the extracted codex-primary-runtime, the
+    highest bundle version among installs, or unreadable metadata (unknown).
+    """
+    mine,ok=codex_bundle_version(path)
+    if not ok:return 'Codex runtime metadata unreadable; cannot tell whether it is current'
+    if mine is None:return ''
+    primary,primary_ok=codex_bundle_version(Path(path).parent/'codex-primary-runtime')
+    if not primary_ok:return 'codex-primary-runtime metadata unreadable; cannot tell which install is current'
+    if primary is not None and primary==mine:return 'Same bundle version as the active codex-primary-runtime'
+    versions=[v for v,_ in (codex_bundle_version(s) for s in siblings if s!=path)]
+    if all(v is None or v<mine for v in versions):return 'Highest bundle version among Codex runtime installs'
+    return ''
+
 
 def workspace_missing(path):
     """True when a DerivedData project's workspace no longer exists.
@@ -398,6 +434,10 @@ class SpecializedRules:
             if r.get('keepNewestPer')=='app' and self.newest_uploaded(f.path,siblings):
                 f.holds.append('Newest uploaded archive retained')
         f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'rule age thresholds per mode'})
+        if r.get('checkCodexRuntime'):
+            current=codex_runtime_current(f.path,self.siblings.get(f.hint_id,[]))
+            if current:f.holds.append('Current Codex runtime: '+current)
+            f.evidence.append({'check':'codexRuntime','current':current or None,'basis':'bundleVersion in payload/*/runtime.json vs codex-primary-runtime and sibling installs'})
         if r.get('checkWorkspaceExists'):
             missing=workspace_missing(f.path)
             if missing:

@@ -25,6 +25,132 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.cache/codex-runtimes/codex-primary-runtime); only the whole install can be cleaned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.cache/codex-runtimes/codex-primary-runtime); only the whole install can be cleaned",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.cache/codex-runtimes/codex-primary-runtime); only the whole install can be cleaned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Inside installed software (installed app, extension or tool folder: ~/.cache/codex-runtimes/codex-primary-runtime); only the whole install can be cleaned"
+  ],
+  "modeHolds": {},
+  "path": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "selected": false
+  },
+  "bytes": 397312,
+  "careful": {
+   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "codex-runtimes",
+  "holds": [
+   "Changed or created within the last 5 minutes",
+   "Current Codex runtime: Highest bundle version among Codex runtime installs"
+  ],
+  "modeHolds": {
+   "aggressive": "Retained newest version per folder",
+   "balanced": "Retained newest version per folder",
+   "careful": "Retained newest version per folder"
+  },
+  "path": "~/.cache/codex-runtimes/codex-runtime-install-L2Mqle",
+  "rank": 0
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 40.0 d; eligible from balanced",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 40.0 d; eligible from balanced",
+   "selected": true
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Retained newest version per folder",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "codex-runtimes",
+  "holds": [],
+  "modeHolds": {
+   "careful": "Retained newest version per folder"
+  },
+  "path": "~/.cache/codex-runtimes/codex-runtime-install-wDayCH",
+  "rank": 1
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 0.5 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Session changed 12.0 h ago; never cleaned within 24 h at balanced",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Session changed 12.0 h ago; never cleaned within 24 h at careful",
+   "selected": false
+  },
+  "early": null,
+  "group": "Agent and editor history",
+  "hint": "claude-sessions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.claude/projects/-code-new-name/current.jsonl",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Idle 1.5 d; eligible from aggressive",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Eligible from aggressive",
+   "selected": false
+  },
+  "early": null,
+  "group": "Agent and editor history",
+  "hint": "claude-sessions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.claude/projects/-code-old-name/renamed.jsonl",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Idle 2.0 d; eligible from balanced",
    "selected": true
   },
@@ -43,6 +169,29 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/.claude/projects/-code-py-agent/session.jsonl",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.config/raycast/extensions/112ad714-bf10-4ccc-a70f-4232bb2241a5",
   "rank": null
  },
  {
@@ -121,6 +270,77 @@
   },
   "path": "~/.nvm/versions/node/v22.3.0",
   "rank": 0
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.t3/tools/expo-device-hub); only the whole install can be cleaned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.t3/tools/expo-device-hub); only the whole install can be cleaned",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.t3/tools/expo-device-hub); only the whole install can be cleaned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Inside installed software (installed app, extension or tool folder: ~/.t3/tools/expo-device-hub); only the whole install can be cleaned"
+  ],
+  "modeHolds": {},
+  "path": "~/.t3/tools/expo-device-hub/0.15.3",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 135168,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Editor extensions",
+  "hint": "vscode-old-extensions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.vscode/extensions/ms-python.python-2026.10.0-darwin-arm64",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Editor extensions",
+  "hint": "vscode-old-extensions",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.vscode/extensions/ritwickdey.liveserver-5.7.10",
+  "rank": null
  },
  {
   "action": null,
@@ -235,6 +455,52 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/Downloads/photos.zip",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "App leftovers",
+  "hint": "app-support-leftovers",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Application Support/Zed",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "App leftovers",
+  "hint": "app-support-leftovers",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/Library/Application Support/discord",
   "rank": null
  },
  {
@@ -896,6 +1162,29 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/code/fresh-web/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/code/loose-web/node_modules/lib",
   "rank": null
  },
  {

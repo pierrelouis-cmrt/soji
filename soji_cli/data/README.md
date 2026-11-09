@@ -85,6 +85,7 @@ never makes Sōji more aggressive. `specialized.py` implements them.
 | Key | Meaning |
 | --- | --- |
 | `checkWorkspaceExists` | Xcode DerivedData: when the project's workspace is gone, Careful takes it and its age and retention gates are skipped |
+| `checkCodexRuntime` | Codex runtime installs: holds the install whose `payload/*/runtime.json` bundle matches `codex-primary-runtime`, the highest bundle version among installs, and any with unreadable metadata |
 | `checkDeviceBuilds` | Device support: held while a connected device runs that build. When a newer prepared build of the same device and version exists, Careful takes it |
 | `checkSimulatorDevice` | Simulators: held unless shut down. When its runtime is gone, the levels take it after 7 days (Careful), 1 day (Balanced) or 1 hour (Aggressive) idle. A spare twin with no apps goes from Balanced after 7 idle days. Removed with `simctl delete` |
 

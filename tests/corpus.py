@@ -46,9 +46,9 @@ SIMCTL = {
 # A declared path's age applies to it and every undeclared descendant.
 LAYOUT: list[tuple[str, int | None, float]] = [
     # Node projects: idle, recently edited, dirty Git, clean Git, secrets.
-    ('code/old-web', None, 40), ('code/old-web/package.json', 64, 40),
+    ('code/old-web', None, 40), ('code/old-web/package.json', 64, 40), ('code/old-web/package-lock.json', 64, 40),
     ('code/old-web/node_modules/lib/index.js', PAYLOAD, 40),
-    ('code/fresh-web', None, 30), ('code/fresh-web/package.json', 64, 1),
+    ('code/fresh-web', None, 30), ('code/fresh-web/package.json', 64, 1), ('code/fresh-web/pnpm-lock.yaml', 64, 30),
     ('code/fresh-web/node_modules/lib/index.js', PAYLOAD, 30),
     ('code/dirty-web', None, 60), ('code/dirty-web/package.json', 64, 60),
     ('code/dirty-web/notes.txt', 64, 60),
@@ -56,7 +56,7 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     ('code/clean-web', None, 60), ('code/clean-web/package.json', 64, 60),
     ('code/clean-web/assets.bin', PAYLOAD, 60),
     ('code/clean-web/node_modules/lib/index.js', PAYLOAD, 60),
-    ('code/secret-web', None, 60), ('code/secret-web/package.json', 64, 60),
+    ('code/secret-web', None, 60), ('code/secret-web/package.json', 64, 60), ('code/secret-web/yarn.lock', 64, 60),
     ('code/secret-web/node_modules/lib/index.js', PAYLOAD, 60),
     ('code/secret-web/node_modules/lib/.env', 64, 60),
     # Rust target with marker, and an unrelated `target` without one.
@@ -64,10 +64,10 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     ('code/rusty/target/debug/app', PAYLOAD, 20),
     ('code/unrelated/target/blob', PAYLOAD, 90),
     # Python venvs: idle project versus one an agent session touched recently.
-    ('code/py-idle', None, 45), ('code/py-idle/pyproject.toml', 64, 45),
+    ('code/py-idle', None, 45), ('code/py-idle/pyproject.toml', 64, 45), ('code/py-idle/uv.lock', 64, 45),
     ('code/py-idle/.venv/pyvenv.cfg', 64, 45),
     ('code/py-idle/.venv/lib/site.py', PAYLOAD, 45),
-    ('code/py-agent', None, 45), ('code/py-agent/pyproject.toml', 64, 45),
+    ('code/py-agent', None, 45), ('code/py-agent/pyproject.toml', 64, 45), ('code/py-agent/poetry.lock', 64, 45),
     ('code/py-agent/.venv/pyvenv.cfg', 64, 45),
     ('code/py-agent/.venv/lib/site.py', PAYLOAD, 45),
     # App caches: owned by an installed app, unowned, fresh, tool-owned.
@@ -109,6 +109,29 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     ('.Trash/junk.bin', PAYLOAD, 10),
     ('.claude/projects/-code-py-agent/session.jsonl', PAYLOAD, 2),
     ('Documents/report.pdf', PAYLOAD, 100),
+    # November 8 regressions. A folder with only package.json is no project.
+    ('code/loose-web', None, 60), ('code/loose-web/package.json', 64, 60),
+    ('code/loose-web/node_modules/lib/index.js', PAYLOAD, 60),
+    # Shipped node_modules of installed extensions/apps, with lockfiles.
+    *[(f'{root}/{rel}', size, 254) for root in (
+        '.vscode/extensions/ritwickdey.liveserver-5.7.10',
+        '.config/raycast/extensions/112ad714-bf10-4ccc-a70f-4232bb2241a5',
+        'Library/Application Support/Zed/extensions/work/html',
+        'Library/Application Support/discord/app-0.0.411/modules/discord_spellcheck-1/discord_spellcheck',
+        '.t3/tools/expo-device-hub/0.15.3',
+    ) for rel, size in (('package.json', 64), ('package-lock.json', 64), ('node_modules/lib/index.js', PAYLOAD))],
+    ('.vscode/extensions/ms-python.python-2026.10.0-darwin-arm64/out/client/node_modules/lib/index.js', PAYLOAD, 21),
+    ('.vscode/extensions/ms-python.python-2026.10.0-darwin-arm64/out/client/package.json', 64, 21),
+    # Codex runtimes: the install in use (fresh __pycache__) and a superseded one.
+    ('.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node', PAYLOAD, 3),
+    ('.cache/codex-runtimes/codex-runtime-install-L2Mqle/node-runtime.tar.xz', PAYLOAD, 29),
+    ('.cache/codex-runtimes/codex-runtime-install-L2Mqle/payload/codex-primary-runtime/dependencies/node/node_modules/pdfjs-dist/pdf.mjs', PAYLOAD, 29),
+    ('.cache/codex-runtimes/codex-runtime-install-L2Mqle/payload/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/pandas/__pycache__/core.pyc', PAYLOAD, 0.001),
+    ('.cache/codex-runtimes/codex-runtime-install-wDayCH/node-runtime.tar.xz', PAYLOAD, 40),
+    # Sessions of a renamed project (code/old-name -> code/new-name).
+    ('code/new-name/README.md', 64, 1),
+    ('.claude/projects/-code-old-name/renamed.jsonl', PAYLOAD, 1.5),
+    ('.claude/projects/-code-new-name/current.jsonl', PAYLOAD, 0.5),
 ]
 
 
@@ -142,9 +165,16 @@ def build_corpus(home: Path, now: float | None = None) -> float:
         else:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b'x' * size)
-    session = home / '.claude/projects/-code-py-agent/session.jsonl'
-    line = json.dumps({'type': 'user', 'cwd': str(home / 'code/py-agent')}) + '\n'
-    session.write_bytes(line.encode().ljust(PAYLOAD, b' '))
+    for session, cwd in [('-code-py-agent/session.jsonl', 'code/py-agent'),
+                         ('-code-old-name/renamed.jsonl', 'code/old-name'),
+                         ('-code-new-name/current.jsonl', 'code/new-name')]:
+        line = json.dumps({'type': 'user', 'cwd': str(home / cwd)}) + '\n'
+        (home / '.claude/projects' / session).write_bytes(line.encode().ljust(PAYLOAD, b' '))
+    for runtime, version in [('codex-primary-runtime', '26.1105.12137'),
+                             ('codex-runtime-install-L2Mqle/payload/codex-primary-runtime', '26.1007.11041')]:
+        (home / '.cache/codex-runtimes' / runtime / 'runtime.json').write_text(json.dumps({'bundleVersion': version}))
+    ext = home / '.vscode/extensions/ritwickdey.liveserver-5.7.10/package.json'
+    ext.write_text(json.dumps({'name': 'LiveServer', 'publisher': 'ritwickdey', 'engines': {'vscode': '^1.22.0'}}))
     # device.plist as CoreSimulator writes it (state 1 = Shutdown, 3 = Booted).
     for d in SIMCTL['devices'][RUNTIME]:
         info = {'UDID': d['udid'], 'name': d['name'], 'runtime': RUNTIME, 'state': 3 if d['state'] == 'Booted' else 1}

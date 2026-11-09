@@ -3865,14 +3865,13 @@
   },
   {
     "id": "codex-runtimes",
-    "label": "Unfinished Codex runtimes",
+    "label": "Old Codex runtime installs",
     "group": "Toolchains and SDKs",
-    "patterns": ["~/.cache/codex-runtimes/*"],
-    "unlessContains": ["runtime.json"],
+    "patterns": ["~/.cache/codex-runtimes/codex-runtime-install-*"],
     "tier": "regenerable",
     "comesBack": "downloads",
-    "ruleSummary": "no runtime.json inside, idle 7 days",
-    "rule": {"minIdleDays": 7}
+    "ruleSummary": "whole superseded install folders, idle 7 days; never the newest, the highest bundle version, the one matching codex-primary-runtime, or one in use",
+    "rule": {"minIdleDays": 7, "keepNewest": 1, "keepNewestPer": "folder", "checkCodexRuntime": true}
   },
   {
     "id": "agent-browser-builds",

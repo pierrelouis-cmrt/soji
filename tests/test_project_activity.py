@@ -20,7 +20,7 @@ class ProjectActivityTests(unittest.TestCase):
         self.home = Path(self.temp.name).resolve() / 'home'
         self.now = time.time()
         for name in ('web', 'other'):
-            for rel, size in [('package.json', 64), ('node_modules/lib/index.js', 8192)]:
+            for rel, size in [('package.json', 64), ('package-lock.json', 64), ('node_modules/lib/index.js', 8192)]:
                 p = self.home / 'code' / name / rel
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_bytes(b'x' * size)
