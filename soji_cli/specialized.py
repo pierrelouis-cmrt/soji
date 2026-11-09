@@ -68,36 +68,101 @@ def rule_threshold_days(rule,mode):
 def codex_bundle_version(folder):
     """bundleVersion of a Codex runtime folder (its own or payload/*/runtime.json).
 
-    Returns (version tuple or None, readable). A folder without runtime.json is
-    an unfinished install: (None, True). An unreadable/malformed one: (None, False).
+    Returns (version tuple or None, readable). No runtime.json at all:
+    (None, True) -- absence says nothing about whether the install is in use.
+    An unreadable/malformed one, or an unreadable folder: (None, False).
     """
     root=Path(folder)
-    candidates=[root/'runtime.json',*sorted(root.glob('payload/*/runtime.json'))]
+    try:
+        # Listed explicitly: glob() would silently skip unreadable folders.
+        os.listdir(root)
+        candidates=[root/'runtime.json']
+        payload=root/'payload'
+        if payload.is_dir() and not payload.is_symlink():
+            for name in sorted(os.listdir(payload)):
+                entry=payload/name
+                if entry.is_dir() and not entry.is_symlink():
+                    os.listdir(entry)
+                    candidates.append(entry/'runtime.json')
+    except OSError:return None,False
+    versions=set()
     for candidate in candidates:
         try:
-            if candidate.is_symlink() or not candidate.is_file():continue
+            if candidate.is_symlink():return None,False
+            if not candidate.is_file():continue
             data=json.loads(candidate.read_text(encoding='utf-8'))
             version=data.get('bundleVersion') if isinstance(data,dict) else None
             if not isinstance(version,str) or not re.fullmatch(r'[0-9]+(\.[0-9]+)*',version):return None,False
-            return tuple(int(x) for x in version.split('.')),True
+            versions.add(tuple(int(x) for x in version.split('.')))
         except (OSError,ValueError):return None,False
-    return None,True
+    if len(versions)>1:return None,False
+    return next(iter(versions),None),True
 
 
-def codex_runtime_current(path,siblings):
-    """Why a codex-runtime-install-* folder is the current runtime, or ''.
+CODEX_INSTALL_PREFIX='codex-runtime-install-'
 
-    Current means: same bundle as the extracted codex-primary-runtime, the
-    highest bundle version among installs, or unreadable metadata (unknown).
+
+def codex_runtime_reference(runtimes):
+    """The codex-runtime-install-* root `codex-primary-runtime` resolves into.
+
+    Returns (install root path or None, why it is not usable). Only a readable
+    symlink that resolves inside a sibling install directory with a readable
+    bundleVersion counts. A plain directory (an extracted copy), a missing or
+    dangling link, anything resolving elsewhere, or missing/malformed metadata
+    at the target identifies nothing.
+    """
+    runtimes=Path(runtimes)
+    primary=runtimes/'codex-primary-runtime'
+    try:
+        if not primary.is_symlink():
+            return None,('codex-primary-runtime is missing' if not os.path.lexists(primary)
+                         else 'codex-primary-runtime is not a reference to an install')
+        base=os.path.realpath(runtimes)
+        target=os.path.realpath(primary)
+    except OSError:return None,'codex-primary-runtime unreadable'
+    rel=os.path.relpath(target,base)
+    first=rel.split(os.sep,1)[0]
+    if rel.startswith('..') or not first.startswith(CODEX_INSTALL_PREFIX):
+        return None,'codex-primary-runtime resolves outside the Codex runtime installs'
+    install=os.path.join(base,first)
+    try:
+        if not os.path.isdir(target) or os.path.islink(install) or not os.path.isdir(install):
+            return None,'codex-primary-runtime target is missing'
+    except OSError:return None,'codex-primary-runtime target unreadable'
+    version,ok=codex_bundle_version(install)
+    if not ok or version is None:return None,'runtime metadata of the referenced install is missing or unreadable'
+    target_version,target_ok=codex_bundle_version(target)
+    if not target_ok or target_version!=version:
+        return None,'primary target has unknown runtime layout or metadata'
+    return install,''
+
+
+def codex_runtime_current(path,siblings=()):
+    """Why a codex-runtime-install-* folder must be kept, or ''.
+
+    Supersession must be positively identified: an install is a candidate only
+    when `codex-primary-runtime` is a readable reference resolving to a
+    DIFFERENT install with readable metadata. Without that (no primary, an
+    extracted primary directory, unknown layout, unreadable or malformed
+    metadata) every install is held: the in-use one cannot be told apart, and
+    a version number, a date or missing metadata is no proof (Nov 8: the
+    in-use L2Mqle matched neither the primary's version nor the highest one).
     """
     mine,ok=codex_bundle_version(path)
-    if not ok:return 'Codex runtime metadata unreadable; cannot tell whether it is current'
-    if mine is None:return ''
-    primary,primary_ok=codex_bundle_version(Path(path).parent/'codex-primary-runtime')
-    if not primary_ok:return 'codex-primary-runtime metadata unreadable; cannot tell which install is current'
-    if primary is not None and primary==mine:return 'Same bundle version as the active codex-primary-runtime'
-    versions=[v for v,_ in (codex_bundle_version(s) for s in siblings if s!=path)]
-    if all(v is None or v<mine for v in versions):return 'Highest bundle version among Codex runtime installs'
+    if mine is None or not ok:return 'Codex runtime metadata unreadable; cannot tell whether it is current'
+    try:
+        roots=Path(path).parent
+        for entry in roots.iterdir():
+            if entry.name.startswith(CODEX_INSTALL_PREFIX):
+                version,readable=codex_bundle_version(entry)
+                if entry.is_symlink() or version is None or not readable:
+                    return 'Codex runtime inventory has unknown metadata or layout; every install is kept'
+    except OSError:return 'Codex runtime inventory unreadable; every install is kept'
+    install,why=codex_runtime_reference(Path(path).parent)
+    if install is None:return 'No readable reference identifies the Codex runtime in use ('+why+'); every install is kept'
+    try:same=os.path.samefile(install,path)
+    except OSError:return 'Codex runtime install unreadable; cannot tell whether it is current'
+    if same:return 'codex-primary-runtime points to this install'
     return ''
 
 
@@ -634,8 +699,8 @@ class SpecializedRules:
         f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'rule age thresholds per mode'})
         if r.get('checkCodexRuntime'):
             current=codex_runtime_current(f.path,self.siblings.get(f.hint_id,[]))
-            if current:f.holds.append('Current Codex runtime: '+current)
-            f.evidence.append({'check':'codexRuntime','current':current or None,'basis':'bundleVersion in payload/*/runtime.json vs codex-primary-runtime and sibling installs'})
+            if current:f.holds.append('Codex runtime kept: '+current)
+            f.evidence.append({'check':'codexRuntime','current':current or None,'basis':'superseded only when codex-primary-runtime is a readable link resolving to a different install with readable bundleVersion'})
         if r.get('checkWorkspaceExists'):
             missing=workspace_missing(f.path)
             if missing:

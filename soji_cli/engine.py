@@ -504,12 +504,24 @@ class Scanner:
         """Executable path of a running process located in `path`, or ''."""
         if getattr(self,'_exe_source',None) is not self.processes:
             self._exe_source=self.processes
-            self._exes=sorted(p for p in self.processes if isinstance(p,str) and p.startswith('/'))
-        key=path.casefold().rstrip('/')
-        i=bisect.bisect_left(self._exes,key+'/')
-        if i<len(self._exes) and self._exes[i].startswith(key+'/'):return self._exes[i]
-        i=bisect.bisect_left(self._exes,key)
-        return self._exes[i] if i<len(self._exes) and self._exes[i]==key else ''
+            # ps reports the path as launched: a program started through a
+            # symlink lives where the link resolves. Keep both spellings.
+            exes=set()
+            for p in self.processes:
+                if isinstance(p,str) and p.startswith('/'):
+                    exes.add(p.casefold())
+                    try:exes.add(os.path.realpath(p).casefold())
+                    except (OSError,ValueError):pass
+            self._exes=sorted(exes)
+        keys=[path.casefold().rstrip('/')]
+        try:keys.append(os.path.realpath(path).casefold().rstrip('/'))
+        except (OSError,ValueError):pass
+        for key in dict.fromkeys(k for k in keys if k):
+            i=bisect.bisect_left(self._exes,key+'/')
+            if i<len(self._exes) and self._exes[i].startswith(key+'/'):return self._exes[i]
+            i=bisect.bisect_left(self._exes,key)
+            if i<len(self._exes) and self._exes[i]==key:return self._exes[i]
+        return ''
 
     def is_open(self,path: str) -> bool:
         i=bisect.bisect_left(self.open_paths,path)

@@ -51,8 +51,12 @@ class CorpusRegression(unittest.TestCase):
             if row['path'].startswith(never):
                 self.assertFalse(any(row[m]['selected'] for m in corpus.MODES), row['path'])
                 self.assertNotIn(row['group'], ('Project dependencies', 'Build output'), row['path'])
+        # The corpus keeps the November 8 layout: codex-primary-runtime is an
+        # extracted directory, so nothing positively identifies the install in
+        # use and the older one is held too (positive supersession through a
+        # primary link is covered by tests/test_runtime_supersession.py).
         superseded = next(r for r in self.rows if r['path'].endswith('codex-runtime-install-wDayCH'))
-        self.assertTrue(superseded['balanced']['selected'])
+        self.assertFalse(any(superseded[m]['selected'] for m in corpus.MODES), superseded)
 
     def test_renamed_project_sessions_not_downgraded(self):
         row = next(r for r in self.rows if r['path'].endswith('-code-old-name/renamed.jsonl'))

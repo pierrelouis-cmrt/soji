@@ -24,6 +24,12 @@ class ProjectActivityTests(unittest.TestCase):
                 p = self.home / 'code' / name / rel
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_bytes(b'x' * size)
+            from test_nov8_regressions import git
+            repo = self.home / 'code' / name
+            (repo / '.gitignore').write_text('node_modules/\n')
+            git(repo, 'init', '-q', '-b', 'main')
+            git(repo, 'add', '.')
+            git(repo, 'commit', '-q', '-m', 'fixture')
 
     def tearDown(self):
         self.temp.cleanup()

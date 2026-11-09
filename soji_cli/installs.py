@@ -8,7 +8,7 @@ workflow restores it. These helpers answer two questions for the classifier:
   Rows there are never cleanup targets in any mode; only the install root as a
   whole can be (and only through its own rule).
 * `InstallTrees.real_project(path)`: does the project owning `path` look like
-  one the user works in (lockfile or VCS checkout)? Project-dependency rules
+  one the user works in (own lockfile and VCS root)? Project-dependency rules
   only match there.
 
 Every answer depends on filesystem facts, so results share the catalog's
@@ -46,6 +46,21 @@ INSTALL_LOCATIONS = (
     '.t3/tools/*',
     '.cache/codex-runtimes/*',
     '.codex/packages/*/releases/*',
+    # Package-manager global prefixes contain installed executables/libraries.
+    '.npm-global', '.local/lib/node_modules', '.local/lib/npm',
+    'Library/pnpm', '.local/share/pnpm', '.bun/install/global',
+    '.config/yarn/global', '.yarn/global', '.volta',
+    # Version-manager installations (not their dedicated download caches).
+    '.fnm/node-versions', '.local/share/fnm/node-versions',
+    '.asdf/installs', '.local/share/mise/installs', '.deno/bin',
+    # Plugin managers use lockfiles AND Git clones to install shipped code.
+    '.local/share/nvim/lazy', '.local/share/nvim/site/pack',
+    '.local/share/nvim/plugged', '.local/share/nvim/mason',
+    '.vim/plugged', '.vim/pack', '.config/coc/extensions',
+    '.local/share/JetBrains',
+    'Library/Application Support/Sublime Text/Packages',
+    'Library/Application Support/Sublime Text 3/Packages',
+    'Library/Application Support/JetBrains/*/plugins',
 )
 
 # Home-relative areas where no development project lives: app-managed
@@ -113,11 +128,8 @@ class InstallTrees:
         return self.catalog.markers_cache
 
     def _vcs(self, folder: str) -> bool:
-        """`folder` or one of its ancestors below home is a VCS checkout."""
-        for a in [folder, *_ancestors(folder, self.home)]:
-            if self.catalog.exists(Path(a), list(VCS_MARKERS)):
-                return True
-        return False
+        """`folder` itself is a VCS root; ancestors never establish ownership."""
+        return self.catalog.exists(Path(folder), list(VCS_MARKERS))
 
     def manifest(self, folder: str) -> str:
         """Kind of installed-package manifest in `folder`, or ''."""
@@ -169,8 +181,11 @@ class InstallTrees:
         return not any(path.startswith(os.path.join(self.home, area) + '/') for area in NO_PROJECT_AREAS)
 
     def real_project(self, path: str) -> bool:
-        """The project owning `path` has a lockfile or is a VCS checkout."""
-        for folder in _ancestors(path, self.home):
-            if self.catalog.exists(Path(folder), list(LOCKFILES) + list(VCS_MARKERS)):
-                return True
-        return False
+        """The immediate owner has both a lockfile and its own VCS root."""
+        # The immediate owner must carry its own lockfile AND VCS root.
+        # A dotfiles checkout above it, or a global tool's lockfile, proves
+        # nothing. Explicit install roots always take precedence.
+        owner = str(Path(path).parent)
+        return (not self.containing(path) and self.project_area(path)
+                and self._vcs(owner)
+                and self.catalog.exists(Path(owner), list(LOCKFILES)))

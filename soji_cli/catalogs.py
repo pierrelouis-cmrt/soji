@@ -58,7 +58,7 @@ def expand_catalogs(scanner):
                         if gone:
                             f.levels={'careful':f.levels['balanced'],'balanced':f.levels['aggressive'],'aggressive':3,'reason':'Session project is gone; one level earlier'}
                         f.evidence.append({'check':'sessionProjectMoved','gone':gone,'signals':signals,
-                                           'basis':'renamed/moved checks: parent present, Git remote name, registered worktree, main repository, successor project'})
+                                           'basis':'registered worktrees and cwd history; unavailable historical identity/completeness stays uncertain'})
                     f.evidence.append({'check':'sessionProject','path':cwd,'exists':exists})
                 # Hard floor whatever the downgrade or judgement: a session
                 # changed within a day is never taken at Careful or Balanced.
@@ -125,34 +125,49 @@ def session_project_gone(scanner,cwd):
 
     A missing folder is often a renamed or moved project (or a worktree that
     git still lists). Gone is returned only when no such signal exists and the
-    evidence is complete; any doubt keeps the normal session policy.
+    evidence is complete; any doubt keeps the normal session policy. The
+    current activity schema cannot prove completeness or historic identity,
+    so all missing projects currently remain uncertain.
     """
     cache=scanner.__dict__.setdefault('_session_gone_cache',{})
     if cwd in cache:return cache[cwd]
     signals=[]
     cwd=os.path.realpath(cwd);parent=os.path.dirname(cwd);name=os.path.basename(cwd).casefold()
     activity=getattr(scanner,'activity',None)
-    if activity is None or activity.errors:signals.append('activity history incomplete')
+    history_complete=activity is not None and not activity.errors
+    if not history_complete:signals.append('activity history incomplete')
     if not os.path.isdir(parent):signals.append('parent folder missing or unmounted: '+parent)
     # Candidate repositories: folders agents/editors worked in, plus siblings.
     candidates=set()
-    for record in (activity.records if activity else ())[:20000]:
+    records=activity.records if activity else ()
+    if len(records)>20000:
+        history_complete=False;signals.append('activity candidate budget reached')
+    for record in records[:20000]:
         if os.path.isdir(record.path):candidates.add(record.path)
+    sibling_complete=True
     try:
         with os.scandir(parent) as it:
             for i,entry in enumerate(it):
-                if i>=500:break
+                if i>=500:
+                    sibling_complete=False;break
                 if entry.is_dir(follow_symlinks=False):candidates.add(entry.path)
-    except OSError:pass
+    except OSError:sibling_complete=False
+    if not sibling_complete:signals.append('sibling project search incomplete')
     candidates.discard(cwd)
-    repos={}
+    repos={};candidate_complete=len(candidates)<=5000
     for folder in sorted(candidates)[:5000]:
         git_dir=_git_dir(folder)
         if git_dir is not None:repos[folder]=git_dir
+    if not candidate_complete:signals.append('repository candidate budget reached')
+    # ActivityIndex stores cwd/time only. Neither a surviving parent Git
+    # repository nor an error-free list of observed cwd paths proves the old
+    # repository identity or that the history covers all possible moves.
+    # Retain normal policy until that positive evidence can be represented.
+    signals.append('missing project has no recorded repository identity; history completeness unproven')
     for folder,git_dir in repos.items():
-        if name in _remote_names(git_dir):signals.append(f'renamed or moved: {folder} has a remote named {name}')
         listed=_registered_worktrees(git_dir)
-        if any(w==cwd or w.startswith(cwd+'/') for w in listed):signals.append(f'worktree still registered in {folder}')
+        if any(w==cwd or w.startswith(cwd+'/') for w in listed):
+            signals.append(f'worktree still registered in {folder}')
     parts=cwd.split('/')
     if 'worktrees' in parts:
         # A worktree is gone only when its main repository is known.
@@ -177,7 +192,7 @@ def session_project_gone(scanner,cwd):
                 except OSError:changed=0
                 if (records and min(records)>=last.at-86400) or (not records and folder in repos and changed>=last.at-86400):
                     signals.append(f'possible rename: {folder} became active when this project stopped')
-    result=(not signals,signals)
+    result=(False,signals)
     cache[cwd]=result
     return result
 

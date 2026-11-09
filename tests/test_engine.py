@@ -30,7 +30,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(cat.match(str(self.home/'other/target'))[0]['id'],'jvm-project-target')
         self.assertIsNone(cat.match(str(self.home/'unrelated/target')))
     def test_inside_marker(self):
-        self.file('project/venv/pyvenv.cfg');self.file('project/uv.lock')
+        self.file('project/venv/pyvenv.cfg');self.file('project/uv.lock');(self.home/'project/.git').mkdir()
         cat=Catalog(str(self.home));self.assertEqual(cat.match(str(self.home/'project/venv'))[0]['id'],'python-venv')
     def test_hardlinks_and_symlinks(self):
         a=self.file('data/a',65536);os.link(a,self.home/'data/b');(self.home/'link').symlink_to(self.home/'data',target_is_directory=True)
@@ -44,7 +44,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertNotIn(str(secret),s.nodes)
         self.assertEqual(s.nodes[str(self.home/'.ssh')].size,0)
     def test_secrets_propagate_to_candidate(self):
-        self.file('project/package.json');self.file('project/package-lock.json');self.file('project/node_modules/lib/.env')
+        self.file('project/package.json');self.file('project/package-lock.json');(self.home/'project/.git').mkdir();self.file('project/node_modules/lib/.env')
         s=self.scan();f=next(f for f in s.findings if f.hint_id=='node-modules')
         self.assertTrue(any('credential' in h for h in f.holds))
     def test_budget_never_marks_incomplete_ready(self):
@@ -52,13 +52,13 @@ class ClassificationTests(unittest.TestCase):
         s=self.scan(max_files=4);self.assertTrue(s.limited)
         self.assertFalse(any(f.selected for f in s.decisions('strict')))
     def test_no_nested_double_count(self):
-        self.file('.npm/_cacache/sub/a',32768);self.file('project/package.json');self.file('project/package-lock.json');self.file('project/node_modules/a',32768)
+        self.file('.npm/_cacache/sub/a',32768);self.file('project/package.json');self.file('project/package-lock.json');(self.home/'project/.git').mkdir();self.file('project/node_modules/a',32768)
         s=self.scan();paths=[f.path for f in s.findings if f.hint_id]
         self.assertTrue(any('_cacache' in p for p in paths))
         self.assertFalse(any(a!=b and within(a,b) for a in paths for b in paths))
         self.assertLessEqual(sum(f.size for f in s.findings),s.bytes)
     def test_deep_known_candidate_not_hidden_by_rollup(self):
-        self.file('a/b/c/d/e/project/package.json');self.file('a/b/c/d/e/project/yarn.lock');self.file('a/b/c/d/e/project/node_modules/output')
+        self.file('a/b/c/d/e/project/package.json');self.file('a/b/c/d/e/project/yarn.lock');(self.home/'a/b/c/d/e/project/.git').mkdir();self.file('a/b/c/d/e/project/node_modules/output')
         s=self.scan();self.assertTrue(any(f.hint_id=='node-modules' for f in s.findings))
     def test_roots_deduplicated(self):
         self.file('a/data');s=Scanner([str(self.home),str(self.home/'a')],home=str(self.home));self.assertEqual(s.roots,[str(self.home)])

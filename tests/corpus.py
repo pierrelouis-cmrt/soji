@@ -131,6 +131,13 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     ('.cache/codex-runtimes/codex-runtime-install-L2Mqle/payload/codex-primary-runtime/dependencies/node/node_modules/pdfjs-dist/pdf.mjs', PAYLOAD, 29),
     ('.cache/codex-runtimes/codex-runtime-install-L2Mqle/payload/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/pandas/__pycache__/core.pyc', PAYLOAD, 0.001),
     ('.cache/codex-runtimes/codex-runtime-install-wDayCH/node-runtime.tar.xz', PAYLOAD, 40),
+    # Global and plugin installs carry lockfiles/VCS too; never project output.
+    *[(f'{root}/{rel}', size, 60) for root in (
+        '.bun/install/global', '.config/yarn/global',
+        '.local/share/nvim/mason/packages/pyright',
+        '.local/share/nvim/lazy/markdown-preview.nvim/app',
+        '.config/coc/extensions',
+    ) for rel, size in (('package.json', 64), ('package-lock.json', 64), ('node_modules/lib/index.js', PAYLOAD))],
     # Sessions of a renamed project (code/old-name -> code/new-name).
     ('code/new-name/README.md', 64, 1),
     ('.claude/projects/-code-old-name/renamed.jsonl', PAYLOAD, 1.5),
@@ -197,8 +204,11 @@ def build_corpus(home: Path, now: float | None = None) -> float:
     (home / '.nvm/alias/lts/iron').write_text('v20.1.0\n')
     (home / '.nvm/alias/lts/gallium').write_text('v16.0.0\n')
     (home / 'code/pinned-web/.nvmrc').write_text('lts/gallium\n')
-    for repo in ('code/dirty-web', 'code/clean-web'):
+    for repo in ('code/dirty-web', 'code/clean-web', 'code/old-web', 'code/fresh-web',
+                 'code/secret-web', 'code/py-idle', 'code/py-agent'):
         r = home / repo
+        if repo in ('code/dirty-web', 'code/clean-web'):
+            (r / 'package-lock.json').write_text('{}')
         (r / '.gitignore').write_text('node_modules/\n.claude/\n')
         _git(r, 'init', '-q', '-b', 'main')
         _git(r, 'add', '.')

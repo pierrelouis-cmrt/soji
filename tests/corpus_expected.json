@@ -25,6 +25,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.bun/install/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.bun/install/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.bun/install/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Inside installed software (installed app, extension or tool folder: ~/.bun/install/global); only the whole install can be cleaned"
+  ],
+  "modeHolds": {},
+  "path": "~/.bun/install/global/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Inside installed software (installed app, extension or tool folder: ~/.cache/codex-runtimes/codex-primary-runtime); only the whole install can be cleaned",
    "selected": false
   },
@@ -50,16 +75,16 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "decision": "Changed or created within the last 5 minutes; Codex runtime kept: Codex runtime inventory has unknown metadata or layout; every install is kept",
    "selected": false
   },
   "balanced": {
-   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "decision": "Changed or created within the last 5 minutes; Codex runtime kept: Codex runtime inventory has unknown metadata or layout; every install is kept",
    "selected": false
   },
   "bytes": 397312,
   "careful": {
-   "decision": "Changed or created within the last 5 minutes; Current Codex runtime: Highest bundle version among Codex runtime installs",
+   "decision": "Changed or created within the last 5 minutes; Codex runtime kept: Codex runtime inventory has unknown metadata or layout; every install is kept",
    "selected": false
   },
   "early": null,
@@ -67,7 +92,7 @@
   "hint": "codex-runtimes",
   "holds": [
    "Changed or created within the last 5 minutes",
-   "Current Codex runtime: Highest bundle version among Codex runtime installs"
+   "Codex runtime kept: Codex runtime inventory has unknown metadata or layout; every install is kept"
   ],
   "modeHolds": {
    "aggressive": "Retained newest version per folder",
@@ -80,22 +105,24 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Idle 40.0 d; eligible from balanced",
-   "selected": true
+   "decision": "Codex runtime kept: Codex runtime metadata unreadable; cannot tell whether it is current",
+   "selected": false
   },
   "balanced": {
-   "decision": "Idle 40.0 d; eligible from balanced",
-   "selected": true
+   "decision": "Codex runtime kept: Codex runtime metadata unreadable; cannot tell whether it is current",
+   "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version per folder",
+   "decision": "Codex runtime kept: Codex runtime metadata unreadable; cannot tell whether it is current",
    "selected": false
   },
   "early": null,
   "group": "Toolchains and SDKs",
   "hint": "codex-runtimes",
-  "holds": [],
+  "holds": [
+   "Codex runtime kept: Codex runtime metadata unreadable; cannot tell whether it is current"
+  ],
   "modeHolds": {
    "careful": "Retained newest version per folder"
   },
@@ -222,6 +249,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/coc/extensions); only the whole install can be cleaned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/coc/extensions); only the whole install can be cleaned",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/coc/extensions); only the whole install can be cleaned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Inside installed software (installed app, extension or tool folder: ~/.config/coc/extensions); only the whole install can be cleaned"
+  ],
+  "modeHolds": {},
+  "path": "~/.config/coc/extensions/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Listed for review; never automatically selected",
    "selected": false
   },
@@ -240,6 +292,77 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/.config/raycast/extensions/112ad714-bf10-4ccc-a70f-4232bb2241a5",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/yarn/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/yarn/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Inside installed software (installed app, extension or tool folder: ~/.config/yarn/global); only the whole install can be cleaned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Inside installed software (installed app, extension or tool folder: ~/.config/yarn/global); only the whole install can be cleaned"
+  ],
+  "modeHolds": {},
+  "path": "~/.config/yarn/global/node_modules",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.local/share/nvim/lazy",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "bytes": 139264,
+  "careful": {
+   "decision": "Listed for review; never automatically selected",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.local/share/nvim/mason",
   "rank": null
  },
  {
@@ -1078,7 +1201,7 @@
    "decision": "Worktree has unpushed commits",
    "selected": false
   },
-  "bytes": 143360,
+  "bytes": 147456,
   "careful": {
    "decision": "Worktree has unpushed commits",
    "selected": false
@@ -1217,6 +1340,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/fresh-web/.git",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Project idle 24.0 h; rule needs 84 h at aggressive",
    "selected": false
   },
@@ -1263,6 +1411,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/old-web/.git",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Idle 40.0 d; eligible from balanced",
    "selected": true
   },
@@ -1286,6 +1459,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/py-agent/.git",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Project idle 48.0 h; rule needs 180 h at aggressive",
    "selected": false
   },
@@ -1304,6 +1502,31 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/code/py-agent/.venv",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/py-idle/.git",
   "rank": null
  },
  {
@@ -1350,6 +1573,31 @@
   "holds": [],
   "modeHolds": {},
   "path": "~/code/rusty/target",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "bytes": 0,
+  "careful": {
+   "decision": "Credentials or repository metadata; contents not scanned",
+   "selected": false
+  },
+  "early": null,
+  "group": "Other folders",
+  "hint": null,
+  "holds": [
+   "Credentials or repository metadata; contents not scanned"
+  ],
+  "modeHolds": {},
+  "path": "~/code/secret-web/.git",
   "rank": null
  },
  {

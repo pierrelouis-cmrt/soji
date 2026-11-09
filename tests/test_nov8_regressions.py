@@ -70,7 +70,7 @@ def git(repo, *args):
     env = dict(os.environ, GIT_CONFIG_GLOBAL='/dev/null', GIT_CONFIG_NOSYSTEM='1',
                GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@example.invalid',
                GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@example.invalid')
-    subprocess.run(['/usr/bin/git', '-C', str(repo), *args], check=True, capture_output=True, env=env)
+    subprocess.run(['/usr/bin/git', '-c', 'core.hooksPath=/dev/null', '-C', str(repo), *args], check=True, capture_output=True, env=env)
 
 
 class FakeHome(unittest.TestCase):
@@ -159,13 +159,29 @@ class ToolchainRuntimeTests(FakeHome):
             self.assert_never_selected_inside(s, self.home / root, strict=False)
         self.assertNotIn(PRIMARY, [r for r, f in rows.items() if f.hint_id == 'codex-runtimes'])
 
-    def test_superseded_installs_are_still_candidates(self):
+    def test_incident_layout_holds_every_install(self):
+        # As on November 8: codex-primary-runtime is an extracted directory
+        # whose version matches no install. Nothing positively identifies the
+        # runtime in use, so no install is superseded (version/date/missing
+        # metadata are no proof).
         self.build()
+        s = self.scan()
+        for root in (ACTIVE, OLD, UNFINISHED):
+            self.assert_never_selected_inside(s, self.home / root, strict=False)
+
+    def test_superseded_installs_are_still_candidates(self):
+        # Positive identification: codex-primary-runtime links into L2Mqle.
+        self.build()
+        shutil.rmtree(self.home / PRIMARY)
+        (self.home / PRIMARY).symlink_to(self.home / ACTIVE / 'payload/codex-primary-runtime')
+        write(self.home / UNFINISHED / 'runtime.json', json.dumps({'bundleVersion': '26.800.1'}))
+        age_tree(self.home / UNFINISHED, 40)
         s = self.scan()
         picked = {str(Path(f.path).relative_to(self.home)) for f in self.selected(s, 'balanced')}
         self.assertIn(OLD, picked)
         self.assertIn(UNFINISHED, picked)
         self.assertNotIn(ACTIVE, picked)
+        self.assert_never_selected_inside(s, self.home / ACTIVE, strict=False)
 
     def test_old_but_current_runtime_kept_by_version_and_retention(self):
         # Even when nothing inside changed for weeks, the highest-version /
@@ -303,6 +319,11 @@ class RenamedProjectSessionTests(FakeHome):
         git(soji, 'remote', 'add', 'origin', 'https://github.com/me/soji.git')
         self.session('-Users-me-Documents-Github-soji', soji, 'now', 2)
         old = h / 'Documents/Github/levo-terminal'
+        # Sidecars are members of the same session and must inherit the same
+        # uncertainty and 24-hour protection.
+        sidecar = self.home / '.claude/projects/-Users-me-Documents-Github-levo-terminal/b/subagents'
+        write(sidecar / 'agent.jsonl', json.dumps({'cwd': str(old)}) + '\n', 30 / 24)
+        age_tree(sidecar.parent, 30 / 24)
         self.renamed_20h = self.session('-Users-me-Documents-Github-levo-terminal', old, 'a', 20)
         self.renamed_30h = self.session('-Users-me-Documents-Github-levo-terminal', old, 'b', 30)
         # Worktree of the renamed project; its main repository is not findable.
@@ -317,10 +338,13 @@ class RenamedProjectSessionTests(FakeHome):
         git(app, 'remote', 'add', 'origin', 'git@github.com:me/app-old.git')
         age_tree(app, 100)
         self.moved_30h = self.session('-Users-me-work-app-old', h / 'work/app-old', 'm', 30)
-        # Really deleted project: nothing renamed, moved or registered.
-        (h / 'archive').mkdir()
-        self.gone_30h = self.session('-Users-me-archive-deleted', h / 'archive/deleted', 'g', 30)
-        self.gone_20h = self.session('-Users-me-archive-deleted', h / 'archive/deleted', 'g2', 20)
+        # A surviving parent repository cannot establish a missing child's
+        # historical identity or prove that the child was deleted.
+        gone_repo = h / 'archive'
+        write(gone_repo / 'README.md', 'fixture\n', 100)
+        git(gone_repo, 'init', '-q', '-b', 'main'); git(gone_repo, 'add', '.'); git(gone_repo, 'commit', '-q', '-m', 'init')
+        self.gone_30h = self.session('-Users-me-archive-deleted', gone_repo / 'deleted', 'g', 30)
+        self.gone_20h = self.session('-Users-me-archive-deleted', gone_repo / 'deleted', 'g2', 20)
         os.utime(h / 'archive', (time.time() - 100 * DAY,) * 2)
 
     def rows(self, s):
@@ -338,18 +362,32 @@ class RenamedProjectSessionTests(FakeHome):
             for mode in ('careful', 'balanced'):
                 self.assertFalse(f.decide(mode, s.now)[0], (p, mode, f.decide(mode, s.now)))
 
-    def test_truly_gone_project_downgrades_but_respects_24h_floor(self):
+    def test_missing_child_of_surviving_repo_is_still_uncertain(self):
         self.build()
         s = self.scan()
         rows = self.rows(s)
         old = rows[str(self.gone_30h)]
-        self.assertEqual(old.levels['reason'], 'Session project is gone; one level earlier')
-        self.assertTrue(old.decide('balanced', s.now)[0])
+        self.assertEqual(old.levels['reason'], 'Claude session/sidecar idle policy')
+        self.assertFalse(old.decide('balanced', s.now)[0])
         young = rows[str(self.gone_20h)]
         for mode in ('careful', 'balanced'):
             ok, why = young.decide(mode, s.now)
             self.assertFalse(ok, mode)
         self.assertTrue(young.decide('aggressive', s.now)[0])
+
+    def test_missing_non_git_and_moved_project_stays_uncertain_for_all_modes(self):
+        self.build()
+        s = self.scan(); rows = self.rows(s)
+        for p in (self.renamed_20h, self.renamed_30h, self.worktree_3h, self.worktree_30h, self.moved_30h):
+            f = rows[str(p)]
+            self.assertNotEqual(f.levels['reason'], 'Session project is gone; one level earlier', p)
+            for mode in ('careful', 'balanced'):
+                self.assertFalse(f.decide(mode, s.now)[0], (p, mode))
+        # Compound sidecar carries the parent transcript's conservative levels.
+        composite = rows[str(self.renamed_30h)]
+        self.assertTrue(any(m['role'] == 'subagents' for m in composite.members))
+        self.assertFalse(composite.decide('balanced', s.now)[0])
+        self.assertTrue(composite.decide('aggressive', s.now)[0])
 
     def test_session_floor_survives_any_levels(self):
         self.build()
