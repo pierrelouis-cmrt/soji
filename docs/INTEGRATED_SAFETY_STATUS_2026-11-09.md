@@ -1,6 +1,7 @@
 # Provisional integrated Sōji safety status — 2026-11-09
 
-Latest code/test head: `fc7d5eea93b930509f04694dc1e7bf945ecc4660`.
+Latest code/test head: `e8a7237c2ea079834eebd6328e6a18b011d34d3b`.
+See [residual marker correction](MARKER_SYMLINK_FOLLOWUP_2026-11-09.md).
 See [exact-head review follow-up](INTEGRATED_REVIEW_FOLLOWUP_2026-11-09.md).
 The original integration record below is preserved chronologically.
 
@@ -242,3 +243,24 @@ Final follow-up validation on `fc7d5ee`: **458 tests OK, zero skips** with the
 disposable native helper (133.406 s); broader targeted run **141 OK**.
 Exact commands/logs are in the five-finding follow-up. Independent approval is
 still pending; main and installed binary remain unchanged.
+
+
+## Residual generic symlink marker P1 — 2026-11-09
+
+Final independent review of `8a5418d` / `fc7d5ee` passed the other four blockers
+but proved an in-family text-marker symlink could still select and remove the
+current Ruby. Corrected in `e8a7237`: linked inactivity now requires a recognized
+version identity matching the candidate's catalog family/product and unit type,
+with a root or executable target; arbitrary text and unrecognized directories
+stay unknown/held. Seven-consumer controls preserve valid recognized reference
+and regular inactive positives. Original preservation proof and historical-plan
+fresh/apply regression retained. No golden changes or restored worktree removal.
+
+See [residual symlink follow-up](MARKER_SYMLINK_FOLLOWUP_2026-11-09.md) for exact code/test SHA,
+before/after evidence and final validation. Prior 458-test results are historical;
+main and installed binary remain unchanged pending fresh independent review.
+
+Final residual-marker validation on `e8a7237`: **462 tests OK, zero skips**,
+135.225 s with disposable native helper; **99 targeted tests OK**. Exact logs
+and commands are in the marker follow-up. Fresh independent targeted approval
+remains pending; main is unchanged.
