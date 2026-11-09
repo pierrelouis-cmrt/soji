@@ -66,8 +66,8 @@ never makes Sōji more aggressive. `specialized.py` implements them.
 | `keepNewest` | Keep this many of the newest. An item counts as newest by its latest change *or* by the highest version in its name. Careful keeps one more and Aggressive one fewer (at least 1) |
 | `keepNewestPer` | How siblings are grouped before `keepNewest` applies: `folder` (all siblings, the default), `product` (the name before the version), `majorVersion` (product plus major version), `minorVersion` (product plus major.minor), `device` (device model, for device support), `app` (bundle id, for Xcode archives) |
 | `newestGoesAtAggressiveAfterDays` | At Aggressive, a newest copy loses `keepNewest` protection once idle this many days |
-| `keepVersionPointedToBy` | Paths (symlinks or version files) that name the active version. That version is held |
-| `keepProjectPinnedVersions` | `node`, `ruby` or `android`: hold any version a project on this Mac pins |
+| `keepVersionPointedToBy` | Paths (symlinks or version files) that name the active version. That version is held. An nvm `alias/<name>` marker is resolved like nvm does (alias chains such as `lts/*` -> `lts/<codename>` -> version, `node`/`stable` = newest installed, partial versions match every installed version they cover), at most 16 hops, confined to `alias/` with no symlinks. A cycle, missing, unreadable or out-of-tree alias holds every version in the family |
+| `keepProjectPinnedVersions` | `node`, `ruby` or `android`: hold any version a project on this Mac pins. Pin files are found across the scan roots plus the home (same exclusions as a scan), and rediscovered live on every cleanup check. `.nvmrc`/`.node-version` aliases resolve through nvm. An unreadable folder or pin file, or a time/size limit, holds the family |
 
 **Holds.** Each one adds a hold when its condition fails:
 

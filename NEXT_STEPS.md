@@ -57,6 +57,12 @@ Destructive paths are tested only on disposable fixtures.
 
 - Post-Opus overlap check: read the completed Opus result, re-ran all 15 November regression tests (OK), then re-ran the archived independent fixtures on the current checkout. All four additional P1 defects still reproduce. The next implementation scope is these four defects; baseline/TUI changes should be preserved and independently reviewed, not rebuilt. See [the updated orchestrator handoff](docs/SAFETY_ORCHESTRATOR_PROMPT.md). Opus reports a full 285-test run (OK, two skipped) and 27 native index tests; those broader runs were not repeated during this overlap check.
 
+## Changelog: version policy context (2026-11-09)
+
+- Project pins at cleanup time: `Cleaner.fresh` no longer judges pins from its target-scoped walk. `SpecializedRules.pins` rediscovers pin files live across the plan roots plus the home (Scanner exclusions, never from the index); a pin created after the plan refuses fresh/apply, and an unreadable folder or pin file or the 120 s / 5 M entry limit refuses as "Project pin discovery incomplete". Full scans reuse their nodes only when the walk covered the home without errors; otherwise they also discover live and hold on incomplete discovery.
+- nvm aliases: `~/.nvm/alias/default` and `.nvmrc` aliases resolve through `NvmAliases` (chains, `lts/*`, `node`/`stable`, `system`, partial versions; 16-hop limit, cycle detection, confined to `alias/`, no symlinks). Uncertain resolution holds the whole nvm family.
+- Regressions: `tests/test_version_policy_context.py`; corpus gained `~/.nvm/versions/node/v16.0.0` (pinned through `lts/gallium`) and its default became the `lts/*` -> `lts/iron` chain (v20.1.0 row unchanged).
+
 ## Changelog: November 8 fixes (2026-11-09)
 
 Each item has a regression in `tests/test_nov8_regressions.py` (fake home, every mode), and the corpus gained the same paths. Golden rows were only added; none changed.

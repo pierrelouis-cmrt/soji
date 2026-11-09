@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import time
 from .util import read_plist,read_json,json_command,command,inside
 
 FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel','checkCodexRuntime'}
@@ -246,27 +247,179 @@ def archive_uploads(info):
         uploads.add(destination.lower()+'|'+task.lower())
     return uploads
 
+class AliasUncertain(Exception):
+    """An nvm alias could not be resolved with certainty; hold, never allow."""
+
+
+NVM_ALIAS_DEPTH=16
+NVM_VERSION=re.compile(r'v?\d+(?:\.\d+){0,2}')
+
+
+def nvm_dir_for(path):
+    """`<nvm>` for a candidate `<nvm>/versions/node/<version>`, else None."""
+    p=Path(path)
+    if p.parent.name=='node' and p.parent.parent.name=='versions':return p.parent.parent.parent
+    return None
+
+
+class NvmAliases:
+    """Bounded, cycle-aware nvm alias resolution confined to `<nvm>/alias`.
+
+    nvm stores aliases as one-line text files (`alias/default`, `alias/lts/*`,
+    `alias/lts/<codename>`); a value is a version (full or partial), a builtin
+    (`node`, `stable`, `system`, `iojs`) or another alias name. `resolve`
+    returns version specs a candidate is matched against with `version_match`.
+    Anything it cannot establish (missing, unreadable, symlinked, oversized,
+    cyclic, too deep or out-of-tree alias; unreadable installed list) raises
+    AliasUncertain so callers hold the whole version family.
+    """
+    def __init__(self,nvm_dir):
+        self.dir=Path(nvm_dir);self.alias=self.dir/'alias';self._installed=None
+    def installed(self):
+        if self._installed is None:
+            try:names=os.listdir(self.dir/'versions'/'node')
+            except OSError:raise AliasUncertain('installed nvm versions unreadable') from None
+            self._installed=[n for n in names if NVM_VERSION.fullmatch(n)]
+        return self._installed
+    def read(self,name):
+        """First line of alias file `name`, or None when no such alias exists."""
+        parts=name.split('/')
+        if (not name or name.startswith('/') or '\\' in name or '\0' in name
+                or any(part in ('','.','..') for part in parts)):
+            raise AliasUncertain(f'alias {name!r} would leave the alias folder')
+        current=self.alias;chain=[current,*(self.alias.joinpath(*parts[:i+1]) for i in range(len(parts)))]
+        for i,current in enumerate(chain):
+            try:st=os.lstat(current)
+            except FileNotFoundError:return None
+            except OSError:raise AliasUncertain(f'alias {name} unreadable') from None
+            if stat.S_ISLNK(st.st_mode):raise AliasUncertain(f'alias path {current} is a symlink')
+            if i<len(chain)-1:
+                if not stat.S_ISDIR(st.st_mode):return None
+            elif not stat.S_ISREG(st.st_mode):raise AliasUncertain(f'alias {name} is not a regular file')
+            elif st.st_size>4095:raise AliasUncertain(f'alias {name} is too large')
+        try:
+            fd=os.open(chain[-1],os.O_RDONLY|os.O_NOFOLLOW|getattr(os,'O_NONBLOCK',0))
+            with os.fdopen(fd,'rb') as fh:data=fh.read(4096)
+            text=data.decode('utf-8')
+        except FileNotFoundError:return None
+        except (OSError,UnicodeError):raise AliasUncertain(f'alias {name} unreadable') from None
+        lines=text.strip().splitlines()
+        return lines[0].strip() if lines else ''
+    def resolve(self,value,_seen=()):
+        value=value.strip()
+        if not value:raise AliasUncertain('empty nvm alias')
+        if any(c.isspace() for c in value):raise AliasUncertain(f'unrecognized nvm alias text {value!r}')
+        low=value.casefold()
+        if low in ('node','stable'):
+            versions=[(version_number(n),n) for n in self.installed()]
+            versions=[v for v in versions if v[0] is not None]
+            return {max(versions)[1]} if versions else set()
+        if low=='system' or low=='iojs' or low.startswith('iojs-'):return set()
+        if NVM_VERSION.fullmatch(value):return {value}
+        if low in _seen:raise AliasUncertain('nvm alias cycle: '+' -> '.join((*_seen,low)))
+        if len(_seen)>=NVM_ALIAS_DEPTH:raise AliasUncertain('nvm alias chain too deep')
+        text=self.read(value)
+        if text is None:raise AliasUncertain(f'nvm alias {value} has no target')
+        return self.resolve(text,(*_seen,low))
+    def selects(self,name,value,_seen=()):
+        """Whether `value` can select installed version folder `name`."""
+        return any(version_match(name,spec) for spec in self.resolve(value,_seen))
+
+
+PIN_KINDS={'.nvmrc':'node','.node-version':'node','.ruby-version':'ruby','build.gradle':'android','build.gradle.kts':'android'}
+PIN_FILE_LIMIT=1_000_000
+PIN_DISCOVERY_SECONDS=120
+PIN_DISCOVERY_ENTRIES=5_000_000
+
+
 class ProjectPins:
-    def __init__(self):self.pins={'node':set(),'ruby':set(),'android':set()};self.files=[]
+    """Versions pinned by project files, plus whether discovery was complete.
+
+    `incomplete` maps a pin kind (or '*' for every kind) to the reason the
+    discovery could not see every pin file in scope; such kinds hold.
+    """
+    def __init__(self):
+        self.pins={'node':set(),'ruby':set(),'android':set()};self.node_aliases=set()
+        self.files=[];self.incomplete={};self._nvm={}
+    def mark(self,kind,reason):self.incomplete.setdefault(kind,reason)
+    def read(self,path):
+        p=Path(path);kind=PIN_KINDS.get(p.name)
+        if kind is None:return
+        try:
+            # A symlinked pin file still pins; only regular targets are read.
+            st=os.stat(p)
+            if not stat.S_ISREG(st.st_mode):return
+            if st.st_size>PIN_FILE_LIMIT:self.mark(kind,f'pin file too large: {p}');return
+            fd=os.open(p,os.O_RDONLY|getattr(os,'O_NONBLOCK',0))
+            with os.fdopen(fd,'rb') as fh:text=fh.read(PIN_FILE_LIMIT+1).decode('utf-8',errors='replace')
+        except FileNotFoundError:return  # vanished, or a dangling symlink: nothing pins
+        except OSError:self.mark(kind,f'pin file unreadable: {p}');return
+        self.files.append(str(p))
+        if kind=='node':
+            for line in text.splitlines():
+                for token in line.split('#',1)[0].split():
+                    if re.fullmatch(r'v?\d+(?:\.[\dx*]+){0,2}',token):self.pins['node'].add(token)
+                    else:self.node_aliases.add(token)
+        elif kind=='ruby':self.pins['ruby'].update(text.split())
+        else:
+            self.pins['android'].update(re.findall(r'\b(?:compileSdk(?:Version)?|targetSdk(?:Version)?)\s*(?:=|\()?\s*["\']?(\d+)',text))
+            self.pins['android'].update(re.findall(r'\b(?:buildToolsVersion|ndkVersion)\s*(?:=|\()?\s*["\']([0-9.]+)',text))
     def scan(self,paths):
-        names=('.nvmrc','.node-version','.ruby-version','build.gradle','build.gradle.kts')
+        names=tuple(PIN_KINDS)
         for path in paths:
-            if not path.endswith(names):continue
-            p=Path(path)
-            if p.name not in names:continue
-            try:
-                if p.is_symlink() or p.stat().st_size>1_000_000:continue
-                text=p.read_text(errors='replace');self.files.append(str(p))
-                if p.name in ('.nvmrc','.node-version'):self.pins['node'].update(t for t in text.split() if re.fullmatch(r'v?\d+(?:\.[\dx*]+){0,2}',t))
-                elif p.name=='.ruby-version':self.pins['ruby'].update(text.split())
-                else:
-                    self.pins['android'].update(re.findall(r'\b(?:compileSdk(?:Version)?|targetSdk(?:Version)?)\s*(?:=|\()?\s*["\']?(\d+)',text))
-                    self.pins['android'].update(re.findall(r'\b(?:buildToolsVersion|ndkVersion)\s*(?:=|\()?\s*["\']([0-9.]+)',text))
-            except OSError:continue
+            if path.endswith(names):self.read(path)
         return self
-    def keeps(self,path,kind):
+    def from_nodes(self,scanner):
+        """Pins from a complete walk's nodes; any gap in that walk is incomplete."""
+        if scanner.limited or scanner.cancel.is_set():self.mark('*','scan stopped before every folder was read')
+        for path,node in scanner.nodes.items():
+            if node.own_errors:self.mark('*','unreadable entry '+path)
+        return self.scan(scanner.nodes)
+    def discover(self,roots,private,max_seconds=None,max_entries=None):
+        """Live walk of `roots` for pin files, with Scanner.visit's exclusions.
+
+        Same scope as a full scan: no symlinked folders, private/protected
+        subtrees, mount boundaries or depth >=128. Never served from an index.
+        """
+        deadline=time.monotonic()+(PIN_DISCOVERY_SECONDS if max_seconds is None else max_seconds)
+        limit=PIN_DISCOVERY_ENTRIES if max_entries is None else max_entries
+        seen=0
+        for root in roots:
+            stack=[(root,0,None)]
+            while stack:
+                path,depth,device=stack.pop()
+                if time.monotonic()>deadline or seen>limit:
+                    self.mark('*','time or size limit reached');return self
+                try:st=os.lstat(path)
+                except FileNotFoundError:continue
+                except OSError:self.mark('*','unreadable folder '+path);continue
+                if not stat.S_ISDIR(st.st_mode):continue
+                if private(path) or depth>=128 or (device is not None and st.st_dev!=device):continue
+                try:
+                    with os.scandir(path) as it:entries=[(e.name,e.path,e.is_dir(follow_symlinks=False)) for e in it]
+                except FileNotFoundError:continue
+                except OSError:self.mark('*','unreadable folder '+path);continue
+                for name,child,is_dir in entries:
+                    seen+=1
+                    if is_dir:stack.append((child,depth+1,st.st_dev))
+                    elif name in PIN_KINDS:self.read(child)
+        return self
+    def hold(self,path,kind):
+        """Hold text when `path` is (or may be) pinned by a project, else None."""
+        why=self.incomplete.get('*') or self.incomplete.get(kind)
+        if why:return 'Project pin discovery incomplete: '+why
         name=Path(path).name.removeprefix('android-')
-        return any(version_match(name,p) for p in self.pins.get(kind,()))
+        if any(version_match(name,p) for p in self.pins.get(kind,())):return 'Version pinned by a project'
+        if kind=='node' and self.node_aliases:
+            nvm=nvm_dir_for(path)
+            for alias in sorted(self.node_aliases):
+                if nvm is None:return f'Project-pinned node alias cannot be resolved: {alias}'
+                resolver=self._nvm.setdefault(str(nvm),NvmAliases(nvm))
+                try:
+                    if resolver.selects(name,alias):return 'Version pinned by a project (nvm alias '+alias+')'
+                except AliasUncertain as e:return f'Project-pinned nvm alias cannot be resolved ({e}): {alias}'
+        return None
+    def keeps(self,path,kind):return self.hold(path,kind) is not None
 
 class DeviceCatalog:
     def __init__(self,home,snapshot=None):
@@ -307,7 +460,7 @@ class DeviceCatalog:
 class SpecializedRules:
     def __init__(self,scanner,apps,activity,tools,devices=None):
         self.scanner=scanner;self.apps=apps;self.activity=activity;self.tools=tools;self.home=Path(scanner.home)
-        self.pins=ProjectPins().scan(scanner.nodes)
+        self._pins=None;self._nvm={}
         self._devices=devices or None
         self.connected_checked=False;self.connected_known=False
         self.siblings=collections.defaultdict(list)
@@ -323,20 +476,63 @@ class SpecializedRules:
         return self._devices
     @devices.setter
     def devices(self,value):self._devices=value
+    @property
+    def pins(self):
+        """Project pins over the policy scope, discovered on first use.
+
+        The scope is every scan root plus the home. A complete walk of it is
+        reused; otherwise (target-scoped fresh checks, partial roots, or
+        `pin_live`) the pin files are discovered anew on the live filesystem.
+        """
+        if getattr(self,'_pins',None) is None:
+            s=self.scanner;home=os.path.realpath(str(self.home))
+            roots=[os.path.realpath(r) for r in (getattr(s,'pin_roots',None) or s.roots)]
+            if not getattr(s,'pin_live',False) and any(inside(home,r) for r in s.roots):
+                self._pins=ProjectPins().from_nodes(s)
+            else:
+                from .index import outermost
+                self._pins=ProjectPins().discover(outermost([home,*roots]),s.private)
+        return self._pins
+    @pins.setter
+    def pins(self,value):self._pins=value
+    def nvm_active(self,path,marker_path,marker):
+        """Hold text for an nvm alias marker (e.g. alias/default), or None."""
+        nvm=Path(marker_path).parent.parent
+        resolver=self._nvm.setdefault(str(nvm),NvmAliases(nvm)) if hasattr(self,'_nvm') else NvmAliases(nvm)
+        name=Path(marker_path).name
+        try:
+            text=resolver.read(name)
+            if text is None:return None  # no such alias set: nothing is the default
+            if resolver.selects(Path(path).name,text,(name.casefold(),)):return 'Active version: '+marker
+        except AliasUncertain as e:return f'Active version cannot be determined ({e}): {marker}'
+        return None
+    def active_reason(self,path,markers):
+        """Hold text when a marker names (or may name) `path` as active."""
+        found=self._active(path,markers)
+        return found[1] if found else None
     def active(self,path,markers):
+        """The marker holding `path` as (possibly) active, or None."""
+        found=self._active(path,markers)
+        return found[0] if found else None
+    def _active(self,path,markers):
         # Literal marker paths: keepVersionPointedToBy is never globbed.
         name=Path(path).name
         for marker in markers:
             expanded=marker.replace('~',str(self.home),1) if marker.startswith('~') else marker
             p=Path(expanded)
+            nvm=nvm_dir_for(path)
+            if nvm is not None and os.path.normpath(str(p.parent))==os.path.normpath(str(nvm/'alias')):
+                reason=self.nvm_active(path,p,marker)
+                if reason:return marker,reason
+                continue
             try:
                 mode=p.lstat().st_mode
                 if stat.S_ISLNK(mode):
                     resolved=p.resolve(strict=True)
-                    if inside(resolved,os.path.realpath(path)):return marker
+                    if inside(resolved,os.path.realpath(path)):return marker,'Active version: '+marker
                 elif stat.S_ISREG(mode) and p.stat().st_size<=4095:
                     text=p.read_text(encoding='utf-8').strip()
-                    if text and (text==name or name.startswith(text+'-') or name.endswith('-'+text) or text[0].isnumeric() and version_match(name,text)):return marker
+                    if text and (text==name or name.startswith(text+'-') or name.endswith('-'+text) or text[0].isnumeric() and version_match(name,text)):return marker,'Active version: '+marker
             except (OSError,UnicodeError,RuntimeError):continue
         return None
     def archive(self,path):
@@ -418,9 +614,11 @@ class SpecializedRules:
             if any(self.apps.is_running(a) for a in owners):f.holds.append('Owning application is running')
             elif not owners and not r.get('notWhileRunning'):f.holds.append('Cannot confirm application ownership or running state')
         if r.get('minSizeBytes',0)>f.size:f.holds.append('Below hint minimum size')
-        active=self.active(f.path,r.get('keepVersionPointedToBy',[]))
-        if active:f.holds.append('Active version: '+active)
-        if r.get('keepProjectPinnedVersions') and self.pins.keeps(f.path,r['keepProjectPinnedVersions']):f.holds.append('Version pinned by a project')
+        active=self.active_reason(f.path,r.get('keepVersionPointedToBy',[]))
+        if active:f.holds.append(active)
+        if r.get('keepProjectPinnedVersions'):
+            pinned=self.pins.hold(f.path,r['keepProjectPinnedVersions'])
+            if pinned:f.holds.append(pinned)
         if r.get('keepNewest'):
             retained,rank,siblings,version_rank=self.retained(f)
             counts={mode:retention_count(r['keepNewest'],mode) for mode in ('careful','balanced','aggressive')}

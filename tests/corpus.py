@@ -86,6 +86,9 @@ LAYOUT: list[tuple[str, int | None, float]] = [
     ('Library/Developer/Xcode/DerivedData/Missing-def/Build/blob', PAYLOAD, 20),
     ('Library/Developer/Xcode/DerivedData/Recent-ghi/Build/blob', PAYLOAD, 3),
     # Version families: nvm (active alias + age rule), playwright (by product).
+    # v16.0.0 is pinned only through an nvm alias named in a project .nvmrc.
+    ('.nvm/versions/node/v16.0.0/bin/node', PAYLOAD, 120),
+    ('code/pinned-web', None, 50),
     ('.nvm/versions/node/v18.0.0/bin/node', PAYLOAD, 100),
     ('.nvm/versions/node/v20.1.0/bin/node', PAYLOAD, 60),
     ('.nvm/versions/node/v22.3.0/bin/node', PAYLOAD, 40),
@@ -186,8 +189,14 @@ def build_corpus(home: Path, now: float | None = None) -> float:
     for name, workspace in [('Present-abc', home / 'code/old-web'), ('Missing-def', home / 'code/gone'),
                             ('Recent-ghi', home / 'code/gone')]:
         (dd / name / 'info.plist').write_bytes(plistlib.dumps({'WorkspacePath': str(workspace)}))
-    (home / '.nvm/alias').mkdir(parents=True, exist_ok=True)
-    (home / '.nvm/alias/default').write_text('v20.1.0\n')
+    # nvm aliases as nvm writes them: default -> lts/* -> lts/iron -> v20.1.0,
+    # and a project pin naming another LTS alias (lts/gallium -> v16.0.0).
+    (home / '.nvm/alias/lts').mkdir(parents=True, exist_ok=True)
+    (home / '.nvm/alias/default').write_text('lts/*\n')
+    (home / '.nvm/alias/lts/*').write_text('lts/iron\n')
+    (home / '.nvm/alias/lts/iron').write_text('v20.1.0\n')
+    (home / '.nvm/alias/lts/gallium').write_text('v16.0.0\n')
+    (home / 'code/pinned-web/.nvmrc').write_text('lts/gallium\n')
     for repo in ('code/dirty-web', 'code/clean-web'):
         r = home / repo
         (r / '.gitignore').write_text('node_modules/\n.claude/\n')

@@ -325,6 +325,10 @@ class Cleaner:
             return identity
         batch=self._batch
         scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None,catalog=batch.get('catalog') if batch else None)
+        # Policy dependencies (project pins) span the plan's whole scope, not
+        # this target-scoped walk: rediscover them live on every check, so a
+        # pin created after the plan holds the item. Incomplete discovery holds.
+        scan.pin_roots=list(plan['roots']);scan.pin_live=True
         if batch is not None:
             batch['catalog']=scan.catalog
             # Marker listings are mutable filesystem facts, not catalog rules.

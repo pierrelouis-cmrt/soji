@@ -245,6 +245,31 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "selected": false
+  },
+  "bytes": 131072,
+  "careful": {
+   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "selected": false
+  },
+  "early": null,
+  "group": "Toolchains and SDKs",
+  "hint": "nvm-versions",
+  "holds": [
+   "Version pinned by a project (nvm alias lts/gallium)"
+  ],
+  "modeHolds": {},
+  "path": "~/.nvm/versions/node/v16.0.0",
+  "rank": 3
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Idle 100.0 d; eligible from aggressive",
    "selected": true
   },
