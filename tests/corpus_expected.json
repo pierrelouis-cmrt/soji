@@ -174,6 +174,54 @@
  {
   "action": null,
   "aggressive": {
+   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "selected": false
+  },
+  "balanced": {
+   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "selected": false
+  },
+  "bytes": 143360,
+  "careful": {
+   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "selected": false
+  },
+  "early": null,
+  "group": "Agent worktrees",
+  "hint": "codex-worktrees",
+  "holds": [
+   "Worktree has ignored files that are not known to be disposable: local-data/"
+  ],
+  "modeHolds": {},
+  "path": "~/.codex/worktrees/data",
+  "rank": null
+ },
+ {
+  "action": "git-worktree",
+  "aggressive": {
+   "decision": "Idle 30.0 d; eligible from careful",
+   "selected": true
+  },
+  "balanced": {
+   "decision": "Idle 30.0 d; eligible from careful",
+   "selected": true
+  },
+  "bytes": 143360,
+  "careful": {
+   "decision": "Idle 30.0 d; eligible from careful",
+   "selected": true
+  },
+  "early": null,
+  "group": "Agent worktrees",
+  "hint": "codex-worktrees",
+  "holds": [],
+  "modeHolds": {},
+  "path": "~/.codex/worktrees/safe",
+  "rank": null
+ },
+ {
+  "action": null,
+  "aggressive": {
    "decision": "Listed for review; never automatically selected",
    "selected": false
   },

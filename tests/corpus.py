@@ -149,7 +149,8 @@ def _git(repo: Path, *args: str) -> None:
     env = dict(os.environ, GIT_CONFIG_GLOBAL='/dev/null', GIT_CONFIG_NOSYSTEM='1',
                GIT_AUTHOR_NAME='corpus', GIT_AUTHOR_EMAIL='corpus@example.invalid',
                GIT_COMMITTER_NAME='corpus', GIT_COMMITTER_EMAIL='corpus@example.invalid')
-    subprocess.run(['/usr/bin/git', '-C', str(repo), *args], check=True,
+    subprocess.run(['/usr/bin/git', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+                    '-C', str(repo), *args], check=True,
                    capture_output=True, env=env)
 
 
@@ -197,6 +198,27 @@ def build_corpus(home: Path, now: float | None = None) -> float:
     # Merged but never pushed: the worktree hold must come from push state.
     _git(home / 'code/clean-web', 'worktree', 'add', '-q', '-b', 'feature', '.claude/worktrees/feature')
     ages['code/clean-web/.claude/worktrees/feature'] = 10
+    # Merged and pushed (local bare remote beside the fake home) Codex
+    # worktrees: one holds only regenerable ignored output, the other a unique
+    # ignored database that `git worktree remove` would delete.
+    app = home / 'code/agent-app'
+    app.mkdir(parents=True, exist_ok=True)
+    (app / 'README.md').write_text('agent app\n')
+    (app / '.gitignore').write_text('node_modules/\nlocal-data/\n*.sqlite\n')
+    _git(app, 'init', '-q', '-b', 'main')
+    _git(app, 'add', '.')
+    _git(app, 'commit', '-q', '-m', 'init')
+    remote = home.parent / 'corpus-agent-app.git'
+    _git(home.parent, 'init', '-q', '--bare', str(remote))
+    _git(app, 'remote', 'add', 'origin', str(remote))
+    _git(app, 'push', '-q', '-u', 'origin', 'main')
+    for name, rel in [('safe', 'node_modules/lib/index.js'), ('data', 'local-data/notes.sqlite')]:
+        _git(app, 'worktree', 'add', '-q', '--detach', str(home / '.codex/worktrees' / name))
+        payload = home / '.codex/worktrees' / name / rel
+        payload.parent.mkdir(parents=True, exist_ok=True)
+        payload.write_bytes(b'x' * PAYLOAD)
+        ages['.codex/worktrees/' + name] = 30
+    ages['code/agent-app'] = 30
     # Ages last, children before parents, so directory mtimes stick.
     for folder, dirs, files in os.walk(home, topdown=False):
         for name in [*files, *dirs, None]:

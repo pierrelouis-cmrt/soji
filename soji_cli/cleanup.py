@@ -604,7 +604,10 @@ class Cleaner:
         if action['kind']=='git-worktree':
             from .gitstate import GitInspector
             state=GitInspector().inspect(action['path'],worktree=True)
-            if not state.get('verified') or state.get('reason') or state.get('mainWorktree')!=action['repository']:raise ValueError('Worktree is no longer clean, merged and pushed')
+            # Re-inspected immediately before removal, ignored files included;
+            # never --force, so Git still refuses dirty or locked worktrees.
+            if not state.get('verified') or state.get('reason') or state.get('mainWorktree')!=action['repository']:raise ValueError('Worktree is no longer clean, merged and pushed'+(f": {state['reason']}" if state.get('reason') else ''))
+            if state.get('contentsVerified') is not True:raise ValueError('Worktree contents (ignored files) are not verified disposable')
             argv=['/usr/bin/git','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-C',action['repository'],'worktree','remove','--',action['path']]
         elif action['kind']=='simulator-device':argv=['/usr/bin/xcrun','simctl','delete',action['udid']]
         elif action['kind']=='simulator-runtime':argv=['/usr/bin/xcrun','simctl','runtime','delete',action['identifier']]
