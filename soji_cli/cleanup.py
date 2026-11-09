@@ -443,6 +443,9 @@ class Cleaner:
         self._fresh_finding=f
         return identity
     def apply(self,plan,*,permanent=False,execute_tools=False,progress=None):
+        # An outdated Sōji (see update.py) may scan and plan but never delete.
+        from .update import ensure_cleaning_allowed
+        ensure_cleaning_allowed()
         # Caches never survive a batch, including on an interrupted/failed apply.
         self._batch={}
         try:return self._apply(plan,permanent=permanent,execute_tools=execute_tools,progress=progress)

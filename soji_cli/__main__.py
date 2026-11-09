@@ -42,6 +42,7 @@ def main():
         if action=='undo':
             if not args.apply:p.error('Restore requires --apply')
             emit(cleaner.undo(args.target));return 0
+        if args.apply:require_current(args.state)
         plan=validate_plan(read_json(args.target))
         if not args.apply:emit({'review':plan,'executed':False});return 0
         result=cleaner.apply(plan,permanent=args.permanent,execute_tools=args.execute_tools);emit(result)
@@ -105,6 +106,7 @@ def main():
         if args.operation=='save':emit(routines.save(read_json(args.target)));return 0
         routine=next((r for r in routines.list() if r['id']==args.target),None)
         if not routine:p.error('Unknown routine ID')
+        if args.apply:require_current(args.state)
         from .index import IndexedScanner
         scanner=IndexedScanner(routine['paths'],database=Path(args.state)/'index.sqlite',refresh=True);scanner.run()
         if scanner.error:raise ValueError(scanner.error)
@@ -129,6 +131,11 @@ def main():
     roots=args.paths or [str(Path.home())]
     for path in roots:
         if not Path(path).expanduser().is_dir():p.error('Not a directory: '+path)
+    interactive=action=='scan' and not args.json and not args.plain and sys.stdin.isatty() and sys.stdout.isatty()
+    if action=='auto' and args.apply:require_current(args.state)
+    if interactive and not args.demo:
+        from .update import interactive_gate
+        interactive_gate(args.state)
     options=dict(home=args.home,protected=args.protect+[args.state],max_files=args.max_files,max_seconds=args.max_seconds,min_bytes=int(args.min_mb*1000000),context=not args.no_context,recent_activity_hours=args.recent_activity_hours)
     if args.no_index:scanner=Scanner(roots,**options)
     else:
@@ -142,7 +149,6 @@ def main():
         if args.no_index:p.error('Watch requires persistent indexing')
         signal.signal(signal.SIGINT,lambda *_:scanner.cancel.set())
         scanner.watch(max(1,args.interval),lambda r:print(json.dumps(r),flush=True));return 0
-    interactive=action=='scan' and not args.json and not args.plain and sys.stdin.isatty() and sys.stdout.isatty()
     if interactive:
         from .tui import run_tui
         run_tui(scanner,args.mode,args.output,args.state);return 0
@@ -176,6 +182,14 @@ def main():
         print(f'{scanner.unreadable} unreadable · {scanner.skipped} excluded · {"PARTIAL" if report["limited"] else "complete"}')
         for f in scanner.decisions(args.mode)[:60]:print(f'{human(f.size):>10}  {"READY" if f.selected else "KEEP ":5}  {f.group:<26}  {f.path}\n                  {f.decision}')
     return 0
+
+
+def require_current(state):
+    """Refuse a deleting command when a newer release exists (offline: allowed, with a note)."""
+    from .update import enforce,ensure_cleaning_allowed
+    result=enforce(state)
+    if result['status']=='unknown':print(f"soji: could not check for updates ({result['error']}); continuing.",file=sys.stderr)
+    ensure_cleaning_allowed()
 
 
 def ai_command(p,argv):

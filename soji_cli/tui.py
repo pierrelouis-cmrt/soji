@@ -311,6 +311,11 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
         from .demo import DemoScanner
 
         demo = isinstance(scanner, DemoScanner)
+        from .update import blocked_reason, upgrade_hint
+
+        scan_only = bool(blocked_reason())
+        if scan_only and not demo:
+            state["message"] = "Scan-only mode: a newer Sōji is available. Update (" + upgrade_hint() + ") to clean."
         analysis_key = None
         analysis_view = None
         rows_key = None
@@ -438,8 +443,10 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             put(
                 1,
                 w - 28,
-                "LOCAL  ·  TRASH ON CONFIRM" if not demo else "DEMO  ·  NOTHING REAL",
-                curses.color_pair(2),
+                "DEMO  ·  NOTHING REAL" if demo
+                else "SCAN ONLY  ·  UPDATE TO CLEAN" if scan_only
+                else "LOCAL  ·  TRASH ON CONFIRM",
+                curses.color_pair(3 if scan_only and not demo else 2),
             )
             x = right
             for i, name in enumerate(MODES, 1):
@@ -855,6 +862,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                     state["message"] = (
                         "Demo data: nothing to clean. Run without --demo."
                     )
+                elif scan_only:
+                    state["message"] = "Scan-only: this Sōji is outdated. Quit and update (" + upgrade_hint() + ") to clean."
                 elif not scanner.done:
                     state["message"] = "Wait for the scan to finish before cleaning."
                 elif state_dir is None:

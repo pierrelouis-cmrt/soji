@@ -27,6 +27,8 @@ Then open a new Terminal window and run `soji`.
 
 Both methods install the same file from the same GitHub release. Neither one leaves a quarantined download behind, so macOS shows no "unidentified developer" warning.
 
+**Updates.** When Sōji opens its interactive view, or runs a command that can delete (`clean --apply`, `auto --apply`, `routines run --apply`), it asks GitHub for the latest release (cached for 15 minutes in the state folder). If a newer version exists, the interactive view offers to update right away (`brew upgrade soji`, the install script, or `git pull` for a checkout) and restarts. If you decline, Sōji runs in scan-only mode: scanning, categorizing and planning work, but nothing can be cleaned until you update. If the check can't complete (offline, GitHub unreachable), cleaning stays available and Sōji prints a note.
+
 Your index, plans and journal live in `~/Library/Application Support/Soji`. Uninstalling keeps them; delete that folder to remove them.
 
 **From source:** `git clone https://github.com/pierrelouis-cmrt/soji && cd soji && ./soji`. You can also double-click `Launch Sōji.command`. The examples below write `soji`; from a checkout, use `./soji`.
