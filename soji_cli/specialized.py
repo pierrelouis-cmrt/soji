@@ -129,6 +129,9 @@ def codex_runtime_reference(runtimes):
         if not os.path.isdir(target) or os.path.islink(install) or not os.path.isdir(install):
             return None,'codex-primary-runtime target is missing'
     except OSError:return None,'codex-primary-runtime target unreadable'
+    # Metadata alone does not turn an arbitrary descendant into a runtime root.
+    if target not in (install, os.path.join(install,'payload','codex-primary-runtime')):
+        return None,'primary target is not a recognized runtime root'
     version,ok=codex_bundle_version(install)
     if not ok or version is None:return None,'runtime metadata of the referenced install is missing or unreadable'
     target_version,target_ok=codex_bundle_version(target)

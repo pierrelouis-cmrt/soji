@@ -228,6 +228,13 @@ class Supersession(FakeHome):
         self.link_primary(ACTIVE)
         self.assert_held_everywhere(self.scan(), OLD, ACTIVE)
 
+    def test_primary_descendant_with_matching_metadata_is_not_a_reference(self):
+        self.install(OLD, '26.901.1', 40)
+        self.install(ACTIVE, '26.1007.11041', 20)
+        write(self.home / (ACTIVE + DEPS) / 'node/runtime.json', runtime('26.1007.11041'), 20)
+        (self.home / PRIMARY).symlink_to(self.home / (ACTIVE + DEPS) / 'node')
+        self.assert_held_everywhere(self.scan(), OLD, ACTIVE)
+
     # -- fresh verification ----------------------------------------------
     def fresh(self, mutate):
         """Plan OLD (positively superseded), apply `mutate`, re-verify fresh."""
