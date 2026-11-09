@@ -109,7 +109,7 @@ class UninstallTests(Fixture):
         appdir=self.home/'Applications/Example.app';(appdir/'Contents').mkdir(parents=True)
         self.file('Library/Application Support/Example/data')
         app={'path':str(appdir),'bundle':'co.example.App','name':'Example','version':'1'}
-        def build(cat):cat.apps=[app];cat.running=[];return cat
+        def build(cat):cat.apps=[app];cat.running=[];cat.running_available=True;return cat
         # Hermetic: the fake app is unsigned and no codesign/pkgutil process runs.
         with patch.object(AppCatalog,'build',build),patch('soji_cli.apps.command',return_value=(1,'','not signed')) as tool:
             plan=uninstall_plan('co.example.App',str(self.home))
@@ -147,6 +147,7 @@ class WorktreeTests(Fixture):
         action={'kind':'git-worktree','repository':str(repo),'path':str(work)}
         with self.assertRaises(ValueError):Cleaner(self.state).tool_action(action)
         subprocess.run(['/usr/bin/git','-C',str(work),'restore','source'],check=True,capture_output=True)
-        Cleaner(self.state).tool_action(action);self.assertFalse(work.exists())
+        with self.assertRaisesRegex(ValueError,'cleanup disabled'):Cleaner(self.state).tool_action(action)
+        self.assertTrue(work.exists())
 
 if __name__=='__main__':unittest.main()

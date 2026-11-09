@@ -32,7 +32,7 @@ def main():
         MCPServer(report,os.environ.get('SOJI_RUN_DIR'),json.loads(os.environ.get('SOJI_HIDDEN_PATHS','[]'))).serve();return 0
     if action=='ai':return ai_command(p,argv)
     if action in ('clean','undo','journal','recover'):
-        p.add_argument('target',nargs='?');p.add_argument('--apply',action='store_true');p.add_argument('--permanent',action='store_true');p.add_argument('--execute-tools',action='store_true')
+        p.add_argument('target',nargs='?');p.add_argument('--apply',action='store_true');p.add_argument('--permanent',action='store_true');p.add_argument('--execute-tools',action='store_true',help='Enable supported native tools; agent worktree removal is disabled')
         args=p.parse_args(argv)
         from .cleanup import Cleaner,validate_plan
         cleaner=Cleaner(args.state)
@@ -121,7 +121,7 @@ def main():
     p.add_argument('--tick-trash',action='store_true');p.add_argument('--agent',default='claude');p.add_argument('--model');p.add_argument('--effort');p.add_argument('--command',help='Custom agent command; argv parsing only, no shell')
     p.add_argument('--dry-run',action='store_true',help='Prepare AI prompt/config without launching an agent')
     p.add_argument('--auto-settings',help='Auto-mode configuration JSON');p.add_argument('--apply',action='store_true');p.add_argument('--permanent',action='store_true')
-    p.add_argument('--method',choices=['trash','permanent'],default='trash');p.add_argument('--interval',type=float,default=5)
+    p.add_argument('--method',choices=['trash','permanent'],default='trash',help='Cleanup method; agent worktree cleanup is disabled to preserve unique data and concurrent writes');p.add_argument('--interval',type=float,default=5)
     p.add_argument('--version',action='version',version='Sōji '+__version__)
     args=p.parse_args(argv)
     if args.max_files<1 or args.max_seconds<=0 or args.min_mb<0:p.error('Invalid scan limits')
@@ -192,7 +192,7 @@ def ai_command(p,argv):
     p.add_argument('--protect',action='append',default=[]);p.add_argument('--home')
     p.add_argument('--max-seconds',type=float,default=300);p.add_argument('--max-files',type=int,default=1000000);p.add_argument('--min-mb',type=float,default=10)
     p.add_argument('--recent-activity-hours',type=float,default=24,help='Recent-use protection window (default 24 h in AI mode)')
-    p.add_argument('--no-index',action='store_true');p.add_argument('--output');p.add_argument('--method',choices=['trash','permanent'],default='trash')
+    p.add_argument('--no-index',action='store_true');p.add_argument('--output');p.add_argument('--method',choices=['trash','permanent'],default='trash',help='Cleanup method; agent worktree cleanup is disabled to preserve unique data and concurrent writes')
     args=p.parse_args(argv)
     if args.operation=='skill':
         print('---\nname: soji\ndescription: Free disk space on macOS safely with Sōji. Use when the user asks to clean up disk space, caches, build output or old dependencies.\n---\n\nStart with `soji --ai [paths]` and follow the instructions it prints.\n\n'+agent.SKILL);return 0

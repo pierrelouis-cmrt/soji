@@ -67,3 +67,5 @@ def verify_native(item):
         plan=runtimes_plan(str(Path.home()),catalog)
         if not any(i['action']==action and i['path']==item['path'] for i in plan['items']):raise ValueError('Runtime no longer passes current retention and device checks')
     else:raise ValueError('Unsupported native catalog action')
+
+    return {'kind':kind,'action':action,'catalogVerified':True}

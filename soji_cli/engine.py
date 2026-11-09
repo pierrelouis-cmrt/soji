@@ -562,6 +562,9 @@ class Scanner:
                 group='Large media files' if name.endswith(('.mov','.mp4','.mkv','.wav','.aiff','.mp3','.jpg','.heic','.png')) else 'Downloads and installers' if name.endswith(('.dmg','.pkg','.xip','.zip','.tar','.gz','.download','.part')) else 'Other files'
             else:group='Other folders'
             f=Finding(node.path,node.size,node.apparent,node.files,node.newest,group,Path(node.path).name or '/',smart_rule='No hint matched; review only')
+        from .safety import agent_worktree_boundary, WORKTREE_DISABLED
+        if f.group=='Agent worktrees' or agent_worktree_boundary(node.path,self.home,self.catalog):
+            f.holds.append(WORKTREE_DISABLED)
         f.recent_activity_hours=self.recent_activity_hours
         staged=self.staged_inside(node.path)
         if staged:f.holds.append(f'Contains a Sōji staged object kept after a failed permanent removal ({staged}); it may be displaced user data: review it with `soji recover`, never cleaned automatically')
@@ -706,7 +709,11 @@ class Scanner:
         self.set_progress('categorize',4,4,'Categories ready')
 
     def decisions(self,mode):
+        from .safety import agent_worktree_boundary, WORKTREE_DISABLED
         for f in self.findings:
+            if f.group=='Agent worktrees' or agent_worktree_boundary(f.path,self.home,self.catalog):
+                if WORKTREE_DISABLED not in f.holds:f.holds.append(WORKTREE_DISABLED)
+                f.action={}
             f.recent_activity_hours=self.recent_activity_hours
             f.selected,f.decision=f.decide(mode,self.now)
         return self.findings

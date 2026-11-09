@@ -263,6 +263,12 @@ class Cleaner:
                               size=sum(scan.nodes[p].size for p in targets),
                               newest=max((scan.nodes[p].newest for p in targets),default=0))
         scan.roots=[root]
+    def checkpoint(self,entry):
+        try:self.append(entry)
+        except Exception as exc:
+            entry['journalError']=str(exc)
+            raise
+
     def append(self,entry):
         fd=os.open(self.journal,os.O_WRONLY|os.O_APPEND|os.O_CREAT|os.O_NOFOLLOW,0o600)
         try:
@@ -284,9 +290,12 @@ class Cleaner:
         return max((v for p,v in refusals.items() if inside(path,p) or inside(p,path)),default=None)
     def fresh(self,item,plan):
         from .engine import Scanner
-        path=item['path'];self._fresh_finding=None
+        path=item['path'];self._fresh_finding=None;self._fresh_policy=None
         staged=staged_ancestor(path)
         if staged:raise SafetyRefusal('Sōji staged object requires manual review: '+staged,'staged-copy')
+        from .safety import agent_worktree_boundary, WORKTREE_DISABLED
+        if (item.get('action') or {}).get('kind')=='git-worktree' or item.get('group')=='Agent worktrees' or agent_worktree_boundary(path,plan['home']):
+            raise ValueError(WORKTREE_DISABLED)
         refused=self.live_use_refusal(path)
         if refused:
             hours=(time.time()-refused[0])/3600
@@ -306,7 +315,7 @@ class Cleaner:
             try:current=file_identity(m['path'])
             except OSError:raise ValueError('Session member missing since analysis: '+m['path'])
             if current!=m['identity']:raise SafetyRefusal('Session member identity changed since analysis: '+m['path'],'identity-changed')
-        if uninstall_action or native_action:
+        if (uninstall_action or native_action) and stat.S_ISDIR(identity['type']):
             # These paths return before Scanner measurement. Protect staged
             # copies here too, with an incomplete inventory treated as unknown.
             seen=0
@@ -318,10 +327,13 @@ class Cleaner:
                     raise SafetyRefusal('Contains a Sōji staged object; review with `soji recover`','staged-copy')
         if uninstall_action:
             from .uninstall import verify_uninstall
-            verify_uninstall(item,plan['home']);return identity
+            evidence=verify_uninstall(item,plan['home'])
+            self._fresh_policy={'source':'fresh','verifier':'uninstall','rule':'explicit-uninstall','mode':plan.get('mode'),'threshold':None,'reason':'Fresh app identity, running-app availability and attribution verified','evidence':evidence}
+            return identity
         if native_action:
             from .nativeplans import verify_native
-            verify_native(item)
+            evidence=verify_native(item)
+            self._fresh_policy={'source':'fresh','verifier':item['action']['kind'],'rule':item.get('hint') or item['action']['kind'],'mode':plan.get('mode'),'threshold':None,'reason':'Fresh native catalog eligibility verified','evidence':evidence}
             return identity
         batch=self._batch
         scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None,catalog=batch.get('catalog') if batch else None)
@@ -436,16 +448,18 @@ class Cleaner:
                    'mode':plan.get('mode'),'version':soji_version(),'planCreatedAt':plan.get('createdAt'),'planVersion':plan.get('version'),
                    'rule':item.get('hint'),'policy':policy_record(item.get('finding') or {},plan.get('mode'),source='plan')}
             try:
-                self._fresh_finding=None
+                self._fresh_finding=None;self._fresh_policy=None
                 self.fresh(item,plan)
                 if self._fresh_finding is not None:
                     entry['planPolicy']=entry['policy']
                     entry['policy']=policy_record(self._fresh_finding,plan['mode'],time.time())
+                if self._fresh_policy is not None:
+                    entry['planPolicy']=entry['policy'];entry['policy']=self._fresh_policy
                 report('clean',len(entries),item['path'])
                 action=item.get('action') or {}
                 if action.get('kind') in ('simulator-device','simulator-runtime','document-version','official-command','git-worktree'):
                     if not execute_tools or not permanent:raise ValueError('Native tool cleanup requires --execute-tools and --permanent')
-                    self.append(entry)
+                    self.checkpoint(entry)
                     if action['kind']=='official-command':
                         from .commands import CommandPolicy,may_remove_permanently
                         if not may_remove_permanently(item['finding']):raise ValueError('Official command requires regenerable remove recommendation without holds')
@@ -459,7 +473,7 @@ class Cleaner:
                         # One journal entry; sidecars first so a failure leaves
                         # the transcript itself in place.
                         entry['members']=[{'path':m['path'],'role':m.get('role',''),'identity':m['identity'],'sizeBytes':m['size'],'status':'prepared'} for m in item['members']]
-                        self.append(entry)
+                        self.checkpoint(entry)
                         order=list(range(1,len(entry['members'])))+[0]
                         for k,i in enumerate(order):
                             rec=entry['members'][i]
@@ -491,13 +505,13 @@ class Cleaner:
     def system_trash(self,rec,entry,fd,name,original):
         """FileManager.trashItem via the native helper, bound to the verified identity."""
         from .platform import native
-        rec['trashApi']='FileManager.trashItem';self.append(entry)
+        rec['trashApi']='FileManager.trashItem';self.checkpoint(entry)
         again=os.stat(name,dir_fd=fd,follow_symlinks=False)
         if (again.st_dev,again.st_ino)!=(original.st_dev,original.st_ino):raise ValueError('Target changed before operation')
         result=native('trash',rec['path'])
         if not isinstance(result,dict) or not result.get('trashedTo'):
             raise ValueError('System Trash failed: '+str(result.get('error') if isinstance(result,dict) else result))
-        rec['trashedTo']=result['trashedTo'];self.append(entry)
+        rec['trashedTo']=result['trashedTo'];self.checkpoint(entry)
         trashed=file_identity(rec['trashedTo'])
         if (trashed['device'],trashed['inode'])!=(original.st_dev,original.st_ino):
             raise ValueError('Trashed item identity differs; inspect '+rec['trashedTo'])
@@ -518,7 +532,7 @@ class Cleaner:
             if current!=expected:raise ValueError('Target or parent changed before operation')
             if want_permanent:
                 from .platform import rename_exclusive
-                staging='.soji-removing-'+tag;rec['stagedName']=staging;self.append(entry)
+                staging='.soji-removing-'+tag;rec['stagedName']=staging;self.checkpoint(entry)
                 # Exclusive: never replaces an existing name; unavailable means nothing moved.
                 try:rename_exclusive(fd,name,fd,staging)
                 except BaseException:rec.pop('stagedName',None);raise
@@ -526,7 +540,7 @@ class Cleaner:
                 staged_stat=os.stat(staged,dir_fd=fd,follow_symlinks=False)
                 if staged_stat.st_ino!=original.st_ino:raise ValueError('Staged identity mismatch')
                 rec.update(phase='removing',stagedPath=str(Path(rec['path']).parent/staged))
-                self.append(entry);removal_started=True
+                self.checkpoint(entry);removal_started=True
                 remove_at(fd,staged,(original.st_dev,original.st_ino));staged=None;rec['method']='permanent';rec['status']='done'
             else:
                 trash=Path(self.trash_directory or Path(plan['home'])/'.Trash')
@@ -543,7 +557,7 @@ class Cleaner:
                     return True
                 try:
                     if os.fstat(tfd).st_dev!=original.st_dev:raise ValueError('Cross-volume Trash move needs native-volume support; no copy/delete fallback')
-                    dest=name+'.soji-'+tag;rec['trashedTo']=str(trash/dest);self.append(entry)
+                    dest=name+'.soji-'+tag;rec['trashedTo']=str(trash/dest);self.checkpoint(entry)
                     os.rename(name,dest,src_dir_fd=fd,dst_dir_fd=tfd);moved=True
                     rec['trashedIdentity']=file_identity(trash/dest);rec['method']='trash';rec['status']='done'
                 finally:os.close(tfd)
@@ -606,17 +620,8 @@ class Cleaner:
             entry['journalError']=f'Journal could not be written: {x}';return False
     def tool_action(self,action):
         if action['kind']=='git-worktree':
-            from .gitstate import GitInspector
-            state=GitInspector().inspect(action['path'],worktree=True)
-            # Re-inspected immediately before removal, ignored files included;
-            # never --force, so Git still refuses dirty or locked worktrees.
-            if not state.get('verified') or state.get('reason') or state.get('mainWorktree')!=action['repository']:raise ValueError('Worktree is no longer clean, merged and pushed'+(f": {state['reason']}" if state.get('reason') else ''))
-            if state.get('contentsVerified') is not True:raise ValueError('Worktree contents (ignored files) are not verified disposable')
-            argv=['/usr/bin/git','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-C',action['repository'],'worktree','remove','--',action['path']]
-            from .gitstate import git_env
-            code,_,err=command(argv,timeout=120,env=git_env())
-            if code:raise OSError(err)
-            return
+            from .safety import WORKTREE_DISABLED
+            raise ValueError(WORKTREE_DISABLED)
         elif action['kind']=='simulator-device':argv=['/usr/bin/xcrun','simctl','delete',action['udid']]
         elif action['kind']=='simulator-runtime':argv=['/usr/bin/xcrun','simctl','runtime','delete',action['identifier']]
         elif action['kind']=='document-version':

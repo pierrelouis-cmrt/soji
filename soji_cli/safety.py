@@ -9,3 +9,17 @@ STAGED_PREFIX='.soji-removing-'
 def staged_ancestor(path):
     p=Path(path)
     return next((str(a) for a in (p,*p.parents) if a.name.startswith(STAGED_PREFIX)),None)
+
+
+WORKTREE_DISABLED='Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved'
+
+
+def agent_worktree_boundary(path, home, catalog=None):
+    """Recognized agent roots and descendants, including actionless old plans."""
+    from .engine import Catalog
+    catalog = catalog or Catalog(home)
+    for parent in (Path(path), *Path(path).parents):
+        if str(parent) == home:break
+        match = catalog.match(str(parent))
+        if match and match[0]['group'] == 'Agent worktrees':return str(parent)
+    return None

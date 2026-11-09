@@ -110,11 +110,11 @@ class WorktreeInventoryGaps(unittest.TestCase):
         self.assertTrue(readme.exists(), 'skip-worktree local edit was deleted')
 
     # Controls: these must keep passing after any fix.
-    def test_control_ignored_node_modules_is_removed(self):
+    def test_control_ignored_node_modules_is_preserved(self):
         self.fixture('node_modules/\n')
         self.write('node_modules/pkg/index.js', 'regenerable')
         self.attempt_removal()
-        self.assertFalse(self.work.exists())
+        self.assertTrue(self.work.exists())
 
     def test_control_symlinked_node_modules_target_survives(self):
         self.fixture('node_modules\n')

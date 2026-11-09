@@ -441,13 +441,14 @@ class ProjectPins:
         """Pins from a complete walk's nodes; any gap in that walk is incomplete."""
         if scanner.limited or scanner.cancel.is_set():self.mark('*','scan stopped before every folder was read')
         for path,node in scanner.nodes.items():
-            if node.own_errors:self.mark('*','unreadable entry '+path)
+            if node.own_errors or (node.skipped and node.reason):self.mark('*','uninspected dependency scope '+path)
         return self.scan(scanner.nodes)
     def discover(self,roots,private,max_seconds=None,max_entries=None):
         """Live walk of `roots` for pin files, with Scanner.visit's exclusions.
 
-        Same scope as a full scan: no symlinked folders, private/protected
-        subtrees, mount boundaries or depth >=128. Never served from an index.
+        Privacy exclusions are retained. Private/protected subtrees, mount
+        boundaries and depth >=128 mark the dependency scope unknown, never
+        pin-free. Never served from an index.
         """
         deadline=time.monotonic()+(PIN_DISCOVERY_SECONDS if max_seconds is None else max_seconds)
         limit=PIN_DISCOVERY_ENTRIES if max_entries is None else max_entries
@@ -462,7 +463,8 @@ class ProjectPins:
                 except FileNotFoundError:continue
                 except OSError:self.mark('*','unreadable folder '+path);continue
                 if not stat.S_ISDIR(st.st_mode):continue
-                if private(path) or depth>=128 or (device is not None and st.st_dev!=device):continue
+                if private(path) or depth>=128 or (device is not None and st.st_dev!=device):
+                    self.mark('*','uninspected dependency scope '+path);continue
                 try:
                     with os.scandir(path) as it:entries=[(e.name,e.path,e.is_dir(follow_symlinks=False)) for e in it]
                 except FileNotFoundError:continue
@@ -768,8 +770,9 @@ class SpecializedRules:
         use=self.tools.use(f.path)
         if use:f.holds.append('Used by installed tool: '+use['source'])
         if f.group=='Agent worktrees':
-            state=next((e['state'] for e in f.evidence if e.get('check')=='git'),{})
-            if state.get('verified') and state.get('mainWorktree') and not state.get('reason'):f.action={'kind':'git-worktree','repository':state['mainWorktree'],'path':f.path}
+            from .safety import WORKTREE_DISABLED
+            if WORKTREE_DISABLED not in f.holds:f.holds.append(WORKTREE_DISABLED)
+            f.action={}
         if r.get('sameIdleAtEveryLevel') and f.group=='Agent worktrees' and not f.holds:
             f.special_min_hours=max(1,r.get('minIdleDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; idle rule'}
         return f

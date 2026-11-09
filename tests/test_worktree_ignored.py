@@ -98,7 +98,7 @@ class IgnoredWorktreeData(unittest.TestCase):
             self.assertFalse(row['selected'], (mode, row['decision']))
             self.assertTrue(any(reason in h for h in row['holds']), (mode, row['holds']))
             self.assertFalse((row.get('action') or {}).get('kind'), mode)
-        with self.assertRaisesRegex(ValueError, 'no longer clean|not verified'):
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
             self.remove(work)
         self.assertTrue(work.exists())
         for p in files:
@@ -133,11 +133,11 @@ class IgnoredWorktreeData(unittest.TestCase):
 
     def test_data_added_after_scan_blocks_at_execution(self):
         work, _ = self.worktree('late')
-        self.assertTrue(all(r['selected'] for r in self.scan(work).values()))
+        self.assertFalse(any(r['selected'] for r in self.scan(work).values()))
         late = work / 'local-data/new.txt'
         late.parent.mkdir()
         late.write_text('only copy')
-        with self.assertRaisesRegex(ValueError, 'not known to be disposable'):
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
             self.remove(work)
         self.assertEqual(late.read_text(), 'only copy')
 
@@ -170,24 +170,26 @@ class IgnoredWorktreeData(unittest.TestCase):
         self.assertFalse(state['verified'])
         self.assertFalse(state['contentsVerified'])
 
-    # Positive cases: still removed.
-    def test_clean_merged_pushed_worktree_is_removed(self):
+    # Inventory controls remain useful; removal is disabled even when verified.
+    def test_clean_merged_pushed_worktree_is_preserved(self):
         work, _ = self.worktree('clean')
         rows = self.scan(work)
         for mode, row in rows.items():
-            self.assertTrue(row['selected'], (mode, row['holds']))
-            self.assertEqual(row['action']['kind'], 'git-worktree')
-        self.remove(work)
-        self.assertFalse(work.exists())
+            self.assertFalse(row['selected'], (mode, row['holds']))
+            self.assertFalse(row['action'])
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
+            self.remove(work)
+        self.assertTrue(work.exists())
 
-    def test_only_regenerable_ignored_output_is_removed(self):
+    def test_only_regenerable_ignored_output_is_preserved(self):
         work, _ = self.worktree('regen', ['node_modules/pkg/index.js', '__pycache__/m.cpython-312.pyc', '.DS_Store'])
         state = GitInspector().inspect(str(work), worktree=True)
         self.assertTrue(state['contentsVerified'], state)
         self.assertCountEqual(state['ignored'], ['.DS_Store', 'node_modules/', '__pycache__/'])
-        self.assertTrue(all(r['selected'] for r in self.scan(work).values()))
-        self.remove(work)
-        self.assertFalse(work.exists())
+        self.assertFalse(any(r['selected'] for r in self.scan(work).values()))
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
+            self.remove(work)
+        self.assertTrue(work.exists())
 
 
     def update_ignore(self, text):
@@ -235,8 +237,9 @@ class IgnoredWorktreeData(unittest.TestCase):
         work, _ = self.worktree('valid-caches', ['__pycache__/x.pyc', '.pytest_cache/v/cache/nodeids',
                                                '.mypy_cache/3.12/a.data.json', '.ruff_cache/0.14.1/1234'])
         self.assertTrue(GitInspector().inspect(str(work), worktree=True)['contentsVerified'])
-        self.remove(work)
-        self.assertFalse(work.exists())
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
+            self.remove(work)
+        self.assertTrue(work.exists())
 
     def test_walk_limits_and_errors_fail_closed(self):
         work, made = self.worktree('bounded', ['node_modules/pkg/index.js'])
@@ -258,7 +261,8 @@ class IgnoredWorktreeData(unittest.TestCase):
         unique.write_text('only copy')
         (outside / '.git').mkdir()
         (work / 'node_modules/link').symlink_to(outside, target_is_directory=True)
-        self.remove(work)
+        with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
+            self.remove(work)
         self.assertEqual(unique.read_text(), 'only copy')
 
     def test_inherited_git_environment_cannot_redirect_inspect_or_remove(self):
@@ -271,8 +275,9 @@ class IgnoredWorktreeData(unittest.TestCase):
             state = GitInspector().inspect(str(work), worktree=True)
             self.assertEqual(state['root'], str(work))
             self.assertTrue(state['contentsVerified'], state)
-            self.remove(work)
-        self.assertFalse(work.exists())
+            with self.assertRaisesRegex(ValueError, 'cleanup disabled'):
+                self.remove(work)
+        self.assertTrue(work.exists())
         self.assertEqual((self.repo / 'README.md').read_text(), 'fixture\n')
 
     def test_undecodable_inventory_blocks(self):

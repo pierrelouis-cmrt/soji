@@ -201,22 +201,23 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has ignored files that are not known to be disposable: local-data/",
    "selected": false
   },
   "balanced": {
-   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has ignored files that are not known to be disposable: local-data/",
    "selected": false
   },
   "bytes": 143360,
   "careful": {
-   "decision": "Worktree has ignored files that are not known to be disposable: local-data/",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has ignored files that are not known to be disposable: local-data/",
    "selected": false
   },
   "early": null,
   "group": "Agent worktrees",
   "hint": "codex-worktrees",
   "holds": [
+   "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved",
    "Worktree has ignored files that are not known to be disposable: local-data/"
   ],
   "modeHolds": {},
@@ -224,24 +225,26 @@
   "rank": null
  },
  {
-  "action": "git-worktree",
+  "action": null,
   "aggressive": {
-   "decision": "Idle 30.0 d; eligible from careful",
-   "selected": true
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved",
+   "selected": false
   },
   "balanced": {
-   "decision": "Idle 30.0 d; eligible from careful",
-   "selected": true
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved",
+   "selected": false
   },
   "bytes": 143360,
   "careful": {
-   "decision": "Idle 30.0 d; eligible from careful",
-   "selected": true
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved",
+   "selected": false
   },
   "early": null,
   "group": "Agent worktrees",
   "hint": "codex-worktrees",
-  "holds": [],
+  "holds": [
+   "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved"
+  ],
   "modeHolds": {},
   "path": "~/.codex/worktrees/safe",
   "rank": null
@@ -368,23 +371,23 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "balanced": {
-   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Version pinned by a project (nvm alias lts/gallium)",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "early": null,
   "group": "Toolchains and SDKs",
   "hint": "nvm-versions",
   "holds": [
-   "Version pinned by a project (nvm alias lts/gallium)"
+   "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git"
   ],
   "modeHolds": {},
   "path": "~/.nvm/versions/node/v16.0.0",
@@ -393,22 +396,24 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Idle 100.0 d; eligible from aggressive",
-   "selected": true
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
+   "selected": false
   },
   "balanced": {
-   "decision": "Eligible from aggressive",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Eligible from aggressive",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "early": null,
   "group": "Toolchains and SDKs",
   "hint": "nvm-versions",
-  "holds": [],
+  "holds": [
+   "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git"
+  ],
   "modeHolds": {},
   "path": "~/.nvm/versions/node/v18.0.0",
   "rank": 2
@@ -416,23 +421,24 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Active version: ~/.nvm/alias/default",
+   "decision": "Active version: ~/.nvm/alias/default; Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "balanced": {
-   "decision": "Active version: ~/.nvm/alias/default",
+   "decision": "Active version: ~/.nvm/alias/default; Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Active version: ~/.nvm/alias/default",
+   "decision": "Active version: ~/.nvm/alias/default; Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "early": null,
   "group": "Toolchains and SDKs",
   "hint": "nvm-versions",
   "holds": [
-   "Active version: ~/.nvm/alias/default"
+   "Active version: ~/.nvm/alias/default",
+   "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git"
   ],
   "modeHolds": {
    "careful": "Retained newest version per folder"
@@ -443,22 +449,24 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Retained newest version per folder",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "balanced": {
-   "decision": "Retained newest version per folder",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Retained newest version per folder",
+   "decision": "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git",
    "selected": false
   },
   "early": null,
   "group": "Toolchains and SDKs",
   "hint": "nvm-versions",
-  "holds": [],
+  "holds": [
+   "Project pin discovery incomplete: uninspected dependency scope ~/code/secret-web/.git"
+  ],
   "modeHolds": {
    "aggressive": "Retained newest version per folder",
    "balanced": "Retained newest version per folder",
@@ -1194,22 +1202,23 @@
  {
   "action": null,
   "aggressive": {
-   "decision": "Worktree has unpushed commits",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has unpushed commits",
    "selected": false
   },
   "balanced": {
-   "decision": "Worktree has unpushed commits",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has unpushed commits",
    "selected": false
   },
   "bytes": 147456,
   "careful": {
-   "decision": "Worktree has unpushed commits",
+   "decision": "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved; Worktree has unpushed commits",
    "selected": false
   },
   "early": null,
   "group": "Agent worktrees",
   "hint": "claude-worktrees",
   "holds": [
+   "Agent worktree cleanup disabled: unique ignored data and concurrent writes cannot be preserved",
    "Worktree has unpushed commits"
   ],
   "modeHolds": {},

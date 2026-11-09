@@ -34,7 +34,7 @@ class UninstallIdentityTests(unittest.TestCase):
         tmp=tempfile.TemporaryDirectory(prefix='soji-uninstall-');self.addCleanup(tmp.cleanup)
         self.home=Path(tmp.name).resolve();self.apps=[];self.signing={}
         self.pkgs={}
-        def build(cat):cat.apps=[dict(a) for a in self.apps];cat.running=[];return cat
+        def build(cat):cat.apps=[dict(a) for a in self.apps];cat.running=[];cat.running_available=True;return cat
         patches=[patch.object(AppCatalog,'build',build),
                  patch.object(appmod,'command',side_effect=lambda *a,**k:fake_codesign(self.signing)(*a,**k)),
                  patch.object(appmod,'user_receipts',side_effect=lambda home:self.pkgs)]

@@ -208,7 +208,10 @@ class JournalSafety(unittest.TestCase):
         for group in ('Editor extensions','Build output','Agent worktrees','Agent and editor history'):
             f=Finding(str(self.target),1,1,1,0,group,'fixture',tier='regenerable',comes_back='rebuilds',list_only=False,identity=file_identity(self.target))
             scan=self.scan();scan.findings=[f]
-            self.assertIn(group,' '.join(create_plan(scan,'aggressive')['warnings']))
+            plan=create_plan(scan,'aggressive')
+            if group=='Agent worktrees':
+                self.assertEqual(plan['items'],[]);self.assertTrue(any('cleanup disabled' in h for h in f.holds))
+            else:self.assertIn(group,' '.join(plan['warnings']))
             self.assertIn(group,' '.join(tui.cleanup_warnings('aggressive',[f])))
     def test_failed_undo_can_retry_without_redoing_successes(self):
         entries=[{'id':'a','path':'a','status':'done'},{'id':'b','path':'b','status':'done'}]

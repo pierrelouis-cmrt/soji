@@ -71,6 +71,7 @@ def uninstall_plan(target,home):
     app=next((a for a in cat.apps if target in (a['path'],a['bundle'],a['name'])),None)
     if not app:raise ValueError('Installed application not found')
     if app['bundle'].startswith('com.apple.') or app['path'].startswith('/System/'):raise ValueError('System/Apple apps cannot be uninstalled')
+    if not cat.running_available:raise ValueError('Running-app inventory unavailable; uninstall refused')
     if cat.is_running(app):raise ValueError('Quit the app before creating an uninstall plan')
     removable,shared=leftovers(app,home,cat)
     ident=cat.identity(app)
@@ -91,11 +92,14 @@ def verify_uninstall(item,home):
     if current['bundle'].startswith('com.apple.') or current['path'].startswith('/System/'):raise ValueError('System application')
     expected=action.get('appIdentity')
     if expected is None or file_identity(current['path'])!=expected:raise ValueError('Application identity changed; recreate uninstall plan')
+    if not cat.running_available:raise ValueError('Running-app inventory unavailable; uninstall refused')
     if cat.is_running(current):raise ValueError('App is running')
-    if item['path']==current['path']:return
+    if item['path']==current['path']:return {'app':current,'runningAvailable':True,'running':False,'identityVerified':True}
     reason=action.get('attribution','bundle-or-name')
     if reason!='bundle-or-name' and 'codeIdentity' not in action:raise ValueError('Signing attribution missing; recreate uninstall plan')
     if 'codeIdentity' in action and cat.identity(current)!=action['codeIdentity']:raise ValueError('Signing identity changed; recreate uninstall plan')
     removable,shared=leftovers(current,home,cat)
     if any(s['path']==item['path'] for s in shared):raise ValueError('Leftover is now shared with another owner; recreate uninstall plan')
     if not any(r['path']==item['path'] and r['reason']==reason for r in removable):raise ValueError('Leftover no longer attributable to this app')
+
+    return {'app':current,'runningAvailable':True,'running':False,'identityVerified':True,'attribution':reason}
