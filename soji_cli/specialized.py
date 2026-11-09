@@ -595,15 +595,37 @@ class SpecializedRules:
                 reason=self.nvm_active(path,p,marker)
                 if reason:return marker,reason
                 continue
+            unknown='Active version reference unknown: '+marker
+            try:info=p.lstat()
+            except FileNotFoundError:
+                # A missing leaf is optional; a dangling/looping parent link is
+                # an unreadable reference layout, not proof the marker is absent.
+                for parent in p.parents:
+                    if parent.is_symlink():
+                        try:parent.resolve(strict=True)
+                        except (OSError,RuntimeError):return marker,unknown
+                continue
+            except OSError:return marker,unknown
             try:
-                mode=p.lstat().st_mode
-                if stat.S_ISLNK(mode):
+                if stat.S_ISLNK(info.st_mode):
                     resolved=p.resolve(strict=True)
-                    if inside(resolved,os.path.realpath(path)):return marker,'Active version: '+marker
-                elif stat.S_ISREG(mode) and p.stat().st_size<=4095:
-                    text=p.read_text(encoding='utf-8').strip()
-                    if text and (text==name or name.startswith(text+'-') or name.endswith('-'+text) or text[0].isnumeric() and version_match(name,text)):return marker,'Active version: '+marker
-            except (OSError,UnicodeError,RuntimeError):continue
+                    family=os.path.realpath(Path(path).parent)
+                    if not inside(str(resolved),family) or str(resolved)==family:
+                        return marker,unknown+' (target outside version family)'
+                    if inside(str(resolved),os.path.realpath(path)):return marker,'Active version: '+marker
+                elif stat.S_ISREG(info.st_mode) and info.st_size<=4095:
+                    # One numeric version token is the supported generic text layout.
+                    # Executable wrappers, empty/multiline/binary metadata and unknown
+                    # layouts cannot prove a candidate inactive.
+                    with p.open('rb') as source:raw=source.read(4096)
+                    if len(raw)>4095:return marker,unknown+' (oversized)'
+                    text=raw.decode('utf-8').strip()
+                    if not re.fullmatch(r'v?[0-9]+(?:[.][0-9A-Za-z]+)*(?:[-+_][0-9A-Za-z.-]+)?',text):
+                        return marker,unknown+' (unsupported metadata)'
+                    if text==name or name.startswith(text+'-') or name.endswith('-'+text) or version_match(name,text):
+                        return marker,'Active version: '+marker
+                else:return marker,unknown+' (unsupported metadata)'
+            except (OSError,UnicodeError,RuntimeError,ValueError):return marker,unknown
         return None
     def archive(self,path):
         if path not in self.archive_cache:

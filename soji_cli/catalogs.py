@@ -64,6 +64,8 @@ def expand_catalogs(scanner):
                 # changed within a day is never taken at Careful or Balanced.
                 f.levels={**f.levels,'careful':max(SESSION_FLOOR_HOURS,f.levels.get('careful',SESSION_FLOOR_HOURS)),
                           'balanced':max(SESSION_FLOOR_HOURS,f.levels.get('balanced',SESSION_FLOOR_HOURS))}
+                if not any(e.get('check')=='sessionProjectMoved' and e.get('gone') is True for e in f.evidence):
+                    f.catalog_min_hours={m:f.levels[m] for m in ('careful','balanced','aggressive')}
                 result.append(f)
         elif finding.group=='Trash' and finding.path in scanner.nodes:
             children=scanner.nodes[finding.path].children

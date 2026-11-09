@@ -94,10 +94,10 @@ class SmartRuleCases(unittest.TestCase):
         marker.write_text('22')
         self.assertIsNone(self.rules.active('/x/v220.0',[str(marker)]))
         marker.write_text('22'+' '*4094)
-        self.assertIsNone(self.rules.active('/x/v22.0',[str(marker)]))
+        self.assertIn('reference unknown',self.rules.active_reason('/x/v22.0',[str(marker)]))
     def test_active_markers_are_literal_and_strict_utf8(self):
         marker=self.home/'active';marker.write_bytes(b'22\xff')
-        self.assertIsNone(self.rules.active('/x/v22.0',[str(marker)]))
+        self.assertIn('reference unknown',self.rules.active_reason('/x/v22.0',[str(marker)]))
         marker.write_text('22')
         self.assertIsNone(self.rules.active('/x/v22.0',[str(self.home/'act*')]))
     def test_active_relative_symlink_descendant(self):

@@ -159,12 +159,12 @@
    "selected": true
   },
   "balanced": {
-   "decision": "Eligible from aggressive",
+   "decision": "Session catalog requires 48 h at balanced; normal policy cannot be lowered by judgment",
    "selected": false
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Eligible from aggressive",
+   "decision": "Session catalog requires 168 h at careful; normal policy cannot be lowered by judgment",
    "selected": false
   },
   "early": null,
@@ -187,7 +187,7 @@
   },
   "bytes": 131072,
   "careful": {
-   "decision": "Eligible from balanced",
+   "decision": "Session catalog requires 168 h at careful; normal policy cannot be lowered by judgment",
    "selected": false
   },
   "early": null,

@@ -76,15 +76,14 @@ LOCKFILES = (
 VCS_MARKERS = ('.git', '.hg', '.svn', '.jj', '.sl', '_darcs')
 # Files that mark a folder as an installed extension/app package.
 MANIFEST_FILES = ('extension.toml', '.vsixmanifest', 'extension.vsixmanifest')
-DEPTH = 12
 
 
 def _ancestors(path: str, home: str, strict: bool = True):
-    """Ancestors of `path` below `home` (nearest first), at most DEPTH."""
+    """All lexical ancestors of `path` below `home` (nearest first)."""
     p = Path(path)
     chain = list(p.parents) if strict else [p, *p.parents]
     out = []
-    for parent in chain[:DEPTH]:
+    for parent in chain:
         s = str(parent)
         if s == home or not s.startswith(home.rstrip('/') + '/'):
             break

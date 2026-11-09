@@ -379,14 +379,15 @@ class AIAnalyzer:
         finally:
             if store:store.close()
     def apply(self,scanner,findings):
-        from .engine import Finding,Node
+        from .engine import Finding,Node,SESSION_HINTS
         bypath={f.path:f for f in scanner.findings}
         for data in findings:
             path=os.path.realpath(data['path'])
             if not any(path==r or path.startswith(r.rstrip('/')+'/') for r in scanner.roots):continue
             f=bypath.get(path)
             node=scanner.nodes.get(path)
-            if node is not None and (f is None or f.size!=node.size or f.files!=node.files):
+            catalog_unit=f is not None and f.managed and f.hint_id in SESSION_HINTS
+            if node is not None and not catalog_unit and (f is None or f.size!=node.size or f.files!=node.files):
                 if f is not None:scanner.findings=[old for old in scanner.findings if old is not f]
                 f=scanner.classify(node);scanner.findings.append(f);bypath[path]=f
             if f is None:continue

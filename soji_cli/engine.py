@@ -118,6 +118,7 @@ class Finding:
     decision: str = ''
     thresholds: dict = dataclasses.field(default_factory=dict)
     levels: dict | None = None
+    catalog_min_hours: dict = dataclasses.field(default_factory=dict)
     last_activity: float | None = None
     mode_holds: dict = dataclasses.field(default_factory=dict)
     special_min_hours: float = 0
@@ -160,6 +161,8 @@ class Finding:
         # Sessions: a hard floor no downgrade or judgement can lower.
         if self.hint_id in SESSION_HINTS and mode in ('careful','balanced') and now-self.newest<SESSION_FLOOR_SECONDS:
             return False,f'Session changed {(now-self.newest)/3600:.1f} h ago; never cleaned within 24 h at {mode}'
+        minimum=self.catalog_min_hours.get(mode,0)
+        if idle<minimum:return False,f'Session catalog requires {minimum:g} h at {mode}; normal policy cannot be lowered by judgment'
         if self.levels is None and self.rule_level is None:
             if self.default_holds:return False,'; '.join(self.default_holds)
             minimum=self.rule_min_hours.get(mode,self.special_min_hours)
