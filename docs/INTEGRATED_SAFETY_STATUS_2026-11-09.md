@@ -1,5 +1,9 @@
 # Provisional integrated Sōji safety status — 2026-11-09
 
+Latest code/test head: `fc7d5eea93b930509f04694dc1e7bf945ecc4660`.
+See [exact-head review follow-up](INTEGRATED_REVIEW_FOLLOWUP_2026-11-09.md).
+The original integration record below is preserved chronologically.
+
 Prepared checkout: `/Users/pierrelouis/.t3/worktrees/soji/t3-e54ebc38`.
 Branch: `integration/safety-sol-20261109`; base: `21ce749`.
 Implementation SHA: `d26dd11`; final code/test head: `8d8e6cb406070343a39d9b6e88626574573b1ba0` (documentation follows separately).
@@ -216,3 +220,25 @@ Final code/test tree was clean before the targeted documentation commit; only
 NEXT_STEPS, the audit, this status, copied main handoff and validation logs were
 pending. The final integration head is reported in the handback after committing
 these documentation files. No physical-terminal or installed-binary validation.
+
+
+## Exact-head cross-review corrections — 2026-11-09
+
+Reviews of `82da248` required two P2 execution corrections and three P1
+classification corrections. Implemented locally in `abdfc1c` and `fc7d5ee`:
+finite entry/member refusal timestamps excluding booleans; structured running-app
+uninstall cooldown; complete explicit-install ancestry; generic active-reference
+uncertainty holds; non-overridable normal session minima and intact compound
+membership under agent judgments. The proven Ruby uncertainty and judgment
+bypasses are corrected claims pending fresh review, not deferred limitations.
+
+See [five-finding follow-up](INTEGRATED_REVIEW_FOLLOWUP_2026-11-09.md) for proof provenance, exact
+code/test SHA, before/after validation and remaining limitations. The earlier
+437-test run does not validate these new changes. Worktree removal remains
+disabled, main and installed binary unchanged, and final approval waits for a
+fresh independent review. No real cleanup is authorized.
+
+Final follow-up validation on `fc7d5ee`: **458 tests OK, zero skips** with the
+disposable native helper (133.406 s); broader targeted run **141 OK**.
+Exact commands/logs are in the five-finding follow-up. Independent approval is
+still pending; main and installed binary remain unchanged.

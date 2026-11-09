@@ -1,0 +1,58 @@
+======================================================================
+FAIL: test_nonfinite_refusal_timestamp_blocks_mutation (tests.test_review_execution_82da248.ExecutionBoundaryProofs.test_nonfinite_refusal_timestamp_blocks_mutation) (field='at')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_review_execution_82da248.py", line 31, in test_nonfinite_refusal_timestamp_blocks_mutation
+    self.assertEqual(result['completed'], 0, result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : {'entries': [{'id': 'a20b7369de6447b7958399f18f1c4187', 'plan': 'fefab6e78e4e4ed6a09a20f81755c105', 'path': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-lckmi2rz/home/.npm/_npx', 'group': 'Package caches', 'sizeBytes': 65536, 'at': 1794255696.858436, 'identity': {'device': 16777233, 'inode': 83811194, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811193, 'mtimeNs': 1790799696588850975, 'ctimeNs': 1794255696588972767}, 'method': 'trash', 'status': 'done', 'mode': 'balanced', 'version': '0.4.0', 'planCreatedAt': 1794255696.858232, 'planVersion': '0.4.0', 'rule': 'npm-npx', 'policy': {'source': 'fresh', 'rule': 'npm-npx', 'label': 'npx cache', 'group': 'Package caches', 'mode': 'balanced', 'threshold': {'basis': 'rule', 'minIdleHours': 168, 'minProjectIdleHours': None, 'ruleLevel': None, 'projectIdleHours': None}, 'reason': 'no npx running, idle 7 days', 'decision': 'Idle 40.0 d; eligible from balanced', 'matchedPattern': '~/.npm/_npx'}, 'planPolicy': {'source': 'plan', 'rule': 'npm-npx', 'label': 'npx cache', 'group': 'Package caches', 'mode': 'balanced', 'threshold': {'basis': 'rule', 'minIdleHours': 168, 'minProjectIdleHours': None, 'ruleLevel': None, 'projectIdleHours': None}, 'reason': 'no npx running, idle 7 days', 'decision': 'Idle 40.0 d; eligible from balanced', 'matchedPattern': '~/.npm/_npx'}, 'trashedTo': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-lckmi2rz/trash/_npx.soji-a20b7369de6447b7958399f18f1c4187', 'trashedIdentity': {'device': 16777233, 'inode': 83811194, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811200, 'mtimeNs': 1790799696588850975, 'ctimeNs': 1794255697010851138}}], 'notice': 'Undo works only while the items are still in the Trash. Once the Trash is emptied (by you, or by macOS after 30 days), they cannot be restored.', 'completed': 1, 'partial': 0, 'failed': 0, 'journalError': None}
+
+======================================================================
+FAIL: test_nonfinite_refusal_timestamp_blocks_mutation (tests.test_review_execution_82da248.ExecutionBoundaryProofs.test_nonfinite_refusal_timestamp_blocks_mutation) (field='refusalAt')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_review_execution_82da248.py", line 31, in test_nonfinite_refusal_timestamp_blocks_mutation
+    self.assertEqual(result['completed'], 0, result)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : {'entries': [{'id': 'a4ef319d6dae40e0b391a3a9212e7566', 'plan': '743b3390808c45cea999a7f196f5fe62', 'path': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-rjzrl26j/home/.npm/_npx', 'group': 'Package caches', 'sizeBytes': 65536, 'at': 1794255697.271786, 'identity': {'device': 16777233, 'inode': 83811205, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811204, 'mtimeNs': 1790799697011765003, 'ctimeNs': 1794255697011888847}, 'method': 'trash', 'status': 'done', 'mode': 'balanced', 'version': '0.4.0', 'planCreatedAt': 1794255697.2715719, 'planVersion': '0.4.0', 'rule': 'npm-npx', 'policy': {'source': 'fresh', 'rule': 'npm-npx', 'label': 'npx cache', 'group': 'Package caches', 'mode': 'balanced', 'threshold': {'basis': 'rule', 'minIdleHours': 168, 'minProjectIdleHours': None, 'ruleLevel': None, 'projectIdleHours': None}, 'reason': 'no npx running, idle 7 days', 'decision': 'Idle 40.0 d; eligible from balanced', 'matchedPattern': '~/.npm/_npx'}, 'planPolicy': {'source': 'plan', 'rule': 'npm-npx', 'label': 'npx cache', 'group': 'Package caches', 'mode': 'balanced', 'threshold': {'basis': 'rule', 'minIdleHours': 168, 'minProjectIdleHours': None, 'ruleLevel': None, 'projectIdleHours': None}, 'reason': 'no npx running, idle 7 days', 'decision': 'Idle 40.0 d; eligible from balanced', 'matchedPattern': '~/.npm/_npx'}, 'trashedTo': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-rjzrl26j/trash/_npx.soji-a4ef319d6dae40e0b391a3a9212e7566', 'trashedIdentity': {'device': 16777233, 'inode': 83811205, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811210, 'mtimeNs': 1790799697011765003, 'ctimeNs': 1794255697418697449}}], 'notice': 'Undo works only while the items are still in the Trash. Once the Trash is emptied (by you, or by macOS after 30 days), they cannot be restored.', 'completed': 1, 'partial': 0, 'failed': 0, 'journalError': None}
+
+======================================================================
+FAIL: test_running_uninstall_refusal_blocks_immediate_retry (tests.test_review_execution_82da248.ExecutionBoundaryProofs.test_running_uninstall_refusal_blocks_immediate_retry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_review_execution_82da248.py", line 51, in test_running_uninstall_refusal_blocks_immediate_retry
+    self.assertEqual(retry['completed'], 0, retry)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : {'entries': [{'id': 'fec0fbe66b3b4d39a518b031a6fa5e7d', 'plan': 'dcbd6b67f92f411797536b957cfff59a', 'path': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-njvs_sgs/home/Applications/Fixture.app', 'group': 'Applications', 'sizeBytes': 0, 'at': 1794255697.5441642, 'identity': {'device': 16777233, 'inode': 83811219, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811218, 'mtimeNs': 1794255697421014077, 'ctimeNs': 1794255697421014077}, 'method': 'trash', 'status': 'done', 'mode': 'careful', 'version': '0.4.0', 'planCreatedAt': 1794255697.421639, 'planVersion': None, 'rule': 'explicit-uninstall', 'policy': {'source': 'fresh', 'verifier': 'uninstall', 'rule': 'explicit-uninstall', 'mode': 'careful', 'threshold': None, 'reason': 'Fresh app identity, running-app availability and attribution verified', 'evidence': {'app': {'path': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-njvs_sgs/home/Applications/Fixture.app', 'bundle': 'org.fixture.app', 'name': 'Fixture', 'version': ''}, 'runningAvailable': True, 'running': False, 'identityVerified': True}}, 'planPolicy': {'source': 'plan', 'rule': None, 'label': None, 'group': None, 'mode': 'careful', 'threshold': {'basis': 'rule', 'minIdleHours': None, 'minProjectIdleHours': None, 'ruleLevel': None, 'projectIdleHours': None}, 'reason': 'None rule (None): age and guard checks only', 'decision': None, 'matchedPattern': None}, 'trashedTo': '/private/var/folders/8n/sc0zqmtx37lb5vqcp_5mpy4w0000gn/T/soji-journal-fixture-njvs_sgs/trash/Fixture.app.soji-fec0fbe66b3b4d39a518b031a6fa5e7d', 'trashedIdentity': {'device': 16777233, 'inode': 83811219, 'type': 16384, 'parentDevice': 16777233, 'parentInode': 83811223, 'mtimeNs': 1794255697421014077, 'ctimeNs': 1794255697547448738}}], 'notice': 'Undo works only while the items are still in the Trash. Once the Trash is emptied (by you, or by macOS after 30 days), they cannot be restored.', 'completed': 1, 'partial': 0, 'failed': 0, 'journalError': None}
+
+======================================================================
+FAIL: test_unknown_session_identity_agent_must_keep_normal_threshold (tests.test_integrated_cross_review.CrossReview.test_unknown_session_identity_agent_must_keep_normal_threshold)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_integrated_cross_review.py", line 60, in test_unknown_session_identity_agent_must_keep_normal_threshold
+    self.assertFalse(bool(plan['items']),'Unknown historical identity session at 30 h became selected AND fresh accepted under agent judgment')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : Unknown historical identity session at 30 h became selected AND fresh accepted under agent judgment
+
+======================================================================
+FAIL: test_unreadable_global_ruby_marker_must_hold_current (tests.test_integrated_cross_review.CrossReview.test_unreadable_global_ruby_marker_must_hold_current)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_integrated_cross_review.py", line 45, in test_unreadable_global_ruby_marker_must_hold_current
+    self.assertFalse(bool(plan['items']), 'Current Ruby version moved to disposable Trash despite unreadable global marker')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : Current Ruby version moved to disposable Trash despite unreadable global marker
+
+======================================================================
+FAIL: test_deep_installed_local_vcs_and_lock_cannot_override_install (tests.test_integrated_cross_review.DeepInstall.test_deep_installed_local_vcs_and_lock_cannot_override_install)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/soji-five-before-oogo59az/tests/test_integrated_cross_review.py", line 137, in test_deep_installed_local_vcs_and_lock_cannot_override_install
+    self.assertFalse(bool(plan['items']),'Deep shipped dependencies override explicit global install exclusion using local VCS and lockfile; fresh accepts')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false : Deep shipped dependencies override explicit global install exclusion using local VCS and lockfile; fresh accepts
+
+----------------------------------------------------------------------
+Ran 12 tests in 5.587s
+
+FAILED (failures=6)

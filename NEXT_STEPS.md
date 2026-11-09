@@ -131,3 +131,25 @@ Missing session identity keeps normal thresholds; positive gone inference is
 still unimplemented. Other atomic version-family active references remain a
 limitation. The installed binary is unchanged; no main update, push or release.
 Final approval waits for independent cross-review of the integrated head.
+
+
+## Exact-head cross-review corrections — 2026-11-09
+
+Reviews of `82da248` required two P2 execution corrections and three P1
+classification corrections. Implemented locally in `abdfc1c` and `fc7d5ee`:
+finite entry/member refusal timestamps excluding booleans; structured running-app
+uninstall cooldown; complete explicit-install ancestry; generic active-reference
+uncertainty holds; non-overridable normal session minima and intact compound
+membership under agent judgments. The proven Ruby uncertainty and judgment
+bypasses are corrected claims pending fresh review, not deferred limitations.
+
+See [five-finding follow-up](docs/INTEGRATED_REVIEW_FOLLOWUP_2026-11-09.md) for proof provenance, exact
+code/test SHA, before/after validation and remaining limitations. The earlier
+437-test run does not validate these new changes. Worktree removal remains
+disabled, main and installed binary unchanged, and final approval waits for a
+fresh independent review. No real cleanup is authorized.
+
+Final follow-up validation on `fc7d5ee`: **458 tests OK, zero skips** with the
+disposable native helper (133.406 s); broader targeted run **141 OK**.
+Exact commands/logs are in the five-finding follow-up. Independent approval is
+still pending; main and installed binary remain unchanged.
