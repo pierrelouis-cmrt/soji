@@ -107,6 +107,24 @@ class AppCatalog:
             for folded,normalized in keys:
                 if folded==bundle or (bundle and folded.startswith(bundle+'.')) or (normalized and normalized==name):result.append(app);break
         return result
+    def vendor_owners(self,path):
+        """Installed apps whose reverse-DNS vendor names the folder directly under
+        a library marker (com.mathworks.matlab -> Application Support/MathWorks).
+        Broader than owner(): use it only to add holds, never to permit removal."""
+        parts=Path(path).parts;tokens=set()
+        for marker in ['Caches','Application Support','Containers','Group Containers','Preferences']:
+            if marker in parts:
+                i=parts.index(marker)
+                if i+1<len(parts):
+                    name=parts[i+1].removesuffix('.plist').casefold().removeprefix('group.');dotted=name.split('.')
+                    # A reverse-DNS folder (com.mathworks.matlabconnector) names its vendor second.
+                    tokens.add(re.sub(r'[^a-z0-9]','',dotted[1] if len(dotted)>=3 else name))
+        tokens.discard('')
+        result=[]
+        for app,_,bundle in self._app_keys():
+            segments=bundle.split('.')
+            if len(segments)>=3 and re.sub(r'[^a-z0-9]','',segments[1]) in tokens:result.append(app)
+        return result
     def _app_keys(self):
         # Normalized (name, bundle) per app, rebuilt if the app list changes.
         stamp=(id(self.apps),len(self.apps))

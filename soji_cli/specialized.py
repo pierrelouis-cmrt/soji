@@ -728,7 +728,10 @@ class SpecializedRules:
         if r.get('notIfAppleOwned'):
             apple=any(a['bundle'].startswith('com.apple.') for a in owners) or any(p.startswith('com.apple.') or p.startswith('group.com.apple.') for p in Path(f.path).parts)
             if apple:f.holds.append('Apple-owned container excluded by rule')
-        if r.get('onlyIfOwnerNotInstalled') and owners:f.holds.append('Owning application is installed')
+        if r.get('onlyIfOwnerNotInstalled'):
+            vendor=[] if owners else self.apps.vendor_owners(f.path)
+            if owners or vendor:f.holds.append('Owning application is installed')
+            if vendor:f.evidence.append({'check':'owner','apps':vendor,'basis':'installed app vendor matches folder name'})
         if r.get('notWhileOwnerRuns'):
             if any(self.apps.is_running(a) for a in owners):f.holds.append('Owning application is running')
             elif not owners and not r.get('notWhileRunning'):f.holds.append('Cannot confirm application ownership or running state')

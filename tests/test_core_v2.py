@@ -89,6 +89,16 @@ class SpecializedTests(Fixture):
         self.assertTrue(any('application is running' in h for h in f.holds))
         f=self.finding(s,p.parent);f.rule={'onlyIfOwnerNotInstalled':True};sp.evaluate(f);self.assertIn('Owning application is installed',f.holds)
         f=self.finding(s,p.parent);f.path=str(self.home/'Library/Containers/com.apple.Example/Data/Library/Caches');f.rule={'notIfAppleOwned':True};sp.evaluate(f);self.assertTrue(any('Apple-owned' in h for h in f.holds))
+    def test_vendor_folder_of_installed_app_is_not_a_leftover(self):
+        p=self.file('Library/Application Support/MathWorks/MATLAB/R2026a/matlab.prf');other=self.file('Library/Application Support/Gone Vendor/data').parent;connector=self.file('Library/Application Support/com.mathworks.matlabconnector/x').parent;s=self.scan()
+        apps=AppCatalog(str(self.home));apps.apps=[{'path':'/Applications/MATLAB_R2026a.app','bundle':'com.mathworks.matlab','name':'MATLAB_R2026a','version':'26.1'}]
+        vendor=self.home/'Library/Application Support/MathWorks';sp=self.special(s,apps=apps)
+        self.assertEqual(apps.owner(str(vendor)),[])
+        f=self.finding(s,vendor);f.rule={'onlyIfOwnerNotInstalled':True};sp.evaluate(f);self.assertIn('Owning application is installed',f.holds)
+        # Vendor matching only adds holds: it never satisfies an installed-owner requirement.
+        f=self.finding(s,vendor);f.rule={'onlyIfOwnerInstalled':True};sp.evaluate(f);self.assertIn('Owning application is unknown',f.holds)
+        f=self.finding(s,connector);f.rule={'onlyIfOwnerNotInstalled':True};sp.evaluate(f);self.assertIn('Owning application is installed',f.holds)
+        f=self.finding(s,other);f.rule={'onlyIfOwnerNotInstalled':True};sp.evaluate(f);self.assertNotIn('Owning application is installed',f.holds)
     def test_missing_workspace_early(self):
         import plistlib
         p=self.file('Library/Developer/Xcode/DerivedData/Old/info.plist',binary=plistlib.dumps({'WorkspacePath':str(self.home/'gone.xcodeproj')}))
