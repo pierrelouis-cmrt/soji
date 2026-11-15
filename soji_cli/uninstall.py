@@ -82,8 +82,8 @@ def uninstall_plan(target,home):
         items.append({'path':path,'identity':file_identity(path),'size':0,'newest':0,'files':0,'hint':'explicit-uninstall','group':'Applications' if path==app['path'] else 'App leftovers','method':'trash','action':{'kind':'uninstall','app':app,'appIdentity':file_identity(app['path']),'codeIdentity':ident,'attribution':entry['reason']},'finding':{}})
     warnings=['Explicit uninstall includes app data at the listed paths. Every item goes to Trash; review before applying.']
     if shared:warnings.append(f'{len(shared)} leftover(s) are shared with another owner (app, Apple or package receipt) and are listed but not removed.')
-    plan={'format':'soji-clean-plan/1','id':uuid.uuid4().hex,'createdAt':time.time(),'mode':'careful','roots':[str(Path(home)),str(Path(app['path']).parent)],'home':str(Path(home).resolve()),'protected':[],'items':items,'shared':shared,'method':'trash','warnings':warnings}
-    plan['digest']=digest(plan);return plan
+    from .plans import build_plan
+    return build_plan(items=items,roots=[str(Path(home)),str(Path(app['path']).parent)],home=str(Path(home).resolve()),mode='careful',method='trash',shared=shared,warnings=warnings)
 
 
 def verify_uninstall(item,home):

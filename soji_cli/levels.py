@@ -9,6 +9,18 @@ import math
 from collections.abc import Mapping
 
 LEVELS = ("careful", "balanced", "aggressive")
+MODES = LEVELS
+ALIASES = {"safe": "careful", "strict": "aggressive", "smart": "balanced"}
+# A session changed within this window is never taken at Careful or Balanced.
+SESSION_FLOOR_HOURS = 24
+SESSION_FLOOR_SECONDS = SESSION_FLOOR_HOURS * 3600
+
+
+def normalize_mode(mode: str) -> str:
+    mode = ALIASES.get(mode, mode)
+    if mode not in LEVELS:
+        raise ValueError("Unknown cleanup level: " + str(mode))
+    return mode
 
 
 def _finite(value):

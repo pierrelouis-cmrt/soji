@@ -12,8 +12,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from soji_cli.ai import (AIAnalyzer, PRESETS, read_submission, decode_submission,
-    judgement_lapsed, judgement_needed, same_content_fingerprint, classify_failure, stop_agent, content_fingerprint, reusable_verdict, fingerprint)
-from soji_cli.cadence import AnalysisCadence, Backlog, Moment
+    judgement_lapsed, judgement_needed, classify_failure, stop_agent, content_fingerprint, reusable_verdict, fingerprint)
 
 
 def claim(path='/fixture/cache'):
@@ -21,49 +20,9 @@ def claim(path='/fixture/cache'):
                 recommendation='remove', confidence=0.9)
 
 
-class CadenceTests(unittest.TestCase):
-    def test_backlog_thresholds_quiet_and_hour_boundaries(self):
-        policy = AnalysisCadence()
-        m = Moment(10000, last_change=9820, last_backlog_run=6400)
-        self.assertEqual(policy.due(Backlog(10), m), 'backlog')
-        self.assertEqual(policy.due(Backlog(0, 1_000_000_000), m), 'backlog')
-        self.assertIsNone(policy.due(Backlog(9, 999_999_999), m))
-        self.assertIsNone(policy.due(Backlog(10), dataclasses.replace(m, last_change=9820.001)))
-        self.assertIsNone(policy.due(Backlog(10), dataclasses.replace(m, last_backlog_run=6400.001)))
-
-    def test_backlog_precedes_power_and_idle_daily_checks(self):
-        m = Moment(10000, on_battery=True, battery_percent=1, pause_below_percent=20)
-        self.assertEqual(AnalysisCadence().due(Backlog(10), m), 'backlog')
-        self.assertIsNone(AnalysisCadence().due(Backlog(1), m))
-
-    def test_daily_counts_stale_rows_and_requires_idle(self):
-        m = Moment(10000, idle_seconds=600)
-        p = AnalysisCadence()
-        self.assertEqual(p.due(Backlog(stale_count=1), m), 'daily')
-        self.assertIsNone(p.due(Backlog(), m))
-        self.assertIsNone(p.due(Backlog(1), dataclasses.replace(m, idle_seconds=599.99)))
-        self.assertIsNone(p.due(Backlog(1), dataclasses.replace(m, last_daily_run=9999)))
-        self.assertEqual(p.due(Backlog(1), dataclasses.replace(m, last_daily_run=10000-86400)), 'daily')
-
-    def test_daily_battery_threshold_is_inclusive_and_unknown_is_zero(self):
-        m = Moment(10000, idle_seconds=600, on_battery=True, pause_below_percent=20)
-        p = AnalysisCadence()
-        for percent in (None, 19, 20):
-            self.assertIsNone(p.due(Backlog(1), dataclasses.replace(m, battery_percent=percent)))
-        self.assertEqual(p.due(Backlog(1), dataclasses.replace(m, battery_percent=20.01)), 'daily')
-        self.assertEqual(p.due(Backlog(1), dataclasses.replace(m, on_battery=False)), 'daily')
-
-
 class VerdictPolicyTests(unittest.TestCase):
     def setUp(self):
         self.old = dict(sizeBytes=1_000_000_000, fileCount=20, newestChange=100)
-
-    def test_fingerprint_timestamp_tolerance_and_nil(self):
-        self.assertTrue(same_content_fingerprint(self.old, dict(self.old, newestChange=100.999)))
-        self.assertFalse(same_content_fingerprint(self.old, dict(self.old, newestChange=101)))
-        self.assertFalse(same_content_fingerprint(self.old, dict(self.old, fileCount=21)))
-        self.assertTrue(same_content_fingerprint(dict(self.old, newestChange=None), dict(self.old, newestChange=None)))
-        self.assertFalse(same_content_fingerprint(self.old, dict(self.old, newestChange=None)))
 
     def test_regular_size_and_age_boundaries(self):
         self.assertFalse(judgement_lapsed(self.old, dict(self.old, sizeBytes=1_250_000_000), 0, 14*86400))

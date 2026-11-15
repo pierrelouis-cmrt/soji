@@ -17,6 +17,7 @@ import uuid
 from .util import atomic_json,read_json,ro_sqlite,inside
 from .mcp import SCHEMAS,validate
 from .index import IndexStore
+from .verdicts import fingerprint,content_fingerprint,reusable_verdict,judgement_lapsed,judgement_needed,IDENTITY_FIELDS  # noqa: F401
 
 PRESETS=json.loads(files('soji_cli').joinpath('data/agents.json').read_text())
 ERRORS={
@@ -51,72 +52,6 @@ def stop_agent(process, grace=5):
         process.wait()
 
 
-def fingerprint(f):
-    from .cleanup import digest
-    return digest({'size':f.size,'newest':f.newest,'files':f.files,'identity':f.identity,'hint':f.hint_id,'rule':f.rule,'tier':f.tier if f.hint_id else 'unmatched'})
-
-
-IDENTITY_FIELDS = ('device', 'inode', 'type', 'parentDevice', 'parentInode')
-
-
-def content_fingerprint(f):
-    """Measured content plus stable identity; mutable mtime/ctime are excluded.
-
-    Identity is a safety boundary in addition to the three-field content
-    policy. Return fresh dictionaries for snapshot storage.
-    """
-    identity = f.identity or {}
-    return {'sizeBytes': f.size, 'newestChange': f.newest, 'fileCount': f.files,
-            'identity': {key: identity[key] for key in IDENTITY_FIELDS if key in identity}}
-
-
-def reusable_verdict(store, f, now, trigger='ordinary'):
-    """Return a reusable claim; absence/negative claims return None.
-
-    Raw records use the selection policy only after stable identity
-    matches. Legacy stores/rows retain their strict hash and TTL behavior.
-    Backlog deliberately checks size alone, ignoring age,
-    levels, count and timestamp; this never bypasses local cleanup checks.
-    """
-    reader = getattr(store, 'verdict_record', None)
-    if not callable(reader):
-        return store.verdict(f.path, fingerprint(f), now)
-    record = reader(f.path)
-    if record is None:
-        return None
-    old = record.get('content')
-    if old is None:
-        return store.verdict(f.path, fingerprint(f), now)
-    if not isinstance(old, dict):
-        return None
-    current = content_fingerprint(f)
-    identity = current['identity']
-    if (not all(identity.get(key) is not None for key in IDENTITY_FIELDS)
-            or old.get('identity') != identity):
-        return None
-    claim = record.get('data')
-    if not isinstance(claim, dict) or claim.get('path') != f.path:
-        return None
-    # Malformed persisted measurements fail closed instead of reaching numeric
-    # policy comparisons. A nullable newestChange remains a valid measurement.
-    import math
-    def numeric(value):
-        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-    for content in (old, current):
-        if not all(numeric(content.get(k)) and content[k] >= 0 for k in ('sizeBytes', 'fileCount')):
-            return None
-        newest = content.get('newestChange')
-        if newest is not None and not numeric(newest):
-            return None
-    if trigger == 'backlog':
-        tolerance = max(100_000_000, old['sizeBytes'] // 4)
-        return claim if abs(current['sizeBytes'] - old['sizeBytes']) <= tolerance else None
-    judged_at = record.get('judgedAt')
-    if not numeric(judged_at):
-        return None
-    return None if judgement_needed(old, current, judged_at, now, claim) else claim
-
-
 def parse_usage(text):
     usage={'inputTokens':0,'outputTokens':0,'cachedTokens':0,'costUSD':0.0}
     for line in text.splitlines():
@@ -130,47 +65,6 @@ def parse_usage(text):
             usage['cachedTokens']=max(usage['cachedTokens'],value.get('cached_input_tokens',value.get('cache_read_input_tokens',0)) or 0)
         if isinstance(obj.get('total_cost_usd'),(int,float)):usage['costUSD']=max(usage['costUSD'],obj['total_cost_usd'])
     return usage
-
-
-# Cache policy, separate from the stricter identity digest.
-# A content fingerprint is sizeBytes/newestChange/fileCount only.
-def same_content_fingerprint(old, current):
-    """Same cached content: timestamp tolerance is strictly <1s."""
-    a, b = old.get('newestChange'), current.get('newestChange')
-    return (old['sizeBytes'] == current['sizeBytes'] and
-            old['fileCount'] == current['fileCount'] and
-            ((a is None and b is None) or (a is not None and b is not None and abs(a-b) < 1)))
-
-
-def judgement_lapsed(old, current, judged_at, now, *, keep=False):
-    """Judgements.lapsed / AgentKeeps.lapsed; strict > boundaries."""
-    if now - judged_at > 14 * 86400:
-        return True
-    if current is None:
-        return False
-    size = old['sizeBytes']
-    tolerance = max(50_000_000, size // 10) if keep else max(100_000_000, size // 4)
-    if abs(current['sizeBytes'] - size) > tolerance:
-        return True
-    if keep and current.get('newestChange') is not None:
-        previous = old.get('newestChange')
-        # Swift uses Date.distantPast when the old date is absent.
-        return previous is None or current['newestChange'] - previous > 3600
-    return False
-
-
-def judgement_needed(old, current, judged_at, now, finding):
-    """None means a cached negative judgment, not an absent cache record.
-
-    Caller handles cache misses before invoking this policy. A non-keep claim
-    without levels is retried. These functions do not grant cleanup permission.
-    """
-    if finding is None:
-        return now - judged_at > 86400
-    keep = finding.get('recommendation') == 'keep'
-    if not keep and finding.get('levels') is None:
-        return True
-    return judgement_lapsed(old, current, judged_at, now, keep=keep)
 
 
 def decode_submission(value):
@@ -379,42 +273,5 @@ class AIAnalyzer:
         finally:
             if store:store.close()
     def apply(self,scanner,findings):
-        from .engine import Finding,Node,SESSION_HINTS
-        bypath={f.path:f for f in scanner.findings}
-        for data in findings:
-            path=os.path.realpath(data['path'])
-            if not any(path==r or path.startswith(r.rstrip('/')+'/') for r in scanner.roots):continue
-            f=bypath.get(path)
-            node=scanner.nodes.get(path)
-            catalog_unit=f is not None and f.managed and f.hint_id in SESSION_HINTS
-            if node is not None and not catalog_unit and (f is None or f.size!=node.size or f.files!=node.files):
-                if f is not None:scanner.findings=[old for old in scanner.findings if old is not f]
-                f=scanner.classify(node);scanner.findings.append(f);bypath[path]=f
-            if f is None:continue
-            levels=data.get('levels')
-            if isinstance(levels,dict):
-                numeric={k:v for k,v in levels.items() if k in ('careful','balanced','aggressive')}
-                # A more permissive mode must not become stricter accidentally.
-                for stricter,looser in [('careful','balanced'),('balanced','aggressive')]:
-                    if stricter in numeric:numeric[looser]=min(numeric.get(looser,numeric[stricter]),numeric[stricter])
-                f.levels={**numeric,'reason':levels.get('reason','Agent judgment')}
-            if not f.hint_id:
-                f.group=data.get('group',f.group);f.label=data.get('title',f.label)
-            if not f.hint_id and data.get('regenerable') and data.get('recommendation')=='remove':
-                parts={p.casefold() for p in Path(path).parts}
-                cache=bool(parts & {'caches','cache','tmp','.cache'})
-                marker=Path(path)/'CACHEDIR.TAG'
-                try:
-                    if marker.is_file() and not marker.is_symlink():
-                        with marker.open('rb') as m:cache |= m.read(43).startswith(b'Signature: 8a477f597d28d172789f06886806bc55')
-                except OSError:pass
-                if cache:f.tier='regenerable';f.list_only=False;f.comes_back=data.get('comesBack','rebuilds')
-                else:f.holds.append('Unknown agent-nominated data lacks deterministic cache evidence')
-            f.source='both' if f.hint_id else 'agent';f.recommendation=data.get('recommendation','review');f.confidence=data.get('confidence')
-            f.evidence.append({'check':'agent','judgment':data})
-            # AI may nominate unknown folders but cannot override any local hold,
-            # personal-data tier, reviewOnly policy, or specialized integrity rule.
-            # cleanCommand is evidence only; the plan uses bound native actions.
-        # Prevent double-counting/cleaning a newly split child and its old parent.
-        nominated={os.path.realpath(d['path']) for d in findings}
-        scanner.findings=[f for f in scanner.findings if not any(p!=f.path and p.startswith(f.path.rstrip('/')+'/') for p in nominated) and not (f.path not in nominated and any(f.path.startswith(p.rstrip('/')+'/') for p in nominated))]
+        from .judgments import apply_judgments
+        apply_judgments(scanner,findings)

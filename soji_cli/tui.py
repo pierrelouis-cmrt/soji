@@ -285,8 +285,9 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             curses.set_escdelay(25)
         except (AttributeError, curses.error):
             pass
-        thread = threading.Thread(target=scanner.run, daemon=True)
-        thread.start()
+        from .scancontrol import ScanController
+        controller=ScanController(scanner)
+        thread=controller.start()
         state = {
             "mode": mode,
             "group": "All categories",
@@ -308,9 +309,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             "selectedPath": None,
         }
         message_seen = ("", 0.0)
-        from .demo import DemoScanner
-
-        demo = isinstance(scanner, DemoScanner)
+        demo = not controller.can_clean
         from .update import blocked_reason, upgrade_hint
 
         scan_only = bool(blocked_reason())
@@ -322,24 +321,8 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
         cached_rows = []
 
         def rescan(refresh):
-            nonlocal thread
-            options = dict(
-                home=scanner.home,
-                protected=scanner.protected,
-                max_files=scanner.max_files,
-                max_seconds=scanner.max_seconds,
-                min_bytes=scanner.min_bytes,
-                context=scanner.context,
-                recent_activity_hours=scanner.recent_activity_hours,
-            )
-            if hasattr(scanner, "database") and scanner.database:
-                options.update(database=scanner.database, refresh=refresh)
-            if demo:
-                scanner.__init__()
-            else:
-                scanner.__init__(scanner.roots, **options)
-            thread = threading.Thread(target=scanner.run, daemon=True)
-            thread.start()
+            nonlocal scanner,thread
+            scanner,thread=controller.restart(refresh)
 
         def modal(title, lines, footer):
             h, w = scr.getmaxyx()
@@ -420,7 +403,6 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                         f"Moved {result['completed']} item(s) to the Trash ({human(result['freed'])}); {result['failed']} refused."
                     )
                     rescan(False)
-            # Status messages fade after a few seconds instead of lingering.
             if state["message"] != message_seen[0]:
                 message_seen = (state["message"], time.monotonic())
             elif state["message"] and time.monotonic() - message_seen[1] > 8:
@@ -463,7 +445,7 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
             # The status bar animates at 10 Hz; decisions and large table sorts
             # only need recomputing when the analysis or view actually changes.
             current_analysis = (
-                id(scanner.findings), len(scanner.findings), scanner.now,
+                controller.revision,
                 scanner.done, state["mode"],
             )
             if analysis_key != current_analysis:
@@ -556,8 +538,6 @@ def run_tui(scanner, mode="balanced", export_path=None, state_dir=None):
                 elif state["sort"] == "age":
                     cached_rows.sort(key=lambda f: f.newest)
                 rows_key = current_rows
-                # Keep the cursor on the same item when rows re-sort, the mode
-                # changes or a rescan lands, instead of jumping to its old index.
                 if state["selectedPath"] is not None:
                     for i, f in enumerate(cached_rows):
                         if f.path == state["selectedPath"]:

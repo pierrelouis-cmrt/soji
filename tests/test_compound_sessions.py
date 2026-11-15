@@ -103,13 +103,13 @@ class CompoundSessionTests(unittest.TestCase):
         self.assertTrue((self.subagents/'agent.jsonl').exists())
     def test_scoped_verification_preserves_catalog_policy(self):
         p=self.plan();original=Scanner._build_findings;captured=[]
-        def build(scan):
+        def build(scan,inventories=None):
             original(scan)
             captured.append([(f.path,f.levels,f.holds,f.members,f.action) for f in scan.findings if f.path==str(self.transcript)])
-        def whole(cleaner,scan,path,root,hint):scan.visit(root)
+        def whole(scan,path,root,hint):scan.visit(root)
         with patch.object(Scanner,'_build_findings',build):
             self.cleaner.fresh(p['items'][0],p)
-            with patch.object(Cleaner,'measure_catalog_target',whole):self.cleaner.fresh(p['items'][0],p)
+            with patch('soji_cli.catalogs.measure_catalog_target',whole):self.cleaner.fresh(p['items'][0],p)
         self.assertEqual(captured[0],captured[1])
     def test_tampered_members_rejected(self):
         p=self.plan();p['items'][0]['members'].append(dict(p['items'][0]['members'][1],path=str(self.memory)))

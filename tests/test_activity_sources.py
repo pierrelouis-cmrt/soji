@@ -15,7 +15,7 @@ from soji_cli.engine import Finding
 from soji_cli.activity import ActivityIndex
 from soji_cli import activity as activity_mod
 from soji_cli.apps import InstalledTools
-from soji_cli.catalogs import codex_writer_ids, codex_idle_ordinal, codex_process_freshness, expand_catalogs, runtime_catalog, document_versions
+from soji_cli.catalogs import codex_writer_ids, codex_process_freshness, expand_catalogs, runtime_catalog, document_versions
 from soji_cli.gitstate import GitInspector
 
 
@@ -116,8 +116,6 @@ class RecoveryTests(unittest.TestCase):
             a=ActivityIndex(self.home,self.now);a.codex()
         self.assertEqual(a.errors,[])
     def test_codex_catalog_idle_boundaries_and_process_freshness(self):
-        for seconds,ordinal in ((-1,3),(10799,3),(10800,2),(172799,2),(172800,1),(604799,1),(604800,0)):
-            self.assertEqual(codex_idle_ordinal(seconds),ordinal)
         self.assertEqual(codex_process_freshness(0),300)
         self.assertEqual(codex_process_freshness(0.01),300)
         self.assertEqual(codex_process_freshness(2),7200)
@@ -128,7 +126,7 @@ class RecoveryTests(unittest.TestCase):
         root=str(p.parent)
         def finding(path):return Finding(str(path),100,100,1,1000,'Agent and editor history','session')
         initial=finding(root);initial.hint_id='codex-sessions'
-        scanner=SimpleNamespace(home=self.home,now=self.now,activity=None,findings=[initial],
+        scanner=SimpleNamespace(home=self.home,now=self.now,activity=None,writer_ids=None,processes=[],recent_activity_hours=0,findings=[initial],
             nodes={str(p):SimpleNamespace(path=str(p),directory=False)},classify=lambda node:finding(node.path))
         rows=expand_catalogs(scanner)
         self.assertEqual(len(rows),1);self.assertEqual(rows[0].path,str(p))
@@ -141,7 +139,7 @@ class RecoveryTests(unittest.TestCase):
         root=str(p.parent)
         def finding(path):return Finding(str(path),100,100,1,self.now-10800,'Agent and editor history','session')
         initial=finding(root);initial.hint_id='codex-sessions'
-        scanner=SimpleNamespace(home=self.home,now=self.now,activity=None,processes=['/fixture/bin/codex'],recent_activity_hours=4,
+        scanner=SimpleNamespace(home=self.home,now=self.now,activity=None,writer_ids=None,processes=['/fixture/bin/codex'],recent_activity_hours=4,
             findings=[initial],nodes={str(p):SimpleNamespace(path=str(p),directory=False)},classify=lambda node:finding(node.path))
         row=expand_catalogs(scanner)[0]
         self.assertIn('Codex is running',row.holds[0])

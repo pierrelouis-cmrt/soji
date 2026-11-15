@@ -11,32 +11,34 @@ workflow restores it. These helpers answer two questions for the classifier:
   one the user works in (own lockfile and VCS root)? Project-dependency rules
   only match there.
 
-Every answer depends on filesystem facts, so results share the catalog's
-marker cache lifetime (cleared before each fresh verification).
+Ownership answers depend on filesystem facts only, never on catalog matching,
+and live in `InstallTrees.cache`, which `Catalog.forget_filesystem_facts` clears
+before each fresh verification.
 """
 from __future__ import annotations
 import json
 import os
 from pathlib import Path
 
-# Groups whose matched folder is one installed unit: never split around nested
-# hints, never descended for review, and every row inside one is refused.
-ATOMIC_GROUPS = ('Toolchains and SDKs', 'Editor extensions')
+ATOMIC = 'atomic-install'
+PROJECT_OUTPUT = 'project-output'
+NEEDS_REAL_PROJECT = 'needs-real-project'
 
-# Rules that describe project output; they never match inside installed software.
-DEV_GROUPS = ('Project dependencies', 'Build output')
 
-# Home-relative install roots. Each match of a pattern is one install; anything
-# below it is shipped code (including its out/, dist/, modules/, node_modules).
+def capabilities(hint) -> frozenset:
+    """Stable rule capabilities are independent of display group names."""
+    return frozenset(hint.get('capabilities',()))
+
+
+def capable(hint, name) -> bool:
+    return name in capabilities(hint)
+
+
+# Home-relative install roots that no catalog rule names. Folders matched by an
+# atomic-install rule (editor extensions, toolchains) are install roots too; see
+# InstallTrees.root_kind. Each match is one install; anything below it is
+# shipped code (including its out/, dist/, modules/, node_modules).
 INSTALL_LOCATIONS = (
-    '.vscode/extensions/*',
-    '.vscode-insiders/extensions/*',
-    '.vscode-oss/extensions/*',
-    '.cursor/extensions/*',
-    '.windsurf/extensions/*',
-    '.antigravity/extensions/*',
-    '.kiro/extensions/*',
-    '.trae/extensions/*',
     '.positron/extensions/*',
     '.config/raycast/extensions/*',
     'Library/Application Support/com.raycast.macos/extensions/*',
@@ -120,11 +122,15 @@ class InstallTrees:
         self.home = home.rstrip('/') or '/'
         self.catalog = catalog
         self.locations = [glob_regex(os.path.join(self.home, p)) for p in INSTALL_LOCATIONS]
+        # Atomic-install rule patterns, matched directly: ownership must not
+        # depend on Catalog.match, which itself consults ownership.
+        self.atomic = [(glob_regex(p.replace('~', self.home, 1) if p.startswith('~') else p), hint)
+                       for hint in catalog.hints if capable(hint, ATOMIC) for p in hint['patterns']]
+        # Filesystem facts for one verification scope; see forget().
+        self.cache = {}
 
-    @property
-    def cache(self):
-        # Shares the marker cache, so it is cleared with it.
-        return self.catalog.markers_cache
+    def forget(self):
+        self.cache.clear()
 
     def _vcs(self, folder: str) -> bool:
         """`folder` itself is a VCS root; ancestors never establish ownership."""
@@ -142,7 +148,6 @@ class InstallTrees:
                 kind = 'extension manifest'
             elif self.catalog.exists(p, ['package.json']):
                 kind = package_manifest_kind(p / 'package.json')
-            # A VCS checkout with a manifest is a project the user develops.
             if kind and kind != 'application bundle' and self._vcs(folder):
                 kind = ''
             self.cache[key] = kind
@@ -156,11 +161,8 @@ class InstallTrees:
             if any(rx.fullmatch(folder) for rx in self.locations):
                 reason = 'installed app, extension or tool folder'
             else:
-                match = self.catalog.match(folder)
-                if match and match[0]['group'] in ATOMIC_GROUPS:
-                    reason = match[0]['label']
-                else:
-                    reason = self.manifest(folder)
+                hint = next((h for rx, h in self.atomic if rx.fullmatch(folder) and self.catalog.conditions_hold(folder, h)), None)
+                reason = hint['label'] if hint else self.manifest(folder)
             self.cache[key] = reason
         return self.cache[key]
 
@@ -180,10 +182,11 @@ class InstallTrees:
         return not any(path.startswith(os.path.join(self.home, area) + '/') for area in NO_PROJECT_AREAS)
 
     def real_project(self, path: str) -> bool:
-        """The immediate owner has both a lockfile and its own VCS root."""
-        # The immediate owner must carry its own lockfile AND VCS root.
-        # A dotfiles checkout above it, or a global tool's lockfile, proves
-        # nothing. Explicit install roots always take precedence.
+        """The immediate owner has both a lockfile and its own VCS root.
+
+        A dotfiles checkout above it, or a global tool's lockfile, proves
+        nothing. Explicit install roots always take precedence.
+        """
         owner = str(Path(path).parent)
         return (not self.containing(path) and self.project_area(path)
                 and self._vcs(owner)

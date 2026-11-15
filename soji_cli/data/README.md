@@ -34,6 +34,7 @@ Fields, in the order they appear:
 | `id` | yes | Stable identifier. Code, tests and saved indexes refer to it |
 | `label` | yes | Name the user sees for a matched folder |
 | `group` | yes | One of the names in `groups.json` |
+| `capabilities` | no | Optional rule capabilities, stored on each hint by stable hint ID: `atomic-install` (one installed unit: never split, never descended for review, its matched folders are install roots and rows inside are refused), `project-output` (`**/` patterns match only inside development projects, never inside installed software), `needs-real-project` (only where the owning folder has its own lockfile and VCS root) |
 | `patterns` | yes | Globs. `~` is the home folder, `*` stays inside one path segment, `**` spans any number of segments |
 | `onlyIfContains` | no | The matched folder must contain one of these names (globs; a name with `/` is a relative path) |
 | `unlessContains` | no | The matched folder must contain none of these names |
@@ -57,7 +58,7 @@ never makes Sōji more aggressive. `specialized.py` implements them.
 | --- | --- | --- | --- | --- |
 | `minIdleDays` | The item must have been idle this many days | ×2 | ×1 | ×0.5, at least 1 day |
 | `minProjectIdleDays` | The project the item belongs to must have been idle this many days | ×4 | ×1 | ×0.25, at least 1 day |
-| `sameIdleAtEveryLevel` | Agent worktrees only: once git shows a worktree is clean, merged and pushed, every level uses `minIdleDays` unscaled | | | |
+| `sameIdleAtEveryLevel` | Legacy worktree rule field; worktree cleanup is disabled | | | |
 
 **Retention.** Applies to sibling folders that are versions of one thing:
 

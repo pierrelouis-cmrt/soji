@@ -8,6 +8,7 @@ import re
 import shlex
 import shutil
 import plistlib
+from xml.parsers.expat import ExpatError
 from .util import read_plist,read_json,inside,command,SubtreeIndex
 from .platform import native
 
@@ -157,7 +158,8 @@ class InstalledTools:
     def config_json(self,path):
         """Bounded JSON/JSONC reader; comments inside strings remain literal."""
         try:
-            if path.is_symlink() or path.stat().st_size>4_000_000:return None
+            if path.is_symlink() or path.stat().st_size>4_000_000:
+                self.errors.append('Tool config inspection skipped: '+str(path));return None
             text=path.read_text()
             # Tokenize strings before comments so https:// and quoted // survive.
             text=re.sub(r'("(?:[^"\\]|\\.)*")|//[^\n]*|/\*[\s\S]*?\*/',
@@ -174,7 +176,7 @@ class InstalledTools:
             try:
                 for entry in p.iterdir():
                     if entry.is_symlink() or entry.is_file() and os.access(entry,os.X_OK):self.add(str(entry.resolve()),'PATH command '+entry.name)
-            except OSError:pass
+            except OSError:self.errors.append('PATH inventory unreadable: '+str(p))
         configs=['.claude/settings.json','.claude/settings.local.json','.cursor/mcp.json','.gemini/settings.json','.gemini/antigravity/mcp_config.json','.config/opencode/opencode.json','.config/opencode/opencode.jsonc','.config/opencode/config.json','.qwen/settings.json','.kimi/config.json','.grok/settings.json','.grok/user-settings.json','.copilot/mcp-config.json','.codeium/windsurf/mcp_config.json','Library/Application Support/Claude/claude_desktop_config.json','Library/Application Support/Code/User/mcp.json','Library/Application Support/Code/User/settings.json','Library/Application Support/Windsurf/User/settings.json','.config/zed/settings.json','.continue/config.json','.amp/settings.json','.config/amp/settings.json','.factory/mcp.json','.kiro/settings/mcp.json','Library/Application Support/Cursor/User/settings.json']
         for rel in configs:
             data=self.config_json(self.home/rel)
@@ -182,7 +184,8 @@ class InstalledTools:
         # TOML support on Python 3.11+, bounded parser fallback before that.
         p=self.home/'.codex/config.toml'
         try:
-            if p.is_file() and p.stat().st_size<4_000_000:
+            if p.is_symlink() or (p.exists() and p.stat().st_size>=4_000_000):self.errors.append('Codex config inspection skipped')
+            elif p.is_file():
                 try:
                     import tomllib
                     self.extract(tomllib.loads(p.read_text()),'Codex MCP config')
@@ -193,11 +196,18 @@ class InstalledTools:
         except (OSError,ValueError):self.errors.append('Codex config unreadable')
         for root in [self.home/'Library/LaunchAgents',*self.SYSTEM_AGENT_ROOTS]:
             for p in root.glob('*.plist'):
-                info=read_plist(p)
+                try:
+                    if p.is_symlink() or p.stat().st_size>8_000_000:raise ValueError('Inspection skipped')
+                    with p.open('rb') as source:info=plistlib.load(source)
+                    if not isinstance(info,dict):raise ValueError('Expected a plist dictionary')
+                except (OSError,ValueError,plistlib.InvalidFileException,ExpatError):
+                    self.errors.append('Launch agent inspection incomplete: '+str(p));continue
                 for value in [info.get('Program'),*(info.get('ProgramArguments') or [])]:self.add(value,'Launch agent '+p.stem)
         return self
+    @property
+    def complete(self):return not self.errors
+
     def use(self,path):
-        # First matching target in list order, via a prefix index.
         key=(id(self.targets),len(self.targets))
         if getattr(self,'_index_key',None)!=key:
             entries=[]

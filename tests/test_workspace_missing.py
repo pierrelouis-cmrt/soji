@@ -89,7 +89,7 @@ class WorkspaceMissingScan(unittest.TestCase):
         for name in ('Old', 'Recent', 'Hours', 'Fresh'):
             f = rows[name]['finding']
             self.assertEqual((f.rule_level, f.rule_early_reason), ('careful', 'workspaceMissing'), name)
-            self.assertEqual(f.rule_min_hours, {}, name)
+            self.assertTrue(any(e.get('check')=='workspaceMissing' and e.get('missing') for e in f.evidence),name)
 
     def test_missing_versus_present_old(self):
         self.project('Missing', 20, self.home / 'code/gone')

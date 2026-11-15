@@ -18,6 +18,33 @@ def inside(path,root):
     return a==r or r=='/' or a.startswith(r+'/')
 
 
+def outermost(paths):
+    """Sorted unique paths with any path inside another one dropped."""
+    kept=SubtreeSet(())
+    for p in sorted(set(paths),key=lambda p:(p.count('/'),p)):
+        if not kept(p):kept.add(p)
+    return sorted(kept.roots)
+
+
+class SubtreeSet:
+    """`within(path, root)` for any root, in O(depth) with a per-folder memo."""
+    def __init__(self,roots):
+        self.roots=set(roots);self._memo={}
+    def add(self,root):
+        self.roots.add(root);self._memo.clear()
+    def __call__(self,path):
+        memo=self._memo;chain=[]
+        while True:
+            if path in self.roots:result=True;break
+            known=memo.get(path)
+            if known is not None:result=known;break
+            parent=os.path.dirname(path)
+            if parent==path:result=False;break
+            chain.append(path);path=parent
+        for p in chain:memo[p]=result
+        return result
+
+
 class SubtreeIndex:
     """Best-scoring entry at or below a path, in O(log n) per query.
 

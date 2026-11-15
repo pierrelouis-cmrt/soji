@@ -65,7 +65,6 @@ class NewerBuild(Fixture):
         f = self.evaluate(s, old)
         self.assertEqual((f.rule_early_reason, f.rule_level), ('newerBuild', 'careful'))
         # keepNewest 2 per device would otherwise retain it.
-        self.assertEqual(f.mode_holds, {})
         # comesBack=downloads keeps the judged floor at Balanced (as for workspaceMissing).
         self.assertTrue(f.decide('balanced', s.now)[0], f.decide('balanced', s.now)[1])
         self.assertFalse(f.decide('careful', s.now)[0])

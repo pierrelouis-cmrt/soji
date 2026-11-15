@@ -17,8 +17,8 @@ def booted_runtimes(catalog):
     return {rid for rid,items in groups.items() if any(d.get('state')!='Shutdown' for d in items)}
 
 def finalize(items,roots,home,mode='aggressive'):
-    plan={'format':'soji-clean-plan/1','id':uuid.uuid4().hex,'createdAt':time.time(),'mode':mode,'roots':roots,'home':home,'protected':[],'items':items,'method':'permanent','warnings':['Native cleanup is permanent; current documents, conflicts, active and retained runtimes are excluded.']}
-    plan['digest']=digest(plan);return plan
+    from .plans import build_plan
+    return build_plan(items=items,roots=roots,home=home,mode=mode,method='permanent',warnings=['Native cleanup is permanent; current documents, conflicts, active and retained runtimes are excluded.'])
 
 def versions_plan(document,home):
     doc=str(Path(document).resolve());catalog=document_versions(doc)
@@ -27,8 +27,7 @@ def versions_plan(document,home):
     for version in catalog['versions']:
         if version['retained']:continue
         action={'kind':'document-version','document':doc,'version':version.get('unit') or version['url'],'versionModified':version['modified']}
-        items.append({'path':doc,'identity':file_identity(doc),'size':0,'newest':version['modified'],'files':1,'hint':'document-versions','group':'Document versions','method':'permanent','action':action,'finding':{}})
-    # Multiple actions on one document are valid; validation deduplicates actions.
+        items.append({'path':doc,'identity':file_identity(doc),'size':0,'newest':version['modified'],'files':1,'hint':'document-versions','group':'Document versions','method':'permanent','action':action})
     return finalize(items,[str(Path(doc).parent)],home)
 
 def runtimes_plan(home,catalog=None):
@@ -50,7 +49,7 @@ def runtimes_plan(home,catalog=None):
         if not last or time.time()-last<7*86400:continue
         path=str(Path(path).resolve());roots.add(str(Path(path).parent))
         action={'kind':'simulator-runtime','identifier':image['identifier'],'runtimeIdentifier':rid,'build':image.get('build')}
-        items.append({'path':path,'identity':file_identity(path),'size':image.get('sizeBytes',0),'newest':last,'files':1,'hint':'simulator-runtime','group':'Simulators and emulators','method':'permanent','action':action,'finding':{}})
+        items.append({'path':path,'identity':file_identity(path),'size':image.get('sizeBytes',0),'newest':last,'files':1,'hint':'simulator-runtime','group':'Simulators and emulators','method':'permanent','action':action})
     return finalize(items,sorted(roots),home)
 
 def verify_native(item):
@@ -63,7 +62,6 @@ def verify_native(item):
         if not version or version.get('retained') or version.get('modified')!=action.get('versionModified'):raise ValueError('Document version is no longer removable')
     elif kind=='simulator-runtime':
         catalog=runtime_catalog()
-        # Derive the current eligible plan, including active-device and retention checks.
         plan=runtimes_plan(str(Path.home()),catalog)
         if not any(i['action']==action and i['path']==item['path'] for i in plan['items']):raise ValueError('Runtime no longer passes current retention and device checks')
     else:raise ValueError('Unsupported native catalog action')

@@ -5,7 +5,7 @@ re-reads ambiguous entries with fstatat, then aggregates sequentially in readdir
 order (hardlink shares and first-name logical bytes included). The result is
 decoded here into `Node` rows identical to a Python walk. Python's `visit`
 stays the reference implementation and the fallback: it is used when the helper
-is missing, when SOJI_NATIVE_WALK=0, when `visit` is patched, and for every
+is missing, when SOJI_NATIVE_WALK=0, for every
 cleanup re-verification.
 """
 from __future__ import annotations
@@ -54,38 +54,13 @@ def helper():
     return _bundled()
 
 
-_extracted = []
-
-
 def _bundled():
     """The packaged helper; inside a zipapp it is extracted once per process."""
-    try:
-        from importlib.resources import files, as_file
-        resource = files('soji_cli').joinpath('native-bin', 'soji-native')
-        if not resource.is_file():
-            return None
-        path = str(resource)
-        if os.path.isfile(path):
-            return path
-        if not _extracted:
-            import atexit
-            context = as_file(resource)
-            extracted = str(context.__enter__())
-            atexit.register(context.__exit__, None, None, None)
-            os.chmod(extracted, 0o700)
-            _extracted.append(extracted)
-        return _extracted[0]
-    except (OSError, TypeError, ValueError):
-        return None
+    from .platform import helper_path
+    return helper_path()
 
 
 def available(scanner) -> bool:
-    from .engine import Scanner
-    # A patched or overridden visit (tests, benchmarks) keeps the Python walk.
-    if 'visit' in vars(scanner) or type(scanner).visit is not Scanner.visit:
-        return False
-    if type(scanner).private is not Scanner.private:
-        return False
     return helper() is not None
 
 
@@ -176,7 +151,7 @@ def walk(scanner, roots):
         return False
     try:
         decode(scanner, payload)
-    except (ValueError, IndexError, KeyError, UnicodeError):
+    except (ValueError, IndexError, KeyError, UnicodeError, TypeError, AttributeError, OverflowError):
         return False
     return True
 
@@ -184,7 +159,13 @@ def walk(scanner, roots):
 def decode(scanner, payload):
     newline = payload.index(b'\n')
     header = json.loads(payload[:newline])
+    if header.get('protocol')!=1 or header.get('columns')!=[field for _,field in COLUMNS] or header.get('reasons')!=list(REASONS):
+        raise ValueError('Unsupported native walk contract')
     count = header['count']
+    if type(count) is not int or count<0:raise ValueError('Invalid native node count')
+    for field in ('namesBytes','visited','bytes','unreadable','skipped'):
+        if type(header.get(field)) is not int or header[field]<0:raise ValueError('Invalid native counter')
+    if type(header.get('limited')) is not bool:raise ValueError('Invalid native limit flag')
     offset = newline + 1
     columns = {}
     for code, field in COLUMNS:
@@ -201,14 +182,24 @@ def decode(scanner, payload):
     names = names_blob.decode('utf-8', 'surrogateescape').split('\0') if count else []
     if len(names) != count:
         raise ValueError('Native walk name count mismatch')
+    if offset+header['namesBytes']!=len(payload):raise ValueError('Trailing native payload')
+    for i,(parent,reason,flags) in enumerate(zip(columns['parent'],columns['reason'],columns['flags'])):
+        if parent < -1 or parent >= i or reason>=len(REASONS) or flags & ~15:raise ValueError('Invalid native node')
+        if parent==-1:
+            if not names[i].startswith('/'):raise ValueError('Invalid native root')
+        elif not names[i] or names[i] in ('.','..') or '/' in names[i]:raise ValueError('Invalid native child')
+    for field in ('size','apparent','files','errors','own_errors','own_size','own_apparent','link_count'):
+        if any(v<0 for v in columns[field]):raise ValueError('Negative native measurement')
+    import math
+    if any(not math.isfinite(v) for field in ('newest','own_newest') for v in columns[field]):raise ValueError('Invalid native time')
     c = columns
     parent, flags, reason = c['parent'], c['flags'], c['reason']
     size, apparent, files = c['size'], c['apparent'], c['files']
     newest, own_newest, errors, own_errors = c['newest'], c['own_newest'], c['errors'], c['own_errors']
     device, inode, own_size, own_apparent, link_count = (
         c['device'], c['inode'], c['own_size'], c['own_apparent'], c['link_count'])
-    nodes = scanner.nodes
-    inodes = scanner._inodes
+    nodes = {}
+    inodes = set()
     paths = [None] * count
     made = [None] * count
     reasons = REASONS
@@ -219,6 +210,8 @@ def decode(scanner, payload):
         else:
             base = paths[p]
             path = base + names[i] if base.endswith('/') else base + '/' + names[i]
+        if path in nodes:raise ValueError('Duplicate native path')
+        if p>=0 and not made[p].directory:raise ValueError('Native parent is not a directory')
         paths[i] = path
         f = flags[i]
         node = Node(path, size[i], apparent[i], files[i], newest[i], own_newest[i], errors[i],
@@ -230,6 +223,8 @@ def decode(scanner, payload):
             made[p].children.append(path)
         if f & 8:
             inodes.add((node.device, node.inode))
+    scanner.nodes.update(nodes)
+    scanner._inodes.update(inodes)
     scanner.visited += header['visited']
     scanner.bytes += header['bytes']
     scanner.unreadable += header['unreadable']

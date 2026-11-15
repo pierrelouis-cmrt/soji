@@ -17,21 +17,21 @@ from .util import atomic_json,inside,command
 
 
 TRASH_NOTICE='Undo works only while the items are still in the Trash. Once the Trash is emptied (by you, or by macOS after 30 days), they cannot be restored.'
-# Fresh-guard refusals that mean "something is using this right now". The
-# checks are momentary snapshots (an app opens and closes cache files), so a
-# path refused for live use stays refused for LIVE_USE_HOLD seconds instead of
-# being retried until a snapshot happens to pass.
+# Legacy journal messages written before stable refusal codes were recorded.
 LIVE_USE_REASONS=('File open or process working in this folder','Owning application is running','Running: ',
                   'A running program is installed here','Codex session has a writer lock',
                   'Coding agent or editor used this project recently','Codex is running and this session changed recently',
                   'Contents changed since analysis','identity changed','Identity changed','Target or parent changed',
                   'Session members changed','Target changed before operation')
 LIVE_USE_HOLD=86400
-from .safety import HIGH_RISK_GROUPS, staged_ancestor, SafetyRefusal
+from .safety import HIGH_RISK_GROUPS, staged_ancestor, SafetyRefusal, STAGED_PREFIX
 
 
 def refusal_code(error):
     if isinstance(error,SafetyRefusal):return error.code
+    return None
+
+def legacy_refusal_code(error):
     return 'active-use' if any(r in str(error) for r in LIVE_USE_REASONS) else None
 
 
@@ -104,20 +104,10 @@ def recoverability(entry):
     return 'recoverable while in Trash'
 
 
-def same_trash_identity(current,expected):
-    # macOS Trash xattrs may change ctime without changing the object.
-    return bool(expected) and {k:v for k,v in current.items() if k!='ctimeNs'}=={k:v for k,v in expected.items() if k!='ctimeNs'}
+from .identity import file_identity, same_trash_identity, digest
 
 
-def file_identity(path):
-    p=Path(path);s=os.lstat(p);parent=os.stat(p.parent,follow_symlinks=False)
-    return {'device':s.st_dev,'inode':s.st_ino,'type':stat.S_IFMT(s.st_mode),'parentDevice':parent.st_dev,'parentInode':parent.st_ino,'mtimeNs':s.st_mtime_ns,'ctimeNs':s.st_ctime_ns}
-
-
-def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
-
-
-def create_plan(scanner,mode,paths=None,method='trash'):
+def create_plan(scanner,mode,paths=None,method='trash',extra_warnings=(),**metadata):
     selected=[f for f in scanner.decisions(mode) if f.selected and (paths is None or f.path in paths)]
     items=[]
     for f in selected:
@@ -129,8 +119,8 @@ def create_plan(scanner,mode,paths=None,method='trash'):
     extra=[]
     if risky:extra.append('High-risk groups selected: '+', '.join(risky)+'. Software may need reinstalling or rebuilding.')
     if no_vcs:extra.append(f'{len(no_vcs)} dependency folder(s) outside a VCS checkout: review them before applying.')
-    value={'format':'soji-clean-plan/1','id':uuid.uuid4().hex,'createdAt':time.time(),'mode':mode,'roots':scanner.roots,'home':scanner.home,'protected':scanner.protected,'items':items,'method':method,'version':soji_version(),'warnings':['Review paths before applying. Trash is reversible while its item exists; permanent cleanup is not.',TRASH_NOTICE,*extra]}
-    value['digest']=digest(value);return value
+    from .plans import build_plan
+    return build_plan(items=items,roots=scanner.roots,home=scanner.home,mode=mode,method=method,protected=scanner.protected,warnings=['Review paths before applying. Trash is reversible while its item exists; permanent cleanup is not.',TRASH_NOTICE,*extra,*extra_warnings],**metadata)
 
 
 def validate_plan(plan):
@@ -138,7 +128,8 @@ def validate_plan(plan):
     copy=dict(plan);expected=copy.pop('digest',None)
     if expected!=digest(copy):raise ValueError('Plan contents changed; generate a new plan')
     if time.time()-plan['createdAt']>3600:raise ValueError('Plan expired; rescan and create a fresh plan')
-    keys=[(x['path'],json.dumps(x.get('action',{}),sort_keys=True)) for x in plan['items']]
+    from .plans import resource_identity
+    keys=[resource_identity(x) for x in plan['items']]
     if len(keys)!=len(set(keys)):raise ValueError('Duplicate cleanup actions')
     by_path={}
     for item in plan['items']:by_path.setdefault(item['path'],[]).append(item)
@@ -193,7 +184,7 @@ def parent_fd(path):
 def remove_at(fd,name,expected=None,device=None):
     """Descriptor-relative recursive removal; symlinks are unlinked, never followed."""
     s=os.stat(name,dir_fd=fd,follow_symlinks=False)
-    if expected and (s.st_dev,s.st_ino)!=expected:raise ValueError('Removal identity changed')
+    if expected and (s.st_dev,s.st_ino)!=expected:raise SafetyRefusal('Removal identity changed','identity-changed')
     if device is None:device=s.st_dev
     if s.st_dev!=device:raise ValueError('Removal crosses a mount boundary')
     if stat.S_ISDIR(s.st_mode):
@@ -228,56 +219,12 @@ def compound_status(entry):
 
 
 class Cleaner:
-    def __init__(self,state,*,context=True,trash_directory=None):
+    def __init__(self,state,*,context=True,trash_directory=None,eligibility=None):
         self.state=Path(state).expanduser().resolve();self.state.mkdir(parents=True,exist_ok=True)
         self.journal=self.state/'journal.jsonl';self.context=context;self.trash_directory=trash_directory
+        self.eligibility=eligibility
         self._batch=None
 
-    def collect_context(self,scan):
-        """Share live snapshots for at most one second, only within one apply call.
-
-        Target contents and identities are never cached. Inventory snapshots have
-        a separate five-second lifetime; new batches always start from scratch.
-        """
-        batch=self._batch
-        now=time.monotonic()
-        if batch is None or now-batch.get('context_at',float('-inf'))>=1:
-            scan.collect_context()
-            from .catalogs import codex_writer_ids
-            locks=codex_writer_ids(scan.home)
-            if batch is not None:
-                batch.update(context_at=now,processes=scan.processes,open_paths=scan.open_paths,
-                             warnings=scan.context_warnings,locks=locks)
-        else:
-            scan.processes=batch['processes'];scan.open_paths=batch['open_paths']
-            scan.context_warnings=list(batch['warnings']);locks=batch['locks']
-        scan._codex_writer_ids=locks
-
-    def measure_catalog_target(self,scan,path,root,hint):
-        """Reconstruct the catalog from just this target's current filesystem unit.
-
-        A synthetic container feeds the same catalog policy as a full scan. For
-        Claude, discover both sidecars anew, including a newly created transcript
-        that would subsume a formerly standalone subagent row.
-        """
-        from .engine import Node
-        for parent in Path(path).parents:
-            if str(parent)==root:break
-            if scan.private(str(parent)):raise ValueError('Protected session ancestor')
-        targets=[path]
-        if hint=='claude-sessions':
-            relative=Path(path).relative_to(root)
-            base=str(Path(root)/relative.parts[0])
-            transcript=base if base.endswith('.jsonl') else base+'.jsonl'
-            stem=transcript[:-len('.jsonl')]
-            targets=([p for p in [transcript,stem+'/subagents',stem+'/tool-results'] if os.path.lexists(p)]
-                     if os.path.lexists(transcript) else [path])
-            if not any(inside(path,p) for p in targets):targets.append(path)
-        for target in targets:scan.visit(target)
-        scan.nodes[root]=Node(root,directory=True,children=targets,
-                              size=sum(scan.nodes[p].size for p in targets),
-                              newest=max((scan.nodes[p].newest for p in targets),default=0))
-        scan.roots=[root]
     def checkpoint(self,entry):
         try:self.append(entry)
         except Exception as exc:
@@ -299,7 +246,7 @@ class Cleaner:
             for e in self.entries(strict=True):
                 for rec in [e,*e.get('members',[])]:
                     error=rec.get('error') or '';at=rec.get('refusalAt',rec.get('at',e.get('at',0)))
-                    if rec.get('status')=='failed' and now-at<LIVE_USE_HOLD and (rec.get('refusalCode') or refusal_code(error)):
+                    if rec.get('status')=='failed' and now-at<LIVE_USE_HOLD and (rec.get('refusalCode') or ('refusalCode' not in rec and legacy_refusal_code(error))):
                         if at>refusals.get(rec['path'],(0,''))[0]:refusals[rec['path']]=(at,error)
             if batch is not None:batch['refusals']=refusals
         return max((v for p,v in refusals.items() if inside(path,p) or inside(p,path)),default=None)
@@ -338,7 +285,7 @@ class Cleaner:
             for folder,dirs,files in os.walk(path,followlinks=False,onerror=unreadable):
                 seen+=len(dirs)+len(files)
                 if seen>100000:raise SafetyRefusal('Staged-copy inventory incomplete; cleanup blocked','staged-unknown')
-                if any(name.startswith('.soji-removing-') for name in [*dirs,*files]):
+                if any(name.startswith(STAGED_PREFIX) for name in [*dirs,*files]):
                     raise SafetyRefusal('Contains a Sōji staged object; review with `soji recover`','staged-copy')
         if uninstall_action:
             from .uninstall import verify_uninstall
@@ -350,102 +297,15 @@ class Cleaner:
             evidence=verify_native(item)
             self._fresh_policy={'source':'fresh','verifier':item['action']['kind'],'rule':item.get('hint') or item['action']['kind'],'mode':plan.get('mode'),'threshold':None,'reason':'Fresh native catalog eligibility verified','evidence':evidence}
             return identity
-        batch=self._batch
-        scan=Scanner([path],home=plan['home'],protected=plan.get('protected',[]),min_bytes=0,context=self.context,max_seconds=120,max_files=1000000,inherit_hint=item.get('hint') or None,catalog=batch.get('catalog') if batch else None)
-        # Policy dependencies (project pins) span the plan's whole scope, not
-        # this target-scoped walk: rediscover them live on every check, so a
-        # pin created after the plan holds the item. Incomplete discovery holds.
-        scan.pin_roots=list(plan['roots']);scan.pin_live=True
-        if batch is not None:
-            batch['catalog']=scan.catalog
-            # Marker listings are mutable filesystem facts, not catalog rules.
-            scan.catalog.markers_cache.clear();scan.catalog.match_cache.clear()
-        measure_root=path
-        if item.get('finding',{}).get('rule',{}).get('minProjectIdleDays'):
-            measure_root=scan.project_for(path) or path
-        elif item.get('finding',{}).get('rule',{}).get('keepNewest'):
-            # Retention ranks against siblings: measure the whole version family,
-            # i.e. climb one level per trailing wildcard segment of the pattern.
-            pattern=item.get('finding',{}).get('matched_pattern') or ''
-            depth=0
-            for segment in reversed(pattern.split('/')):
-                if not any(c in segment for c in '*?['):break
-                depth+=1
-            family=Path(path)
-            for _ in range(depth):family=family.parent
-            if depth and inside(path,str(family)) and inside(str(family),plan['home']):measure_root=str(family)
-        if item.get('hint') in ('claude-sessions','codex-sessions','trash-item'):
-            for parent in Path(path).parents:
-                match=scan.catalog.match(str(parent))
-                if match and (match[0]['id']==item.get('hint') or item.get('hint')=='trash-item' and match[0]['id']=='trash'):
-                    measure_root=str(parent);break
-            scan.tick_trash=item.get('hint')=='trash-item'
-        scan.started=time.monotonic()
-        # Fresh process/open-file snapshot, taken while the target is re-measured.
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(1) as pool:
-            context=pool.submit(self.collect_context,scan)
-            if item.get('hint') in ('claude-sessions','codex-sessions','trash-item') and measure_root!=path:
-                self.measure_catalog_target(scan,path,measure_root,item['hint'])
-            else:scan.visit(measure_root)
-            context.result()
-        n=scan.nodes.get(path)
-        if n is None:raise ValueError('Fresh target could not be measured')
-        if scan.limited:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
-        for m in members or [{'path':path,'size':item['size'],'newest':item['newest'],'files':item['files']}]:
-            mn=scan.nodes.get(m['path'])
-            if mn is None:raise ValueError('Fresh target could not be measured')
-            if mn.errors or mn.skipped or mn.secret:raise ValueError('Fresh verification incomplete, protected, or contains secrets')
-            if mn.size!=m['size'] or mn.newest!=m['newest'] or mn.files!=m['files']:raise SafetyRefusal('Contents changed since analysis'+(': '+m['path'] if members else ''),'contents-changed')
-        if item.get('hint') in ('claude-sessions','codex-sessions','trash-item') and measure_root!=path:
-            # Re-derive the catalog row (FindingPart policy, compound members)
-            # from its catalog root, not from a bare file.
-            scan.roots=[measure_root]
-        if batch is not None and time.monotonic()-batch.get('inventory_at',float('-inf'))<5:
-            scan._shared_inventories=batch['inventories']
-        inventory_started=time.monotonic()
-        scan._build_findings()
-        if batch is not None and not hasattr(scan,'_shared_inventories'):
-            batch.update(inventory_at=inventory_started,inventories=(scan.activity,scan.apps,scan.tools))
-        f=next((f for f in scan.findings if f.path==path),None)
-        if members is not None:
-            now_members=[(m['path'],m['identity']) for m in (f.members if f else [])]
-            if now_members!=[(m['path'],m['identity']) for m in members]:raise ValueError('Session members changed since analysis')
-        elif f is not None and f.members:raise ValueError('Target became a compound session; generate a new plan')
-        if f is None:
-            if item.get('hint') in ('claude-sessions','codex-sessions','trash-item'):raise ValueError('Session or Trash catalog membership changed since analysis')
-            f=scan.classify(n)
-        permit=plan.get('routinePermit')
-        if permit:
-            if f.tier!='regenerable' or f.comes_back not in ('rebuilds','downloads'):raise ValueError('Routine cannot remove non-regenerable data')
-            if permit.get('groups') and f.group not in permit['groups']:raise ValueError('Routine group changed')
-            if f.size<permit.get('minItemBytes',0) or time.time()-max(f.newest,f.last_activity or 0,f.date_added or 0)<permit.get('minIdleHours',0)*3600:raise ValueError('Routine conditions no longer hold')
-        # Restore verified agent thresholds, never old holds or filesystem facts.
-        original=item['finding']
-        if original.get('source') in ('agent','both'):
-            judgment=next((e.get('judgment') for e in reversed(original.get('evidence',[])) if e.get('check')=='agent'),None)
-            if not isinstance(judgment,dict):raise ValueError('Agent judgment cannot be revalidated')
-            from .ai import AIAnalyzer
-            if not any(candidate is f for candidate in scan.findings):scan.findings.append(f)
-            AIAnalyzer(self.state).apply(scan,[judgment])
-            f=next(candidate for candidate in scan.findings if candidate.path==path)
-        # Part-based session/Trash catalogs already reconstruct their own policy.
-        selected,reason=f.decide(plan['mode'],time.time())
-        if not selected:
-            code=refusal_code(reason)
-            if code:raise SafetyRefusal('Fresh guards refuse: '+reason,code)
-            raise ValueError('Fresh guards refuse: '+reason)
-        if f.action.get('kind')=='official-command' and item.get('method')!='trash':
-            from .commands import may_remove_permanently
-            if not may_remove_permanently(f):raise ValueError('Fresh finding does not permit an official command')
-        expected_action={} if item.get('method')=='trash' and f.action.get('kind')=='official-command' else f.action
-        if (item.get('action') or {}) != expected_action:raise ValueError('Cleanup action changed or is not derived from current facts')
+        from .revalidation import RevalidationContext,TargetSpec
+        result=Scanner.revalidate_target(TargetSpec(item,plan),RevalidationContext(self.context,self._batch if self._batch is not None else {})).require()
+        scan,f=result.scanner,result.finding
         self._fresh_finding=f
         return identity
     def apply(self,plan,*,permanent=False,execute_tools=False,progress=None):
         # An outdated Sōji (see update.py) may scan and plan but never delete.
         from .update import ensure_cleaning_allowed
-        ensure_cleaning_allowed()
+        ensure_cleaning_allowed(self.state,self.eligibility)
         # Caches never survive a batch, including on an interrupted/failed apply.
         self._batch={}
         try:return self._apply(plan,permanent=permanent,execute_tools=execute_tools,progress=progress)
@@ -462,7 +322,7 @@ class Cleaner:
         entries=[]
         for item in plan['items']:
             report('verify',len(entries),item['path'])
-            entry={'id':uuid.uuid4().hex,'plan':plan['id'],'path':item['path'],'group':item['group'],'sizeBytes':item['size'],'at':time.time(),'identity':item['identity'],'method':item.get('method','trash'),'status':'prepared',
+            entry={'id':uuid.uuid4().hex,'plan':plan['id'],'path':item['path'],'group':item['group'],'sizeBytes':item['size'],'at':time.time(),'identity':item['identity'],'method':item.get('method','trash'),'status':'prepared','refusalCode':None,
                    'mode':plan.get('mode'),'version':soji_version(),'planCreatedAt':plan.get('createdAt'),'planVersion':plan.get('version'),
                    'rule':item.get('hint'),'policy':policy_record(item.get('finding') or {},plan.get('mode'),source='plan')}
             try:
@@ -490,7 +350,7 @@ class Cleaner:
                     if item.get('members'):
                         # One journal entry; sidecars first so a failure leaves
                         # the transcript itself in place.
-                        entry['members']=[{'path':m['path'],'role':m.get('role',''),'identity':m['identity'],'sizeBytes':m['size'],'status':'prepared'} for m in item['members']]
+                        entry['members']=[{'path':m['path'],'role':m.get('role',''),'identity':m['identity'],'sizeBytes':m['size'],'status':'prepared','refusalCode':None} for m in item['members']]
                         self.checkpoint(entry)
                         order=list(range(1,len(entry['members'])))+[0]
                         for k,i in enumerate(order):
@@ -525,7 +385,7 @@ class Cleaner:
         from .platform import native
         rec['trashApi']='FileManager.trashItem';self.checkpoint(entry)
         again=os.stat(name,dir_fd=fd,follow_symlinks=False)
-        if (again.st_dev,again.st_ino)!=(original.st_dev,original.st_ino):raise ValueError('Target changed before operation')
+        if (again.st_dev,again.st_ino)!=(original.st_dev,original.st_ino):raise SafetyRefusal('Target changed before operation','identity-changed')
         result=native('trash',rec['path'])
         if not isinstance(result,dict) or not result.get('trashedTo'):
             raise ValueError('System Trash failed: '+str(result.get('error') if isinstance(result,dict) else result))
@@ -547,10 +407,10 @@ class Cleaner:
             original=os.stat(name,dir_fd=fd,follow_symlinks=False)
             parent=os.fstat(fd);expected=rec['identity']
             current={'device':original.st_dev,'inode':original.st_ino,'type':stat.S_IFMT(original.st_mode),'parentDevice':parent.st_dev,'parentInode':parent.st_ino,'mtimeNs':original.st_mtime_ns,'ctimeNs':original.st_ctime_ns}
-            if current!=expected:raise ValueError('Target or parent changed before operation')
+            if current!=expected:raise SafetyRefusal('Target or parent changed before operation','identity-changed')
             if want_permanent:
                 from .platform import rename_exclusive
-                staging='.soji-removing-'+tag;rec['stagedName']=staging;self.checkpoint(entry)
+                staging=STAGED_PREFIX+tag;rec['stagedName']=staging;self.checkpoint(entry)
                 # Exclusive: never replaces an existing name; unavailable means nothing moved.
                 try:rename_exclusive(fd,name,fd,staging)
                 except BaseException:rec.pop('stagedName',None);raise
@@ -583,6 +443,7 @@ class Cleaner:
         except Exception as e:
             rec['status']='prepared' if moved else 'failed';rec['error']=str(e)
             code=refusal_code(e)
+            rec['refusalCode']=code
             if code:rec['refusalCode']=code;entry['refusalCode']=code
             if staged and fd is not None and not removal_started:
                 self.rollback_staged(fd,staged,rec,entry,original)
@@ -756,14 +617,8 @@ class Cleaner:
             if (parent.st_dev,parent.st_ino)!=(expected.get('parentDevice'),expected.get('parentInode')):
                 raise ValueError('Original parent changed; refusing restore')
             if not same(file_identity(source)):raise ValueError('Trashed item changed before restore')
-            # Reserve the destination atomically; macOS renameatx_np offers
-            # RENAME_EXCL, used rather than a check-then-overwrite rename.
-            import ctypes
-            libc=ctypes.CDLL(None,use_errno=True)
-            if hasattr(libc,'renameatx_np'):
-                AT_FDCWD=-2
-                if libc.renameatx_np(AT_FDCWD if sfd is None else sfd,os.fsencode(sname),dfd,os.fsencode(Path(dest).name),4)!=0:raise OSError(ctypes.get_errno(),'Exclusive restore failed')
-            else:raise ValueError('Exclusive directory restore requires macOS renameatx_np')
+            from .platform import rename_exclusive
+            rename_exclusive(-2 if sfd is None else sfd,sname,dfd,Path(dest).name)
         finally:
             if sfd is not None:os.close(sfd)
             os.close(dfd)

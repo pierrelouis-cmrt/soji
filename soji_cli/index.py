@@ -13,15 +13,11 @@ import time
 import zlib
 from .engine import Scanner,Node,within
 from .platform import native,events
+from .util import outermost,SubtreeSet  # noqa: F401
 
 # Index scheduling defaults.
-INDEX_DEFAULTS = {
-    'rollUpBytes': 50_000_000, 'forcedDepth': 1, 'latency': 30.0,
-    'fullCheckInterval': 604800.0, 'snapshotDays': 60, 'cooldown': 60.0,
-    'busyCooldown': 180.0, 'relaxedLatency': 300.0, 'relaxedCooldown': 300.0,
-    'relaxedBusyCooldown': 900.0, 'rootRewalkDelay': 600.0,
-    'rootRewalkEvery': 1800.0, 'eventIDSaveEvery': 60.0, 'folderCache': True,
-}
+INDEX_DEFAULTS = {'fullCheckInterval':604800.0,'snapshotDays':60}
+
 # In addition to lost history, mount/unmount changes invalidate device boundaries.
 RESCAN_FLAGS = 0x1 | 0x2 | 0x4 | 0x8 | 0x20 | 0x40 | 0x80
 HISTORY_DONE = 0x10
@@ -74,33 +70,6 @@ def readable_now(path,node):
         else:os.lstat(path)
         return True
     except OSError:return False
-
-
-def outermost(paths):
-    """Sorted unique paths with any path inside another one dropped."""
-    kept=SubtreeSet(())
-    for p in sorted(set(paths),key=lambda p:(p.count('/'),p)):
-        if not kept(p):kept.add(p)
-    return sorted(kept.roots)
-
-
-class SubtreeSet:
-    """`within(path, root)` for any root, in O(depth) with a per-folder memo."""
-    def __init__(self,roots):
-        self.roots=set(roots);self._memo={}
-    def add(self,root):
-        self.roots.add(root);self._memo.clear()
-    def __call__(self,path):
-        memo=self._memo;chain=[]
-        while True:
-            if path in self.roots:result=True;break
-            known=memo.get(path)
-            if known is not None:result=known;break
-            parent=os.path.dirname(path)
-            if parent==path:result=False;break
-            chain.append(path);path=parent
-        for p in chain:memo[p]=result
-        return result
 
 
 def snapshot_blob(nodes,catalog=None):
@@ -247,8 +216,17 @@ class IndexedScanner(Scanner):
         super().__init__(*args,**kw)
         self.database=str(Path(database or Path.home()/'Library/Application Support/Soji/index.sqlite').expanduser().resolve())
         self.refresh=refresh;self.index_info={};self.growth=[]
+    def new_scan(self,refresh=False):
+        from .scancontrol import ScanConfiguration
+        config=ScanConfiguration.of(self)
+        return type(self)(list(config.roots),database=self.database,refresh=refresh,**config.options)
+
+    def measurement_policy(self):
+        from .engine import PRIVATE_HOME,PRIVATE_NAMES,PRIVATE_SUFFIXES,SECRET_SUFFIXES,CLOUD_NAMES
+        return [sorted(PRIVATE_NAMES),PRIVATE_HOME,PRIVATE_SUFFIXES,SECRET_SUFFIXES,CLOUD_NAMES]
+
     def signature(self):
-        return hashlib.sha256(json.dumps({'roots':self.roots,'home':self.home,'protected':self.protected,'measure':6,'hints':self.catalog.hints,'locations':self.catalog.locations},sort_keys=True).encode()).hexdigest()
+        return hashlib.sha256(json.dumps({'roots':self.roots,'home':self.home,'protected':self.protected,'measure':7,'privatePolicy':self.measurement_policy()},sort_keys=True).encode()).hexdigest()
     def recompute(self):
         # Reassign hardlink payload once over the entire persisted tree, then
         # propagate all aggregates bottom-up (no filesystem traversal needed).
@@ -272,7 +250,12 @@ class IndexedScanner(Scanner):
                     n.size=n.own_size
                 else:n.size=0 if duplicate else n.own_size
                 n.apparent=0 if duplicate else n.own_apparent
-        for p in sorted(self.nodes,key=lambda p:p.count('/'),reverse=True):
+        self.aggregate_directories(self.nodes)
+        self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
+        self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
+        self.skipped=sum(bool(n.reason) for n in self.nodes.values())
+    def aggregate_directories(self,paths):
+        for p in sorted(paths,key=lambda p:p.count('/'),reverse=True):
             n=self.nodes[p]
             n.children=[c for c in n.children if c in self.nodes]
             if n.directory and not n.reason:
@@ -282,9 +265,6 @@ class IndexedScanner(Scanner):
                 n.newest=max([n.own_newest]+[k.newest for k in kids])
                 n.files=sum(k.files for k in kids);n.errors=n.own_errors+sum(k.errors for k in kids)
                 n.secret=any(k.secret for k in kids);n.skipped=any(k.skipped for k in kids)
-        self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
-        self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
-        self.skipped=sum(bool(n.reason) for n in self.nodes.values())
     def reconcile(self,store,dirty):
         """Re-walk dirty subtrees, then refresh only cached names sharing a
         hardlink identity with a name added, removed or changed inside them.
@@ -370,16 +350,7 @@ class IndexedScanner(Scanner):
                 if any(q==r for r in self.roots) or q=='/':break
         # Within dirty subtrees visit() already aggregated; re-aggregate them
         # only when a descendant's attribution changed afterwards.
-        for p in sorted(dirs,key=lambda p:p.count('/'),reverse=True):
-            n=self.nodes[p]
-            n.children=[c for c in n.children if c in self.nodes]
-            if n.directory and not n.reason:
-                kids=[self.nodes[c] for c in n.children]
-                n.size=n.own_size+sum(k.size for k in kids)
-                n.apparent=n.own_apparent+sum(k.apparent for k in kids)
-                n.newest=max([n.own_newest]+[k.newest for k in kids])
-                n.files=sum(k.files for k in kids);n.errors=n.own_errors+sum(k.errors for k in kids)
-                n.secret=any(k.secret for k in kids);n.skipped=any(k.skipped for k in kids)
+        self.aggregate_directories(dirs)
         self.bytes=sum(self.nodes[p].size for p in self.roots if p in self.nodes)
         self.unreadable=sum(n.own_errors>0 for n in self.nodes.values())
         self.skipped=sum(bool(n.reason) for n in self.nodes.values())
@@ -388,7 +359,7 @@ class IndexedScanner(Scanner):
         self.started=time.monotonic();store=None;pool=None
         self.set_progress('scan',path='Checking disk index')
         self.visited=0;self.bytes=0;self.unreadable=0;self.skipped=0;self.limited=False;self.error='';self._inodes=set()
-        self.catalog.markers_cache.clear()
+        self.catalog.forget_markers()
         try:
             store=IndexStore(self.database);signature=self.signature()
             # Process/open-file snapshot runs alongside the index work below.
@@ -442,13 +413,11 @@ class IndexedScanner(Scanner):
             if any(r not in self.nodes for r in self.roots):self.limited=True
             context.result();pool.shutdown();pool=None
             self._build_findings()
-            from .ai import AIAnalyzer,fingerprint
-            from . import ai
-            reusable=getattr(ai,'reusable_verdict',None)
+            from .verdicts import reusable_verdict
+            from .judgments import apply_judgments
             now=time.time()
-            cached=[reusable(store,f,now,trigger='ordinary') if callable(reusable) else store.verdict(f.path,fingerprint(f),now) for f in self.findings]
-            cached=[v for v in cached if v is not None]
-            if cached:AIAnalyzer(Path(self.database).parent).apply(self,cached)
+            cached=[v for v in (reusable_verdict(store,f,now,trigger='ordinary') for f in self.findings) if v is not None]
+            if cached:apply_judgments(self,cached)
             self.index_info['cachedVerdicts']=len(cached)
             checkpoints=[x['checkpoint'] for x in (changes or []) if x.get('checkpoint')]
             # For a full walk retain the pre-walk cursor so mid-walk changes replay.
@@ -466,4 +435,4 @@ class IndexedScanner(Scanner):
             self.done=False;self.now=time.time();self.run()
             if on_update:on_update(self.report('balanced'))
             if self.cancel.wait(interval):break
-            self.catalog.markers_cache.clear()
+            self.catalog.forget_markers()

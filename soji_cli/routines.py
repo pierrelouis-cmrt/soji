@@ -7,6 +7,7 @@ import shutil
 import time
 from .util import atomic_json,read_json
 from .cleanup import create_plan,Cleaner
+from .routine_policy import normalize_routine,item_allowed
 
 def idle_enough(timestamp, minimum_hours, now):
     """Routine idle check: missing date refuses; >= boundary."""
@@ -15,8 +16,9 @@ def idle_enough(timestamp, minimum_hours, now):
 
 class Routines:
     def __init__(self,state):self.state=Path(state).expanduser().resolve();self.path=self.state/'routines.json'
-    def list(self):return read_json(self.path) or []
+    def list(self):return [normalize_routine(r) for r in (read_json(self.path) or [])]
     def save(self,routine):
+        routine=normalize_routine(routine)
         if not routine.get('id') or not routine.get('paths'):raise ValueError('Routine requires id and paths')
         if routine.get('mode','aggressive') not in ('careful','balanced','aggressive'):raise ValueError('Invalid cleanup level')
         if routine.get('everyHours',24)<1:raise ValueError('Routine interval must be at least an hour')
@@ -40,10 +42,11 @@ class Routines:
             if at<=now:return at>last
         return False
     def run(self,routine,scanner,apply=False):
+        routine=normalize_routine(routine)
         if not self.due(routine):return {'skipped':'Routine not due or disabled'}
         conditions=routine.get('conditions',{});groups=set(routine.get('groups',[]))
         if not groups and routine.get('target',{}).get('group'):groups.add(routine['target']['group'])
-        idle=conditions.get('unusedForHours',routine.get('unusedForHours',168));minimum=conditions.get('minItemBytes',0)
+        idle=conditions.get('unusedForHours',conditions.get('minIdleHours',168));minimum=conditions.get('minItemBytes',0)
         free=conditions.get('freeBelow')
         if free:
             usage=shutil.disk_usage(scanner.home)
@@ -51,13 +54,9 @@ class Routines:
             byte_limit=free.get('freeBelowBytes',{}).get('_0') if isinstance(free,dict) else None
             if percent is not None and usage.free/usage.total*100>=percent:return {'skipped':'Free space above routine threshold'}
             if byte_limit is not None and usage.free>=byte_limit:return {'skipped':'Free space above routine threshold'}
-        chosen=[]
-        for f in scanner.decisions(routine.get('mode','aggressive')):
-            if f.selected and f.size>=minimum and f.tier=='regenerable' and f.comes_back in ('downloads','rebuilds') and (not groups or f.group in groups) and idle_enough(max(f.newest,f.last_activity or 0,f.date_added or 0),idle,scanner.now):chosen.append(f.path)
-        plan=create_plan(scanner,routine.get('mode','aggressive'),chosen,method='permanent')
-        plan['routinePermit']={'routineID':routine['id'],'groups':sorted(groups),'minIdleHours':idle,'minItemBytes':minimum}
-        from .cleanup import digest
-        plan.pop('digest');plan['digest']=digest(plan)
+        permit={'routineID':routine['id'],'groups':sorted(groups),'minIdleHours':idle,'minItemBytes':minimum}
+        chosen=[f.path for f in scanner.decisions(routine.get('mode','aggressive')) if f.selected and item_allowed(f,permit,scanner.now)]
+        plan=create_plan(scanner,routine.get('mode','aggressive'),chosen,method='permanent',routinePermit=permit)
         if not apply:return {'plan':plan,'executed':False}
         result=Cleaner(self.state).apply(plan,permanent=True)
         routine['lastRun']=time.time();self.save(routine);return result
@@ -68,10 +67,8 @@ def auto_clean_plan(scanner,settings):
     if disk.free/disk.total*100>=settings.get('freeBelowPercent',5):return {'skipped':'Free-space threshold not reached'}
     if time.time()-settings.get('lastRun',0)<settings.get('minHoursBetweenRuns',6)*3600:return {'skipped':'Minimum interval not reached'}
     minimum=settings.get('minItemBytes',0)
-    paths=[f.path for f in scanner.decisions('careful') if f.selected and f.size>=minimum and f.tier=='regenerable' and f.comes_back in ('rebuilds','downloads') and (not settings.get('groups') or f.group in settings['groups'])]
-    plan=create_plan(scanner,'careful',paths,method='permanent')
-    plan['routinePermit']={'routineID':'auto','groups':settings.get('groups',[]),'minIdleHours':settings.get('minIdleHours',0),'minItemBytes':minimum}
-    from .cleanup import digest
-    plan.pop('digest');plan['digest']=digest(plan)
+    permit={'routineID':'auto','groups':settings.get('groups',[]),'minIdleHours':settings.get('minIdleHours',0),'minItemBytes':minimum}
+    paths=[f.path for f in scanner.decisions('careful') if f.selected and item_allowed(f,permit,scanner.now)]
+    plan=create_plan(scanner,'careful',paths,method='permanent',routinePermit=permit)
     if sum(i['size'] for i in plan['items'])<settings.get('minGainBytes',1_000_000_000):return {'skipped':'Minimum gain not reached'}
     return {'plan':plan}

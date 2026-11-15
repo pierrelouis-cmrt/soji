@@ -4,6 +4,10 @@ import time
 from .engine import Scanner, Finding
 
 class DemoScanner(Scanner):
+    can_clean=False
+
+    def new_scan(self,refresh=False):return type(self)()
+
     def __init__(self):
         super().__init__(['/demo'],home='/demo');self.database=None
         self.current='Synthetic demo — press Q and run without --demo to scan your disk'

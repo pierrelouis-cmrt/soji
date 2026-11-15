@@ -213,6 +213,9 @@ class AITests(Fixture):
         self.file('Documents/personal.txt');s=self.scan();f=s.findings[0];f.holds=['protected'];ai=AIAnalyzer(self.state)
         ai.apply(s,[{'path':f.path,'regenerable':True,'recommendation':'remove','levels':{'careful':0,'reason':'claimed'},'confidence':1}])
         self.assertIn('protected',f.holds);self.assertFalse(f.decide('aggressive',s.now)[0])
+        f.holds=[]
+        self.assertFalse(f.decide('aggressive',s.now)[0])
+        self.assertEqual(f.tier,'userData')
     def test_judgment_levels_are_cumulative(self):
         self.file('.cache/uv/data');s=self.scan();f=s.findings[0];AIAnalyzer(self.state).apply(s,[{'path':f.path,'recommendation':'remove','levels':{'careful':168,'balanced':200,'aggressive':300,'reason':'test'}}])
         self.assertEqual(f.levels['balanced'],168);self.assertEqual(f.levels['aggressive'],168)

@@ -19,8 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 
 DATA = resource_files('soji_cli').joinpath('data')
-MODES = ('careful', 'balanced', 'aggressive')
-ALIASES = {'safe':'careful','strict':'aggressive','smart':'balanced'}
+from .levels import MODES, ALIASES, SESSION_FLOOR_SECONDS, normalize_mode  # noqa: E402,F401
+from .policy import ACTIVE_USE, PolicyResult  # noqa: E402
 MODE_TEXT = {
     'careful': 'Only clearly disposable items; per-item judgments and safety floors apply.',
     'balanced': 'Stale items; preserve costly or uncertain data unless explicitly judged.',
@@ -32,11 +32,8 @@ PRIVATE_SUFFIXES = ('.photoslibrary', '.photolibrary', '.aplibrary', '.keychain-
 SECRET_SUFFIXES = ('.pem', '.key', '-keypair.json', '.p12', '.pfx')
 PRIVATE_HOME = ('Library/Mail', 'Library/Messages', 'Library/Keychains', 'Library/CloudStorage', 'Library/Mobile Documents', 'Library/Application Support/com.apple.TCC', 'Library/Application Support/Soji')
 CLOUD_NAMES = ('Dropbox', 'Google Drive', 'OneDrive', 'Box Sync', 'Box Drive', 'pCloud Drive', 'MEGA', 'Nextcloud', 'ownCloud', 'SynologyDrive', 'Tresorit')
-from .installs import ATOMIC_GROUPS, DEV_GROUPS  # noqa: E402
-SESSION_HINTS = ('claude-sessions', 'codex-sessions')
+from .installs import ATOMIC, PROJECT_OUTPUT, NEEDS_REAL_PROJECT, capable  # noqa: E402
 from .safety import STAGED_PREFIX, staged_ancestor
-SESSION_FLOOR_SECONDS = 86400
-SPECIAL_RULES = {'checkDeviceBuilds', 'checkSimulatorDevice', 'keepVersionPointedToBy', 'keepProjectPinnedVersions', 'onlyIfOwnerInstalled', 'notIfAppleOwned', 'onlyIfOwnerNotInstalled', 'checkWorkspaceExists'}
 
 
 def within(path: str, root: str) -> bool:
@@ -72,123 +69,7 @@ def glob_regex(pattern: str) -> re.Pattern:
 NO_MATCH = -1
 
 
-# slots (3.10+) keep large scans small; 3.9 (the macOS system Python) runs without.
-@dataclasses.dataclass(**({'slots': True} if sys.version_info >= (3, 10) else {}))
-class Node:
-    path: str
-    size: int = 0
-    apparent: int = 0
-    files: int = 0
-    newest: float = 0
-    own_newest: float = 0
-    errors: int = 0
-    secret: bool = False
-    skipped: bool = False
-    reason: str = ''
-    directory: bool = True
-    children: list[str] = dataclasses.field(default_factory=list)
-    device: int = 0
-    inode: int = 0
-    own_size: int = 0
-    own_apparent: int = 0
-    own_errors: int = 0
-    link_count: int = 0
-
-
-@dataclasses.dataclass
-class Finding:
-    path: str
-    size: int
-    apparent: int
-    files: int
-    newest: float
-    group: str
-    label: str
-    hint_id: str = ''
-    tier: str = 'userData'
-    comes_back: str = 'gone'
-    rule: dict = dataclasses.field(default_factory=dict)
-    smart_rule: str = ''
-    list_only: bool = True
-    holds: list[str] = dataclasses.field(default_factory=list)
-    limitations: list[str] = dataclasses.field(default_factory=list)
-    project_idle_hours: float | None = None
-    matched_pattern: str = ''
-    selected: bool = False
-    decision: str = ''
-    thresholds: dict = dataclasses.field(default_factory=dict)
-    levels: dict | None = None
-    catalog_min_hours: dict = dataclasses.field(default_factory=dict)
-    last_activity: float | None = None
-    mode_holds: dict = dataclasses.field(default_factory=dict)
-    special_min_hours: float = 0
-    evidence: list = dataclasses.field(default_factory=list)
-    action: dict = dataclasses.field(default_factory=dict)
-    identity: dict = dataclasses.field(default_factory=dict)
-    source: str = 'hint'
-    managed: bool = False
-    recommendation: str = 'remove'
-    confidence: float | None = None
-    date_added: float | None = None
-    default_holds: list[str] = dataclasses.field(default_factory=list)
-    recent_activity_hours: float = 0
-    rule_min_hours: dict = dataclasses.field(default_factory=dict)
-    rule_project_min_hours: dict = dataclasses.field(default_factory=dict)
-    rule_early_reason: str | None = None
-    # Early outcome of a rule check (e.g. workspace missing -> careful). When
-    # set, the rule's own age/rank gates were skipped; the level is combined
-    # with the judged risk level.
-    rule_level: str | None = None
-    # Compound unit (Claude session): explicit member paths, each measured once.
-    # Empty for ordinary single-path rows.
-    members: list = dataclasses.field(default_factory=list)
-
-
-    def decide(self, mode: str, now: float) -> tuple[bool, str]:
-        mode=ALIASES.get(mode,mode)
-        if mode not in MODES:raise ValueError('Unknown cleanup level: '+mode)
-        if staged_ancestor(self.path):return False,'Sōji staged object requires manual review with `soji recover`; never cleaned automatically'
-        if self.holds: return False, '; '.join(dict.fromkeys(self.holds))
-        if mode in self.mode_holds:return False,self.mode_holds[mode]
-        if self.recommendation in ('keep','review'):return False,'Agent recommends '+self.recommendation
-        if (self.list_only or self.tier in ('never','userData')) and not self.managed:
-            return False, 'Listed for review; never automatically selected'
-        from .levels import effective_minimum,judged_minimum,judgment_level,selected_at
-        stamp=max(self.newest,self.date_added or self.newest)
-        idle=(now-max(stamp,self.last_activity or stamp))/3600
-        floor=max(300,self.recent_activity_hours*3600)
-        if now-stamp<floor:return False,'Changed within the recent-activity window'
-        # Sessions: a hard floor no downgrade or judgement can lower.
-        if self.hint_id in SESSION_HINTS and mode in ('careful','balanced') and now-self.newest<SESSION_FLOOR_SECONDS:
-            return False,f'Session changed {(now-self.newest)/3600:.1f} h ago; never cleaned within 24 h at {mode}'
-        minimum=self.catalog_min_hours.get(mode,0)
-        if idle<minimum:return False,f'Session catalog requires {minimum:g} h at {mode}; normal policy cannot be lowered by judgment'
-        if self.levels is None and self.rule_level is None:
-            if self.default_holds:return False,'; '.join(self.default_holds)
-            minimum=self.rule_min_hours.get(mode,self.special_min_hours)
-            if idle<minimum:return False,f'Idle {idle:.1f} h; rule needs {minimum:g} h at {mode}'
-            project_min=self.rule_project_min_hours.get(mode)
-            if project_min is not None:
-                if self.project_idle_hours is None:return False,'Project inactivity not measurable'
-                if self.project_idle_hours<project_min:return False,f'Project idle {self.project_idle_hours:.1f} h; rule needs {project_min:g} h at {mode}'
-        if self.managed:
-            # Session and Trash rows carry their own FindingPart levels, not
-            # the general regenerable/costly risk policy.
-            effective=judgment_level(self.levels or {},idle*3600)
-        else:
-            judged=judged_minimum(self.tier,self.recommendation,self.list_only,
-                                  comes_back=self.comes_back)
-            if self.levels is None and self.rule_level is not None:
-                from .levels import combine_rule_level
-                judged=combine_rule_level(self.rule_level,judged)
-            effective=effective_minimum(judged,self.levels,self.tier,stamp,
-                self.last_activity,now,self.recent_activity_hours,
-                app_cache=self.group=='App caches')
-        if not selected_at(effective,mode):
-            return False,('Eligible from '+effective if effective else 'No eligible cleanup level at the current age/activity')
-        return True,f'Idle {idle/24:.1f} d; eligible from {effective}'
-
-
+from .models import Node, Finding, SESSION_HINTS
 
 
 # Rules that make a matched folder one cleanup unit (retention family, device,
@@ -206,10 +87,9 @@ def generic_container(match) -> bool:
     """
     if not match:return False
     hint,pattern=match
-    from .installs import ATOMIC_GROUPS
     # An installed toolchain/extension is one unit: never split it file by file.
     return (pattern.rstrip('/').rsplit('/',1)[-1]=='*' and not hint.get('reviewOnly')
-            and hint['tier']!='userData' and hint['group'] not in ATOMIC_GROUPS
+            and hint['tier']!='userData' and not capable(hint,ATOMIC)
             and not any(k in (hint.get('rule') or {}) for k in UNIT_RULES))
 
 
@@ -262,6 +142,27 @@ class Catalog:
         self.pure = {}
         self.seeded = {}
         self.key = hashlib.sha256(json.dumps([self.hints, self.locations], sort_keys=True).encode()).hexdigest()
+
+    @staticmethod
+    def atomic(hint) -> bool:
+        return capable(hint, ATOMIC)
+
+    def forget_markers(self):
+        """Drop marker listings and the ownership answers derived from them."""
+        self.markers_cache.clear();self.installs.forget()
+
+    def forget_filesystem_facts(self):
+        """Also drop cached matches: they may depend on the forgotten markers."""
+        self.forget_markers();self.match_cache.clear()
+
+    def conditions_hold(self, path: str, hint) -> bool:
+        """The hint's marker conditions (contains / unless / ancestor) at `path`."""
+        p=Path(path)
+        if hint.get('onlyIfContains') and not self.exists(p,hint['onlyIfContains']):return False
+        if hint.get('unlessContains') and self.exists(p,hint['unlessContains']):return False
+        # Ancestor markers may sit in up to four ancestors.
+        if hint.get('onlyIfAncestorContains') and not any(self.exists(a,hint['onlyIfAncestorContains']) for a in list(p.parents)[:4]):return False
+        return True
 
     def exists(self, folder: Path, markers: list[str]) -> bool:
         key=(str(folder),tuple(markers))
@@ -319,20 +220,17 @@ class Catalog:
         if not candidates:
             self.pure[path] = NO_MATCH
             return None
-        p=Path(path);pure=True
+        pure=True
         for regex,hint,pattern in candidates:
             if not regex.fullmatch(path): continue
             if hint.get('onlyIfContains') or hint.get('unlessContains') or hint.get('onlyIfAncestorContains'):pure=False
-            if hint.get('onlyIfContains') and not self.exists(p,hint['onlyIfContains']):continue
-            if hint.get('unlessContains') and self.exists(p,hint['unlessContains']):continue
-            # Ancestor markers may sit in up to four ancestors.
-            if hint.get('onlyIfAncestorContains') and not any(self.exists(a,hint['onlyIfAncestorContains']) for a in list(p.parents)[:4]):continue
-            if hint['group'] in DEV_GROUPS and pattern.startswith('**/'):
+            if not self.conditions_hold(path,hint):continue
+            if capable(hint,PROJECT_OUTPUT) and pattern.startswith('**/'):
                 # Project output only exists in projects: never inside installed
                 # software, and dependencies only in a real (locked/VCS) project.
                 pure=False
                 if not self.installs.project_area(path) or self.installs.containing(path):continue
-                if hint['group']=='Project dependencies' and not self.installs.real_project(path):continue
+                if capable(hint,NEEDS_REAL_PROJECT) and not self.installs.real_project(path):continue
             if pure:self.pure[path]=self.record_index[(hint['id'],pattern)]
             return hint,pattern
         if pure:self.pure[path]=NO_MATCH
@@ -344,8 +242,15 @@ class Catalog:
 
 
 class Scanner:
-    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0, inherit_hint=None, catalog=None):
+    def __init__(self, roots: list[str], *, home: str | None = None, protected=(), max_files=2_000_000, max_seconds=300, min_bytes=1_000_000, context=True, recent_activity_hours=0, inherit_hint=None, catalog=None, pin_roots=None, live_pins=False, tick_trash=False, walk_backend='auto'):
+        if walk_backend not in ('auto','native','python'):raise ValueError('Unknown walk backend: '+str(walk_backend))
         self.inherit_hint=inherit_hint
+        # Project pins span this policy scope; live_pins rediscovers them on the
+        # filesystem rather than trusting this walk's nodes.
+        self.pin_roots=list(pin_roots) if pin_roots else None;self.live_pins=live_pins
+        self.tick_trash=tick_trash;self.walk_backend=walk_backend
+        # Codex writer-lock names; None means discover them when rows are built.
+        self.writer_ids=None
         self.home=os.path.realpath(home or str(Path.home()))
         cleaned=sorted(set(os.path.realpath(os.path.expanduser(p)) for p in roots))
         self.roots=[p for p in cleaned if not any(p != q and within(p,q) for q in cleaned)]
@@ -363,6 +268,18 @@ class Scanner:
         self._private_home=(None,())
         self.activity=None;self.apps=None;self.tools=None;self.specialized=None;self.git=None
         self.progress={'phase':'scan','completed':0,'total':None,'path':''}
+
+    can_clean=True
+
+    def new_scan(self,refresh=False):
+        from .scancontrol import ScanConfiguration
+        config=ScanConfiguration.of(self)
+        return type(self)(list(config.roots),**config.options)
+
+    @staticmethod
+    def revalidate_target(spec, context):
+        from .revalidation import revalidate_target
+        return revalidate_target(spec, context)
 
     def set_progress(self,phase,completed=0,total=None,path=''):
         self.progress={'phase':phase,'completed':completed,'total':total,'path':path}
@@ -470,7 +387,8 @@ class Scanner:
         once the budget is spent (Scanner.run); True roots get a "stopped" row.
         """
         from . import walker
-        if not self._inodes and walker.available(self) and walker.walk(self,roots):return
+        if self.walk_backend!='python' and not self._inodes and walker.available(self) and walker.walk(self,roots):return
+        if self.walk_backend=='native':raise RuntimeError('Native walk unavailable')
         for path,depth,device,stop_node in roots:
             if not stop_node and not self.budget():break
             self.visit(path,depth,device)
@@ -480,18 +398,6 @@ class Scanner:
             if str(parent)=='/':break
             if self.catalog.exists(parent,list(PROJECT_MARKERS)) or (parent/'.git').exists():return str(parent)
         return None
-
-    def git_hold(self,project: str) -> str:
-        if project in self._git_cache:return self._git_cache[project]
-        result=''
-        try:
-            env=dict(os.environ,GIT_OPTIONAL_LOCKS='0',GIT_TERMINAL_PROMPT='0',GIT_NO_LAZY_FETCH='1')
-            r=subprocess.run(['/usr/bin/git','-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','-C',project,'status','--porcelain','--untracked-files=normal'],capture_output=True,text=True,timeout=3,env=env)
-            if r.returncode==0 and r.stdout.strip():result='Project has uncommitted or untracked work'
-            elif r.returncode and (Path(project)/'.git').exists():result='Git state could not be confirmed'
-        except (OSError,subprocess.TimeoutExpired):result='Git state could not be confirmed'
-        self._git_cache[project]=result
-        return result
 
     def project_age(self,project: str) -> float | None:
         root=self.nodes.get(project)
@@ -575,9 +481,9 @@ class Scanner:
         if node.skipped:f.holds.append(node.reason or 'Contains an excluded or unreadable subtree')
         if node.secret:f.holds.append('Contains credential or environment-file names')
         if self.now-node.newest<300:f.holds.append('Changed or created within the last 5 minutes')
-        if self.is_open(node.path):f.holds.append('File open or process working in this folder')
+        if self.is_open(node.path):f.hold('File open or process working in this folder',ACTIVE_USE)
         program=self.running_inside(node.path)
-        if program:f.holds.append('A running program is installed here: '+program)
+        if program:f.hold('A running program is installed here: '+program,ACTIVE_USE)
         install=self.catalog.installs.containing(node.path)
         if install:
             # Shipped code of installed software: only the whole install root,
@@ -587,7 +493,7 @@ class Scanner:
         running=[]
         for proc in f.rule.get('notWhileRunning',[]):
             if any(Path(p).name==proc.casefold() or p.endswith('/'+proc.casefold()) for p in self.processes):running.append(proc)
-        if running:f.holds.append('Running: '+', '.join(running))
+        if running:f.hold('Running: '+', '.join(running),ACTIVE_USE)
         project=(node.path if f.group=='Agent worktrees' else self.project_for(node.path)) if f.hint_id and (f.rule.get('minProjectIdleDays') or f.group in ('Build output','Project dependencies','Agent worktrees')) else None
         if project:
             f.project_idle_hours=self.project_age(project)
@@ -600,7 +506,7 @@ class Scanner:
                 idle=max(0,(self.now-used.at)/3600)
                 f.evidence.append({'check':'projectActivity','project':project,'source':used.source,'at':used.at,'basis':'safety extension: activity at owning project root'})
                 if f.project_idle_hours is None or idle<f.project_idle_hours:f.project_idle_hours=idle
-                if self.now-used.at<max(300,self.recent_activity_hours*3600):f.holds.append('Coding agent or editor used this project recently')
+                if self.now-used.at<max(300,self.recent_activity_hours*3600):f.hold('Coding agent or editor used this project recently',ACTIVE_USE)
             state=self.git.inspect(project,worktree=f.group=='Agent worktrees') if self.git else {}
             if state.get('reason'):f.holds.append(state['reason'])
             f.evidence.append({'check':'git','state':state})
@@ -608,12 +514,11 @@ class Scanner:
             f.holds.append('Owning application running status unknown; running-app inventory unavailable')
         if self.specialized:self.specialized.evaluate(f)
         if self.context_warnings:f.holds.extend(self.context_warnings)
-        from .cleanup import file_identity
+        from .identity import file_identity
         try:
             f.identity=file_identity(f.path)
             if f.identity['type']==stat.S_IFLNK:f.holds.append('Symlink itself is never a cleanup target')
         except OSError:f.holds.append('File identity unavailable')
-        # Show the rule thresholds, separate from mode choices.
         f.thresholds={'minIdleDays':f.rule.get('minIdleDays'),'minProjectIdleDays':f.rule.get('minProjectIdleDays')}
         return f
 
@@ -630,7 +535,20 @@ class Scanner:
         finally:
             self.set_progress('done',1,1);self.done=True;self.finished=time.monotonic()
 
-    def _build_findings(self):
+    def _build_findings(self,inventories=None):
+        self.prepare_policy(inventories)
+        self.set_progress('categorize',1,4,'Matching categories')
+        rows=self.frontier_rows()
+        self.set_progress('categorize',2,4,'Sorting session and Trash catalogs')
+        from . import catalogs
+        self.findings=self.finish_rows(catalogs.expand_catalogs(self,rows))
+
+    def prepare_policy(self,inventories=None):
+        """Build the activity/app/tool inventories every rule consults.
+
+        `inventories` reuses an (activity, apps, tools) snapshot taken moments
+        earlier by the same cleanup batch.
+        """
         from .activity import ActivityIndex
         from .apps import AppCatalog,InstalledTools
         from .specialized import SpecializedRules
@@ -638,9 +556,8 @@ class Scanner:
         self.now=time.time();self.findings=[]
         self.set_progress('categorize',0,4,'Checking activity and apps')
         self.git=GitInspector()
-        shared=getattr(self,'_shared_inventories',None)
-        if shared is not None:
-            self.activity,self.apps,self.tools=shared
+        if inventories is not None:
+            self.activity,self.apps,self.tools=inventories
         elif self.context:
             # Independent local inventories; their file and subprocess I/O overlaps.
             with ThreadPoolExecutor(3) as pool:
@@ -651,9 +568,12 @@ class Scanner:
         else:
             self.activity=ActivityIndex(self.home);self.apps=AppCatalog(self.home);self.tools=InstalledTools(self.home)
         self.specialized=SpecializedRules(self,self.apps,self.activity,self.tools) if self.context else None
-        self.set_progress('categorize',1,4,'Matching categories')
-        # Every row is measured once. Select a non-overlapping frontier: known
-        # hint roots first; otherwise recurse to expose meaningful children.
+        return self.activity,self.apps,self.tools
+
+    def frontier_rows(self):
+        """Every row is measured once. Select a non-overlapping frontier: known
+        hint roots first; otherwise recurse to expose meaningful children."""
+        rows=[]
         below=collections.defaultdict(set)  # ancestor -> hint ids matched beneath it
         for path,n in self.nodes.items():
             match=self.catalog.match(path)
@@ -668,34 +588,34 @@ class Scanner:
             if n.size<self.min_bytes and not n.reason:return
             match=self.catalog.match(path) or inherited
             descend_review=bool(match and (match[0].get('reviewOnly') or match[0]['tier']=='userData') and path in known_ancestors and match[0]['id'] not in ('claude-sessions','codex-sessions','trash')
-                                and match[0]['group'] not in ATOMIC_GROUPS)
+                                and not self.catalog.atomic(match[0]))
             split=bool(not descend_review and generic_container(match) and below.get(path,set())-{match[0]['id']})
             if (match and not descend_review and not split) or not n.children or n.reason:
-                self.findings.append(self.classify(n,match));return
+                rows.append(self.classify(n,match));return
             if level>=4 and n.size<500_000_000 and path not in known_ancestors:
-                self.findings.append(self.classify(n,match));return
+                rows.append(self.classify(n,match));return
             if n.children:
                 own=n.size-sum(self.nodes[c].size for c in n.children)
                 if own>=self.min_bytes:
                     direct=dataclasses.replace(n,size=own,apparent=own,children=[],directory=False)
-                    f=self.classify(direct);f.label='Directory metadata';f.group='Other files';self.findings.append(f)
+                    f=self.classify(direct);f.label='Directory metadata';f.group='Other files';rows.append(f)
                 for c in n.children:frontier(c,level+1,match if split else None)
         for root in self.roots:
             if root in self.nodes:frontier(root,0,self.inherited_match(root))
-        self.findings.sort(key=lambda f:f.size,reverse=True)
-        self.set_progress('categorize',2,4,'Sorting session and Trash catalogs')
-        from .catalogs import expand_catalogs
-        self.findings=expand_catalogs(self)
-        for f in self.findings:
+        rows.sort(key=lambda f:f.size,reverse=True)
+        return rows
+
+    def finish_rows(self,rows):
+        """Staged-object holds, native metadata and final order for built rows."""
+        for f in rows:
             staged=next((hit for p in [f.path,*[m['path'] for m in f.members]] if (hit:=self.staged_inside(p))),None)
             if staged and not any('staged object' in h for h in f.holds):
                 f.holds.append('Sōji staged object requires manual review: '+staged)
         self.set_progress('categorize',3,4,'Checking file metadata')
         if self.context:
             from .platform import native
-            # 512 rows per helper launch (was 64), four launches at a time:
-            # ~100 sequential launches cost ~1.5 s. Applied in row order.
-            batches=[self.findings[start:start+512] for start in range(0,len(self.findings),512)]
+            # 512 rows per helper launch, four launches at a time.
+            batches=[rows[start:start+512] for start in range(0,len(rows),512)]
             with ThreadPoolExecutor(4) as pool:
                 answers=list(pool.map(lambda batch:native('metadata',*[f.path for f in batch],timeout=30),batches))
             for batch,values in zip(batches,answers):
@@ -706,10 +626,11 @@ class Scanner:
                         f.date_added=meta.get('added') or None
                         if meta.get('cloud'):f.holds.append('Cloud-managed or online-only item')
                         if meta:f.evidence.append({'check':'nativeMetadata',**meta})
-        self.findings.sort(key=lambda f:f.size,reverse=True)
+        rows.sort(key=lambda f:f.size,reverse=True)
         if self.context and not self.apps.running_available:
             self.context_warnings.append('Running-app inventory unavailable; owner-running checks unknown')
         self.set_progress('categorize',4,4,'Categories ready')
+        return rows
 
     def decisions(self,mode):
         from .safety import agent_worktree_boundary, WORKTREE_DISABLED

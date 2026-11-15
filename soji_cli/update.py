@@ -122,9 +122,12 @@ def block(reason):
     _blocked = reason
 
 
-def ensure_cleaning_allowed():
+def ensure_cleaning_allowed(state_dir=None,eligibility=None):
     if _blocked:
         raise ValueError(_blocked)
+    result=eligibility() if callable(eligibility) else eligibility
+    if result is None and state_dir is not None:result=check(state_dir)
+    if result and result.get('status')=='outdated':raise ValueError(outdated_reason(result))
 
 
 def outdated_reason(result):

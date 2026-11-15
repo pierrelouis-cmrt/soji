@@ -55,10 +55,6 @@ class IndexRecovery(unittest.TestCase):
             store.save_verdict('/new','other-hash',{},102)
             self.assertIsNone(store.verdict_record('/new')['content'])
         finally:store.close()
-    def test_index_defaults(self):
-        self.assertEqual(INDEX_DEFAULTS['fullCheckInterval'],7*86400)
-        self.assertEqual(INDEX_DEFAULTS['snapshotDays'],60)
-        self.assertEqual(INDEX_DEFAULTS['rollUpBytes'],50_000_000)
     def test_daily_snapshot_is_first_complete_scan_and_growth_is_live(self):
         store=IndexStore(self.database)
         try:

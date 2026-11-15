@@ -136,11 +136,13 @@ class NativeWalkParity(unittest.TestCase):
         with self.assertRaises(ValueError):
             walker.decode(s, b'{"count": 5, "namesBytes": 10}\n\x00\x01')
 
-    def test_patched_visit_keeps_python_walk(self):
-        s = Scanner([str(self.root)], min_bytes=0, context=False)
-        with patch.object(s, 'visit', wraps=s.visit):
-            self.assertFalse(walker.available(s))
-        self.assertTrue(walker.available(s))
+    def test_explicit_python_backend(self):
+        s=Scanner([str(self.root)],home=str(self.root),min_bytes=0,context=False,walk_backend='python')
+        s.started=time.monotonic()
+        with patch.object(walker,'walk',side_effect=AssertionError('native called')):
+            s.walk([(str(self.root),0,None,False)])
+        self.assertIn(str(self.root),s.nodes)
+
 
 
 if __name__ == '__main__':

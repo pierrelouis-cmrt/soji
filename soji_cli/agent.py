@@ -277,7 +277,7 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
         scanner.run()
         if scanner.error:
             raise ValueError(scanner.error)
-        from .ai import AIAnalyzer
+        from .judgments import apply_judgments
         bypath = {f.path: f for f in scanner.findings}
         judgments = []
         for rid, (reason, unused) in removes.items():
@@ -290,7 +290,7 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
             judgments.append({'path': f.path, 'recommendation': 'remove', 'regenerable': f.tier == 'regenerable',
                               'levels': {**{m: unused * 24 for m in MODES[start:]}, 'reason': 'Agent: ' + reason}})
         if judgments:
-            AIAnalyzer(state).apply(scanner, judgments)
+            apply_judgments(scanner, judgments)
         wanted = {j['path'] for j in judgments}
         ids = {data['rows'][r]['path']: r for r in removes}
         for f in scanner.decisions(mode):
@@ -302,11 +302,7 @@ def propose(state, session: str, value, scanner_factory, output=None, method='tr
                 rejected.append({'id': ids[f.path], 'reason': 'Guard refused: ' + f.decision})
         if accepted:
             from .cleanup import create_plan
-            plan = create_plan(scanner, mode, paths={os.path.realpath(p) for p in wanted}, method=method)
-            from .cleanup import digest
-            plan['warnings'].append('Proposed by an AI agent through soji ai propose; review every path.')
-            del plan['digest']
-            plan['digest'] = digest(plan)
+            plan = create_plan(scanner, mode, paths={os.path.realpath(p) for p in wanted}, method=method, extra_warnings=['Proposed by an AI agent through soji ai propose; review every path.'])
             if output is None:
                 output = Path(state).expanduser() / 'ai' / f'plan-{session}-{int(_now())}.json'
             atomic_json(output, plan)

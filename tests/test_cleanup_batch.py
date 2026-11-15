@@ -62,6 +62,14 @@ class BatchCleanupTests(unittest.TestCase):
         with patch('soji_cli.cleanup.time.monotonic',side_effect=lambda:clock[0]),patch.object(ActivityIndex,'build',autospec=True,side_effect=build) as inventory,patch.object(Scanner,'collect_context',autospec=True) as context:
             self.cleaner.apply(plan,progress=progress)
         self.assertEqual(inventory.call_count,12);self.assertEqual(context.call_count,12)
+        for item in plan['items']:
+            self.cleaner.undo(next(e['id'] for e in self.cleaner.entries() if e['path']==item['path']))
+        second=self.plan();victim=second['items'][0]['path']
+        def busy(scan):scan.open_paths=[victim]
+        with patch.object(Scanner,'collect_context',busy):result=self.cleaner.apply(second)
+        self.assertTrue(Path(victim).exists())
+        self.assertEqual(result['failed'],1)
+
         self.assertIsNone(self.cleaner._batch)
 
     def test_live_open_file_refresh_refuses_later_target(self):

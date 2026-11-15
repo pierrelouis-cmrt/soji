@@ -20,7 +20,7 @@ class SmartRuleCases(unittest.TestCase):
         self.rules.scanner=NS(nodes={},now=2000000000,catalog=NS(hints=[]))
         self.rules.apps=NS(owner=lambda p:[])
         self.rules.activity=NS(errors=[],last=lambda p:None)
-        self.rules.tools=NS(use=lambda p:None)
+        self.rules.tools=NS(errors=[],use=lambda p:None)
     def plist(self,path,value):
         p=self.home/path;p.parent.mkdir(parents=True,exist_ok=True)
         p.write_bytes(plistlib.dumps(value));return p

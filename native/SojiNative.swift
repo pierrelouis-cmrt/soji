@@ -474,7 +474,7 @@ func runWalk() {
             out.errors[i] = 1; out.ownErrors[i] = 1; out.reason[i] = Reason.stopped.rawValue; out.flags[i] = 4
         } else { out.emitEntry(e, name: Array(root.path.utf8), parent: -1, dir: dir) }
     }
-    let header: [String: Any] = ["count": out.parent.count, "namesBytes": out.names.count, "visited": walker.visited,
+    let header: [String: Any] = ["protocol": 1, "columns": ["parent", "size", "apparent", "files", "newest", "own_newest", "errors", "own_errors", "flags", "reason", "device", "inode", "own_size", "own_apparent", "link_count"], "reasons": ["", "Scan stopped before measuring", "Unreadable entry", "Symlink; not followed", "Mount boundary or depth limit; contents not scanned", "User protected path", "Credentials or repository metadata; contents not scanned", "Personal library; contents not scanned", "Private or cloud data; contents not scanned", "Cloud-synced folder; contents not scanned", "Agent memory; contents not scanned", "Installed application bundle; contents not scanned"], "count": out.parent.count, "namesBytes": out.names.count, "visited": walker.visited,
         "bytes": out.bytes, "unreadable": walker.unreadable + out.ownErrorsFromOpen(), "skipped": out.skipped,
         "limited": walker.limited, "cancelled": walker.cancelled,
         "verify": walker.verifyCounts, "verifySamples": walker.verifySamples]

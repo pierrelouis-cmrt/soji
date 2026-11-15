@@ -12,10 +12,10 @@ from pathlib import Path
 import re
 import tempfile
 import time
-from .util import read_plist,read_json,json_command,command,inside
+from .util import read_plist,read_json,json_command,command,inside,outermost
+from .policy import ACTIVE_USE,RuleGates
 
 FIELDS={'minIdleDays','minProjectIdleDays','keepNewest','keepNewestPer','newestGoesAtAggressiveAfterDays','keepVersionPointedToBy','keepProjectPinnedVersions','minSizeBytes','notWhileRunning','notWhileOwnerRuns','onlyIfOwnerInstalled','onlyIfOwnerNotInstalled','notIfAppleOwned','checkWorkspaceExists','checkDeviceBuilds','checkSimulatorDevice','sameIdleAtEveryLevel','checkCodexRuntime'}
-# How `keepNewestPer` reads in a hold.
 KEEP_PER_TEXT={'app':'app','device':'device','product':'product','majorVersion':'major version','minorVersion':'minor version','folder':'folder'}
 
 def version_key(name):
@@ -554,13 +554,12 @@ class SpecializedRules:
         reused; otherwise (target-scoped fresh checks, partial roots, or
         `pin_live`) the pin files are discovered anew on the live filesystem.
         """
-        if getattr(self,'_pins',None) is None:
+        if self._pins is None:
             s=self.scanner;home=os.path.realpath(str(self.home))
-            roots=[os.path.realpath(r) for r in (getattr(s,'pin_roots',None) or s.roots)]
-            if not getattr(s,'pin_live',False) and any(inside(home,r) for r in s.roots):
+            roots=[os.path.realpath(r) for r in (s.pin_roots or s.roots)]
+            if not s.live_pins and any(inside(home,r) for r in s.roots):
                 self._pins=ProjectPins().from_nodes(s)
             else:
-                from .index import outermost
                 self._pins=ProjectPins().discover(outermost([home,*roots]),s.private)
         return self._pins
     @pins.setter
@@ -715,11 +714,9 @@ class SpecializedRules:
     def evaluate(self,f):
         hint=next((h for h in self.scanner.catalog.hints if h['id']==f.hint_id),None)
         if hint and hint.get('cleanCommand'):f.action={'kind':'official-command','hint':f.hint_id,'argv':hint['cleanCommand']}
-        r=f.rule;f.mode_holds={};f.special_min_hours=0
+        r=f.rule
         thresholds={mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')}
-        f.rule_min_hours={mode:v['minIdleDays']*24 for mode,v in thresholds.items() if 'minIdleDays' in v}
-        f.rule_project_min_hours={mode:v['minProjectIdleDays']*24 for mode,v in thresholds.items() if 'minProjectIdleDays' in v}
-        f.rule_early_reason=None;f.rule_level=None
+        gates=RuleGates.from_thresholds(thresholds)
         unknown=set(r)-FIELDS
         if unknown:f.holds.append('Unknown rule fields: '+', '.join(sorted(unknown)))
         owners=self.apps.owner(f.path)
@@ -733,7 +730,7 @@ class SpecializedRules:
             if owners or vendor:f.holds.append('Owning application is installed')
             if vendor:f.evidence.append({'check':'owner','apps':vendor,'basis':'installed app vendor matches folder name'})
         if r.get('notWhileOwnerRuns'):
-            if any(self.apps.is_running(a) for a in owners):f.holds.append('Owning application is running')
+            if any(self.apps.is_running(a) for a in owners):f.hold('Owning application is running',ACTIVE_USE)
             elif not owners and not r.get('notWhileRunning'):f.holds.append('Cannot confirm application ownership or running state')
         if r.get('minSizeBytes',0)>f.size:f.holds.append('Below hint minimum size')
         active=self.active_reason(f.path,r.get('keepVersionPointedToBy',[]))
@@ -750,21 +747,17 @@ class SpecializedRules:
                 if held<count:
                     if mode=='aggressive' and r.get('newestGoesAtAggressiveAfterDays') is not None:
                         if (self.scanner.now-f.newest)/86400>=r['newestGoesAtAggressiveAfterDays']:continue
-                    f.mode_holds[mode]='Retained newest version per '+KEEP_PER_TEXT[r.get('keepNewestPer','folder')]
+                    gates=gates.retain(mode,'Retained newest version per '+KEEP_PER_TEXT[r.get('keepNewestPer','folder')])
             if r.get('keepNewestPer')=='app' and self.newest_uploaded(f.path,siblings):
                 f.holds.append('Newest uploaded archive retained')
-        f.evidence.append({'check':'ruleThresholds','days':{mode:rule_threshold_days(r,mode) for mode in ('careful','balanced','aggressive')},'basis':'rule age thresholds per mode'})
+        f.evidence.append({'check':'ruleThresholds','days':thresholds,'basis':'rule age thresholds per mode'})
         if r.get('checkCodexRuntime'):
             current=codex_runtime_current(f.path,self.siblings.get(f.hint_id,[]))
             if current:f.holds.append('Codex runtime kept: '+current)
             f.evidence.append({'check':'codexRuntime','current':current or None,'basis':'superseded only when codex-primary-runtime is a readable link resolving to a different install with readable bundleVersion'})
         if r.get('checkWorkspaceExists'):
             missing=workspace_missing(f.path)
-            if missing:
-                # Early outcome: level Careful, earlier holds kept, rank/age
-                # gates skipped. The normal recency/age policy then applies.
-                f.rule_early_reason='workspaceMissing';f.rule_level='careful'
-                f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
+            if missing:gates=gates.early('workspaceMissing')
             f.evidence.append({'check':'workspaceMissing','missing':missing,'basis':'literal WorkspacePath existence; absent/unreadable metadata is missing'})
         if r.get('checkDeviceBuilds'):
             if not self.connected_checked:self.connected_known=self.devices.connected();self.connected_checked=True
@@ -772,18 +765,14 @@ class SpecializedRules:
             build=build_match.group(1) if build_match else None
             if not self.connected_known:f.holds.append('Connected-device build state unavailable')
             elif build and build in self.devices.device_builds:f.holds.append('A connected device uses this build')
-            # Early outcome for a direct match: a prepared newer build of the
-            # same device and version gives level Careful exactly like
-            # workspaceMissing; earlier holds stay, retention and rule clocks go,
-            # then normal recency applies.
+            # A direct match superseded by a prepared newer build of the same
+            # device and version is an early outcome like workspaceMissing.
             newer=None
-            if f.matched_pattern and f.rule_early_reason is None:
+            if f.matched_pattern and gates.early_reason is None:
                 try:direct=stat.S_ISDIR(os.lstat(f.path).st_mode)
                 except OSError:direct=False
                 if direct:newer=newer_build(f.path)
-            if newer:
-                f.rule_early_reason='newerBuild';f.rule_level='careful'
-                f.rule_min_hours={};f.rule_project_min_hours={};f.mode_holds={}
+            if newer:gates=gates.early('newerBuild')
             f.evidence.append({'check':'deviceBuild','newerBuild':newer,'basis':'DeviceSupportFolder.newerBuild: same device and version, prepared sibling, BuildNumber train or creation time'})
         if r.get('checkSimulatorDevice'):
             device=self.devices.devices.get(Path(f.path).name)
@@ -797,7 +786,7 @@ class SpecializedRules:
                     # Runtime not installed: level Careful plus normal recency
                     # (>=7 d Careful, 1-7 d Balanced, 1 h-1 d Aggressive),
                     # expressed as explicit levels.
-                    f.special_min_hours=0;f.rule_early_reason='runtimeMissing'
+                    gates=gates.explicit_levels('runtimeMissing')
                     f.levels={'careful':168,'balanced':24,'aggressive':1,'reason':'Simulator runtime is not installed'}
                 else:
                     bundles=Path(f.path)/'data/Containers/Bundle/Application'
@@ -818,13 +807,15 @@ class SpecializedRules:
         if activity:
             f.last_activity=activity.at
             f.evidence.append({'check':'activity','source':activity.source,'at':activity.at})
-            if self.scanner.now-activity.at<max(300,getattr(self.scanner,'recent_activity_hours',0)*3600):f.holds.append('Coding agent or editor used this project recently')
+            if self.scanner.now-activity.at<max(300,self.scanner.recent_activity_hours*3600):f.hold('Coding agent or editor used this project recently',ACTIVE_USE)
+        if self.tools.errors:
+            f.evidence.append({'check':'toolDiscovery','complete':False,'diagnostics':list(self.tools.errors)})
+            if f.tier in ('regenerable','costly'):f.holds.append('Installed tool discovery incomplete; references could not be inspected')
         use=self.tools.use(f.path)
         if use:f.holds.append('Used by installed tool: '+use['source'])
         if f.group=='Agent worktrees':
             from .safety import WORKTREE_DISABLED
             if WORKTREE_DISABLED not in f.holds:f.holds.append(WORKTREE_DISABLED)
             f.action={}
-        if r.get('sameIdleAtEveryLevel') and f.group=='Agent worktrees' and not f.holds:
-            f.special_min_hours=max(1,r.get('minIdleDays',3)*24);f.levels={'careful':f.special_min_hours,'balanced':f.special_min_hours,'aggressive':f.special_min_hours,'reason':'Clean, merged and pushed worktree; idle rule'}
+        gates.apply_to(f)
         return f

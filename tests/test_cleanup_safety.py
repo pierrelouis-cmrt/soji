@@ -136,7 +136,7 @@ class PolicyTests(unittest.TestCase):
     def test_auto_plan_has_minimum_and_fresh_permit(self):
         f=Finding('/fixture/cache',100,100,1,1,'Caches','Cache',tier='regenerable',comes_back='rebuilds',selected=True,identity={'inode':1},recommendation='remove')
         class Scanner:
-            home='/fixture';roots=['/fixture'];protected=[]
+            home='/fixture';roots=['/fixture'];protected=[];now=time.time()
             def decisions(self,mode):return [f]
         with patch('soji_cli.routines.shutil.disk_usage',return_value=type('Usage',(),{'free':1,'total':100})()):
             result=auto_clean_plan(Scanner(),{'enabled':True,'minGainBytes':0,'minItemBytes':50})

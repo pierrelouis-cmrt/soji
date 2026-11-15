@@ -4,17 +4,26 @@ import dataclasses
 import os
 import time
 from pathlib import Path
-from .engine import Finding
+from .levels import SESSION_FLOOR_HOURS
 from .platform import native
-from .util import json_command,read_plist,command
+from .policy import ACTIVE_USE
+from .util import json_command,command
 
 
-def expand_catalogs(scanner):
+def child_paths(scanner,folder):
+    """Measured direct children of `folder`, even when `folder` itself was not walked."""
+    node=scanner.nodes.get(folder)
+    if node is not None:return node.children
+    return [p for p in scanner.nodes if os.path.dirname(p)==folder]
+
+
+def expand_catalogs(scanner,findings=None):
+    """Split session and Trash catalog rows into their part rows."""
     result=[]
-    live_codex=getattr(scanner,'_codex_writer_ids',None)
+    live_codex=scanner.writer_ids
     if live_codex is None:live_codex=codex_writer_ids(scanner.home)
-    codex_running=any(Path(p).name.casefold()=='codex' for p in getattr(scanner,'processes',()) if isinstance(p,str))
-    for finding in scanner.findings:
+    codex_running=any(Path(p).name.casefold()=='codex' for p in scanner.processes if isinstance(p,str))
+    for finding in (scanner.findings if findings is None else findings):
         if finding.hint_id in ('claude-sessions','codex-sessions'):
             prefix=finding.path.rstrip('/')+'/'
             parts=[n for p,n in scanner.nodes.items() if p.startswith(prefix) and not n.directory and (p.endswith('.jsonl') or finding.hint_id=='codex-sessions' and p.endswith('.jsonl.zst')) and '/memory/' not in p and '/memories/' not in p]
@@ -40,11 +49,11 @@ def expand_catalogs(scanner):
                 if finding.hint_id=='codex-sessions' and any(key in Path(n.path).name for key in live_codex):
                     f.last_activity=scanner.now
                     f.evidence.append({'check':'codexWriterLock','active':True})
-                    f.holds.append('Codex session has a writer lock')
+                    f.hold('Codex session has a writer lock',ACTIVE_USE)
                 if finding.hint_id=='codex-sessions' and codex_running:
-                    freshness=codex_process_freshness(getattr(scanner,'recent_activity_hours',0))
+                    freshness=codex_process_freshness(scanner.recent_activity_hours)
                     if scanner.now-f.newest<freshness:
-                        f.holds.append('Codex is running and this session changed recently')
+                        f.hold('Codex is running and this session changed recently',ACTIVE_USE)
                         f.evidence.append({'check':'codexProcessFreshness','active':True,'seconds':freshness})
                 # Associate cwd via bounded metadata parser; running/open-file guard
                 # on the exact transcript remains authoritative.
@@ -54,25 +63,24 @@ def expand_catalogs(scanner):
                     cwd=probe.records[0].path
                     exists=Path(cwd).exists()
                     if not exists and finding.hint_id=='claude-sessions':
-                        gone,signals=session_project_gone(scanner,cwd)
-                        if gone:
-                            f.levels={'careful':f.levels['balanced'],'balanced':f.levels['aggressive'],'aggressive':3,'reason':'Session project is gone; one level earlier'}
-                        f.evidence.append({'check':'sessionProjectMoved','gone':gone,'signals':signals,
-                                           'basis':'registered worktrees and cwd history; unavailable historical identity/completeness stays uncertain'})
+                        # Activity records hold cwd and time only: they cannot
+                        # prove the project was deleted rather than moved or
+                        # renamed, so the normal session policy stays.
+                        f.evidence.append({'check':'sessionProjectMoved','gone':None,
+                                           'basis':'no recorded repository identity; a missing folder may be a moved or renamed project'})
                     f.evidence.append({'check':'sessionProject','path':cwd,'exists':exists})
-                # Hard floor whatever the downgrade or judgement: a session
-                # changed within a day is never taken at Careful or Balanced.
+                # Hard floor whatever the judgement: a session changed within a
+                # day is never taken at Careful or Balanced.
                 f.levels={**f.levels,'careful':max(SESSION_FLOOR_HOURS,f.levels.get('careful',SESSION_FLOOR_HOURS)),
                           'balanced':max(SESSION_FLOOR_HOURS,f.levels.get('balanced',SESSION_FLOOR_HOURS))}
-                if not any(e.get('check')=='sessionProjectMoved' and e.get('gone') is True for e in f.evidence):
-                    f.catalog_min_hours={m:f.levels[m] for m in ('careful','balanced','aggressive')}
+                f.catalog_min_hours={m:f.levels[m] for m in ('careful','balanced','aggressive')}
                 result.append(f)
-        elif finding.group=='Trash' and finding.path in scanner.nodes:
-            children=scanner.nodes[finding.path].children
+        elif finding.group=='Trash':
+            children=child_paths(scanner,finding.path)
             if not children:result.append(finding);continue
             for path in children:
                 f=scanner.classify(scanner.nodes[path]);f.group='Trash';f.label=Path(path).name;f.hint_id='trash-item';f.tier='userData'
-                f.managed=bool(getattr(scanner,'tick_trash',False));f.list_only=not f.managed
+                f.managed=scanner.tick_trash;f.list_only=not f.managed
                 f.levels={'careful':720,'balanced':168,'aggressive':24,'reason':'Old-Trash policy'}
                 f.action={'kind':'empty-trash'};f.recommendation='remove';result.append(f)
         else:result.append(finding)
@@ -80,123 +88,6 @@ def expand_catalogs(scanner):
 
 
 CLAUDE_SIDECARS=('subagents','tool-results')
-SESSION_FLOOR_HOURS=24
-
-
-def _git_dir(repo):
-    g=Path(repo)/'.git'
-    try:
-        if g.is_dir():return g
-        if g.is_file():
-            text=g.read_text(encoding='utf-8',errors='replace').strip()
-            if text.startswith('gitdir:'):
-                target=Path(text[7:].strip())
-                return target if target.is_absolute() else (Path(repo)/target)
-    except OSError:pass
-    return None
-
-
-def _remote_names(git_dir):
-    """Repository names (last URL segment, without .git) of every remote."""
-    names=set()
-    for config in (git_dir/'config',git_dir.parent.parent/'config' if git_dir.parent.name=='worktrees' else None):
-        if config is None:continue
-        try:text=config.read_text(encoding='utf-8',errors='replace')
-        except OSError:continue
-        for line in text.splitlines():
-            key,_,value=line.strip().partition('=')
-            if key.strip()=='url' and value.strip():
-                names.add(value.strip().rstrip('/').rsplit('/',1)[-1].rsplit(':',1)[-1].removesuffix('.git').casefold())
-    return names
-
-
-def _registered_worktrees(git_dir):
-    """Worktree paths a repository lists (`git worktree list`, read from disk)."""
-    result=set()
-    try:entries=list((git_dir/'worktrees').iterdir())[:500]
-    except OSError:return result
-    for entry in entries:
-        try:target=(entry/'gitdir').read_text(encoding='utf-8',errors='replace').strip()
-        except OSError:continue
-        if target:result.add(os.path.dirname(target) if target.endswith('/.git') else target)
-    return result
-
-
-def session_project_gone(scanner,cwd):
-    """(gone, signals) for a session cwd that no longer exists.
-
-    A missing folder is often a renamed or moved project (or a worktree that
-    git still lists). Gone is returned only when no such signal exists and the
-    evidence is complete; any doubt keeps the normal session policy. The
-    current activity schema cannot prove completeness or historic identity,
-    so all missing projects currently remain uncertain.
-    """
-    cache=scanner.__dict__.setdefault('_session_gone_cache',{})
-    if cwd in cache:return cache[cwd]
-    signals=[]
-    cwd=os.path.realpath(cwd);parent=os.path.dirname(cwd);name=os.path.basename(cwd).casefold()
-    activity=getattr(scanner,'activity',None)
-    history_complete=activity is not None and not activity.errors
-    if not history_complete:signals.append('activity history incomplete')
-    if not os.path.isdir(parent):signals.append('parent folder missing or unmounted: '+parent)
-    # Candidate repositories: folders agents/editors worked in, plus siblings.
-    candidates=set()
-    records=activity.records if activity else ()
-    if len(records)>20000:
-        history_complete=False;signals.append('activity candidate budget reached')
-    for record in records[:20000]:
-        if os.path.isdir(record.path):candidates.add(record.path)
-    sibling_complete=True
-    try:
-        with os.scandir(parent) as it:
-            for i,entry in enumerate(it):
-                if i>=500:
-                    sibling_complete=False;break
-                if entry.is_dir(follow_symlinks=False):candidates.add(entry.path)
-    except OSError:sibling_complete=False
-    if not sibling_complete:signals.append('sibling project search incomplete')
-    candidates.discard(cwd)
-    repos={};candidate_complete=len(candidates)<=5000
-    for folder in sorted(candidates)[:5000]:
-        git_dir=_git_dir(folder)
-        if git_dir is not None:repos[folder]=git_dir
-    if not candidate_complete:signals.append('repository candidate budget reached')
-    # ActivityIndex stores cwd/time only. Neither a surviving parent Git
-    # repository nor an error-free list of observed cwd paths proves the old
-    # repository identity or that the history covers all possible moves.
-    # Retain normal policy until that positive evidence can be represented.
-    signals.append('missing project has no recorded repository identity; history completeness unproven')
-    for folder,git_dir in repos.items():
-        listed=_registered_worktrees(git_dir)
-        if any(w==cwd or w.startswith(cwd+'/') for w in listed):
-            signals.append(f'worktree still registered in {folder}')
-    parts=cwd.split('/')
-    if 'worktrees' in parts:
-        # A worktree is gone only when its main repository is known.
-        i=len(parts)-1-parts[::-1].index('worktrees')
-        owner='/'.join(parts[:i])
-        names={p.casefold() for p in parts[i+1:] if p}
-        main=None
-        if owner.endswith('/.claude') or owner.endswith('/.codex') or owner.endswith('/.cursor'):
-            main=os.path.dirname(owner) if os.path.dirname(owner) in repos or _git_dir(os.path.dirname(owner)) else None
-        if main is None:
-            main=next((f for f,g in repos.items() if os.path.basename(f).casefold() in names or names&_remote_names(g)),None)
-        if main is None:signals.append('worktree whose main repository cannot be found (renamed project?)')
-    else:
-        # Successor: a sibling project whose recorded use starts where this
-        # one's ends (a rename shows up exactly like that).
-        last=activity.last(cwd) if activity else None
-        if last is not None:
-            for folder in candidates:
-                if os.path.dirname(folder)!=parent:continue
-                records=[r.at for r in activity.records if r.path==folder or r.path.startswith(folder+'/')]
-                try:changed=os.lstat(folder).st_ctime
-                except OSError:changed=0
-                if (records and min(records)>=last.at-86400) or (not records and folder in repos and changed>=last.at-86400):
-                    signals.append(f'possible rename: {folder} became active when this project stopped')
-    result=(False,signals)
-    cache[cwd]=result
-    return result
 
 
 def claude_session_units(scanner,project):
@@ -207,8 +98,7 @@ def claude_session_units(scanner,project):
     common `<id>` parent, never memory/memories.
     """
     units={}
-    node=scanner.nodes.get(project)
-    for child in (node.children if node else ()):
+    for child in child_paths(scanner,project):
         main=scanner.nodes.get(child)
         if not main or main.directory or not child.endswith('.jsonl'):continue
         members=[main];base=child[:-len('.jsonl')]
@@ -224,24 +114,13 @@ def compound_session(scanner,f,members):
     records=[]
     for i,n in enumerate(members):
         part=f if i==0 else scanner.classify(n)
-        for hold in part.holds:
-            if hold not in f.holds:f.holds.append(hold)
+        if part is not f:f.merge_holds(part)
         records.append({'path':n.path,'role':'transcript' if i==0 else Path(n.path).name,'size':n.size,'apparent':n.apparent,'files':n.files,'newest':n.newest,'identity':part.identity})
     # Distinct, non-nested paths: each byte is counted once.
     f.size=sum(r['size'] for r in records);f.apparent=sum(r['apparent'] for r in records)
     f.files=sum(r['files'] for r in records);f.newest=max(r['newest'] for r in records)
     f.members=records;f.label=Path(f.path).name+(f' + {len(records)-1} sidecar folder'+('s' if len(records)>2 else '') if len(records)>1 else '')
     f.evidence.append({'check':'sessionMembers','paths':[r['path'] for r in records]})
-
-
-def codex_idle_ordinal(idle_seconds):
-    """Level ordinal for a Codex rollout from its idle time.
-
-    0: Careful, 1: Balanced, 2: Aggressive, 3: below selectable age.
-    Boundary comparisons are inclusive. Negative/future idle stays at 3.
-    """
-    days=idle_seconds/86400
-    return 0 if days>=7 else 1 if days>=2 else 2 if days>=0.125 else 3
 
 
 def codex_process_freshness(recent_activity_hours):
@@ -307,3 +186,26 @@ def runtime_catalog():
                      'Simulator runtime tools are busy' if processes else
                      'Runtime/device service unavailable' if not services_available else None),
             'available':services_available and processes_available and not processes}
+
+
+def measure_catalog_target(scan,path,root,hint):
+    from .util import inside as within
+    """Measure a catalog unit and discover its current session sidecars."""
+    from .models import Node
+    for parent in Path(path).parents:
+        if str(parent)==root:break
+        if scan.private(str(parent)):raise ValueError('Protected session ancestor')
+    targets=[path]
+    if hint=='claude-sessions':
+        relative=Path(path).relative_to(root)
+        base=str(Path(root)/relative.parts[0])
+        transcript=base if base.endswith('.jsonl') else base+'.jsonl'
+        stem=transcript[:-len('.jsonl')]
+        targets=([p for p in [transcript,stem+'/subagents',stem+'/tool-results'] if os.path.lexists(p)]
+                 if os.path.lexists(transcript) else [path])
+        if not any(within(path,p) for p in targets):targets.append(path)
+    for target in targets:scan.visit(target)
+    scan.nodes[root]=Node(root,directory=True,children=targets,
+                          size=sum(scan.nodes[p].size for p in targets),
+                          newest=max((scan.nodes[p].newest for p in targets),default=0))
+    scan.roots=[root]

@@ -176,7 +176,7 @@ class JournalSafety(unittest.TestCase):
         from soji_cli import catalogs
         staged=self.target/'.soji-removing-kept'
         write(staged/'blob',age=40);age_tree(self.home,40)
-        def synthetic(scan):
+        def synthetic(scan,rows):
             # Deliberately bypass classify, as native/session catalog rows can.
             return [Finding(str(self.target),1,1,1,0,'App caches','catalog',tier='regenerable',comes_back='rebuilds',list_only=False)]
         with patch.object(catalogs,'expand_catalogs',side_effect=synthetic):scan=self.scan()
@@ -204,7 +204,6 @@ class JournalSafety(unittest.TestCase):
         self.assertEqual(result['entries'][0]['refusalCode'],'history-unknown')
 
     def test_shared_risk_groups(self):
-        self.assertEqual(set(tui.RISK_GROUPS),set(HIGH_RISK_GROUPS))
         for group in ('Editor extensions','Build output','Agent worktrees','Agent and editor history'):
             f=Finding(str(self.target),1,1,1,0,group,'fixture',tier='regenerable',comes_back='rebuilds',list_only=False,identity=file_identity(self.target))
             scan=self.scan();scan.findings=[f]

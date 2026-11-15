@@ -95,7 +95,7 @@ def main():
             hints=Catalog(args.home).hints;emit([h for h in hints if not args.target or args.target in h['id'] or args.target in h['group']])
         else:
             from .mcp import MCPServer
-            emit(MCPServer({'roots':[args.home]}).call('processes',{'sort':args.target or 'cpu'}))
+            emit(MCPServer({'roots':[args.home]}).call('top_processes',{'sort':args.target or 'cpu'}))
         return 0
     if action=='routines':
         p.add_argument('operation',choices=['list','save','run']);p.add_argument('target',nargs='?');p.add_argument('--apply',action='store_true');args=p.parse_args(argv)
